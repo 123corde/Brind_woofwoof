@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.nos1）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.nos1te）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -37,49 +37,52 @@ let dogWarnSound = new Audio();
 let gameOverSound = new Audio();
 let noSound = new Audio();
 let soundReady = false;
-// 変数定義の部分に unlockInProgress を追加
-let unlockInProgress = false; // 二重実行防止用
 
 function unlockAudio() {
-    // すでに準備完了か、現在処理中なら何もしない
-    if (soundReady || unlockInProgress) return;
-    unlockInProgress = true;
-    
-    dogWarnSound.src = dogAudioData1;
-    gameOverSound.src = dogAudioData2;
+    // すでに準備完了、または処理中なら何もしない
+    if (soundReady || isUnlocking) return;
+    isUnlocking = true;
+
+    // 1. noSound (data3) を使って「再生許可」の壁を突破する
     noSound.src = dogAudioData3;
+    noSound.volume = 0.01; 
 
-    // 最初の一回だけ、ごく小さな音で再生して「許可」を取る
-    dogWarnSound.volume = 0.01;
-    gameOverSound.volume = 0.01;
-    noSound.volume = 0.01;
-    
-    const p1 = dogWarnSound.play();
-    const p2 = gameOverSound.play();
-    const p3 = noSound.play();
-
-    Promise.all([p1, p2, p3]).then(() => {
-        // 成功したら即座に停止してリセット
-        dogWarnSound.pause();
-        gameOverSound.pause();
+    // 再生を試みる
+    noSound.play().then(() => {
+        // --- 再生成功！ここから解禁処理 ---
         noSound.pause();
-        dogWarnSound.currentTime = 0;
-        gameOverSound.currentTime = 0;
         noSound.currentTime = 0;
         
-        // 本番用の音量に戻す
+        // 2. 他のオリジナル音源をセット
+        dogWarnSound.src = dogAudioData1;
+        gameOverSound.src = dogAudioData2;
+        
+        // 音量を元に戻す
         dogWarnSound.volume = 1.0;
         gameOverSound.volume = 1.0;
         noSound.volume = 1.0;
-        
+
         soundReady = true;
-        unlockInProgress = false;
-        console.log("Sound Unlocked!");
+        isUnlocking = false;
+        
+        if (startMsg) startMsg.style.display = 'none';
+        
+        alert("音源の解禁に成功しました！ゲームを開始します。");
     }).catch(e => {
-        console.log("Unlock waiting...");
-        unlockInProgress = false; // 失敗（ユーザー操作判定外など）なら次回のタッチで再挑戦
+        // ユーザー操作として認識されなかった場合など
+        alert("許可待ち... 画面をもう一度しっかりタップしてください。");
+        isUnlocking = false;
     });
 }
+
+function playCustomSound(audioObj) {
+    if (!soundReady) return;
+    audioObj.currentTime = 0;
+    audioObj.play().catch(e => {
+        alert("再生エラー: 再度タップして許可を更新してください。");
+    });
+}
+
 
 function playCustomSound(audioObj) {
     if (!soundReady) return;
