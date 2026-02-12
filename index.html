@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.13）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.2）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -43,7 +43,9 @@ async function unlockAudio() {
     gameOverSound.src = dogAudioData2;
     dogWarnSound.volume = 0;
     gameOverSound.volume = 0;
+    alert("Sound0000000");
     try {
+        alert("TRYYYYY");
         await dogWarnSound.play();
         dogWarnSound.pause();
         await gameOverSound.play();
@@ -51,7 +53,8 @@ async function unlockAudio() {
         dogWarnSound.volume = 1.0;
         gameOverSound.volume = 1.0;
         soundReady = true;
-    } catch(e) { console.log("Unlock failed", e); }
+    } catch(e) { alert("UnlockFFFFF");
+                console.log("Unlock failed", e); }
 }
 
 async function playOscillator(f, t, d, v = 0.05) {
