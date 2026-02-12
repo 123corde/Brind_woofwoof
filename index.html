@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.2）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.21）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -37,24 +37,47 @@ let gameOverSound = new Audio();
 let soundReady = false;
 let audioCtx = null; // ここで1回だけ宣言
 
+let isUnlocking = false; // 解除作業中かどうかを覚えるフラグ
+
 async function unlockAudio() {
-    if (soundReady) return;
-    dogWarnSound.src = dogAudioData1;
-    gameOverSound.src = dogAudioData2;
-    dogWarnSound.volume = 0;
-    gameOverSound.volume = 0;
-    alert("Sound0000000");
+    // 1. すでに完了している、または作業中なら何もしない
+    if (soundReady || isUnlocking) return;
+    
+    isUnlocking = true; // 「今から作業します」と宣言
+    console.log("try unlocking...");
+    alert("IF_STRRRRRR");
+
     try {
-        alert("TRYYYYY");
+        dogWarnSound.src = dogAudioData1;
+        gameOverSound.src = dogAudioData2;
+        
+        dogWarnSound.volume = 0;
+        gameOverSound.volume = 0;
+        alert("0000000");
+
+        // iOSの再生許可を取る（ここが時間かかる）
         await dogWarnSound.play();
         dogWarnSound.pause();
+        dogWarnSound.currentTime = 0;
+
         await gameOverSound.play();
         gameOverSound.pause();
+        gameOverSound.currentTime = 0;
+
         dogWarnSound.volume = 1.0;
         gameOverSound.volume = 1.0;
+        
         soundReady = true;
-    } catch(e) { alert("UnlockFFFFF");
-                console.log("Unlock failed", e); }
+        console.log("unlock success!");
+    } catch(e) {
+        console.log("unlock failed", e);
+        alert("UnlockFFFFF");
+        // 失敗した場合は、次のタップで再挑戦できるようにボリュームを戻しておく
+        dogWarnSound.volume = 1.0;
+        gameOverSound.volume = 1.0;
+    } finally {
+        isUnlocking = false; // 成功しても失敗しても「作業中」は解除する
+    }
 }
 
 async function playOscillator(f, t, d, v = 0.05) {
