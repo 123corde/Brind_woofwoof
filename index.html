@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.12）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.13）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -35,63 +35,53 @@ const dogAudioData2 = "data:audio/wav;base64,UklGRgZsBwBXQVZFZm10IBAAAAABAAIARKw
 let dogWarnSound = new Audio();
 let gameOverSound = new Audio();
 let soundReady = false;
-let audioCtx = null;
+let audioCtx = null; // ここで1回だけ宣言
 
 async function unlockAudio() {
     if (soundReady) return;
-    
     dogWarnSound.src = dogAudioData1;
     gameOverSound.src = dogAudioData2;
-    
     dogWarnSound.volume = 0;
     gameOverSound.volume = 0;
-    
-    // play()自体がPromiseを返すのでawaitして確実に許可を取る
     try {
         await dogWarnSound.play();
         dogWarnSound.pause();
         await gameOverSound.play();
         gameOverSound.pause();
-        
         dogWarnSound.volume = 1.0;
         gameOverSound.volume = 1.0;
         soundReady = true;
-        console.log("Audio Unlocked");
-    } catch(e) {
-        console.log("Unlock failed", e);
-    }
+    } catch(e) { console.log("Unlock failed", e); }
 }
 
-// コイン・壁・ゴールの音
 async function playOscillator(f, t, d, v = 0.05) {
     if (!audioCtx) return;
-
-    // iOS対策：再生のたびに状態を確認して起こす
+    // iOS対策: suspended状態なら復帰を待つ
     if (audioCtx.state === 'suspended') {
         await audioCtx.resume();
     }
-
     const now = audioCtx.currentTime;
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    
-    o.type = t; 
+    o.type = t;
     o.frequency.setValueAtTime(f, now);
-    
     g.gain.setValueAtTime(v, now);
     g.gain.exponentialRampToValueAtTime(0.01, now + d);
-    
-    o.connect(g); 
+    o.connect(g);
     g.connect(audioCtx.destination);
-    
-    o.start(now); 
+    o.start(now);
     o.stop(now + d);
 }
 
 function playCustomSound(audioObj) {
     if (!soundReady) return;
     audioObj.currentTime = 0;
-    audioObj.play().catch(e => console.log("Play failed"));
+    audioObj.play().catch(e => {});
+}
+
+function checkDogSound() {
+    let d = Math.abs(player.x - dog.x) + Math.abs(player.y - dog.y);
+    if (d === 1) playCustomSound(dogWarnSound);
 }
 
 // ==========================================
@@ -104,13 +94,9 @@ const modeText = document.getElementById('mode-text');
 const distText = document.getElementById('dist-text');
 const ROWS = 13, COLS = 13;
 
-let map = []; 
-let player = { x: 1, y: 1 };
-let dog = { x: 0, y: 0 };
+let map = [], player = { x: 1, y: 1 }, dog = { x: 0, y: 0 };
 let isBlind = false;
-let audioCtx = null;
-let currentSteps = 0, minDistance = 0, currentPitchIndex = 0;
-let coinPositions = []; 
+let currentSteps = 0, minDistance = 0, currentPitchIndex = 0, coinPositions = [];
 
 function generateSimpleMaze() {
     let found = false;
@@ -178,7 +164,6 @@ function movePlayer(dx, dy) {
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         playOscillator(150, 'square', 0.1);
-        if (navigator.vibrate) navigator.vibrate(50);
     } else {
         player.x = nx; player.y = ny;
         currentSteps++;
@@ -234,11 +219,6 @@ function draw() {
     }
 }
 
-document.getElementById('toggleMode').onclick = (e) => {
-    e.stopPropagation();
-    isBlind = !isBlind; modeText.innerText = isBlind ? "ブラインド" : "視界あり"; draw();
-};
-
 function initGame() {
     generateSimpleMaze();
     player = { x: 1, y: 1 };
@@ -248,20 +228,18 @@ function initGame() {
 }
 
 // ==========================================
-// 3. イベント操作 (ここが重要)
+// 3. イベント操作
 // ==========================================
-let tsX, tsY;
+let tsX = null, tsY = null;
 
 window.addEventListener('touchstart', async (e) => {
-    // 1. AudioContextの作成と再開 (iOSではここが生命線)
+    // AudioContextの初期化
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-    }
-
-    // 2. 犬・アウト音のロック解除
+    // どんな状態でもとりあえずresumeをかける（iOS対策）
+    await audioCtx.resume();
+    
     unlockAudio();
     
     startMsg.style.display = 'none';
@@ -278,8 +256,14 @@ window.addEventListener('touchend', e => {
     tsX = null; tsY = null;
 }, { passive: false });
 
+document.getElementById('toggleMode').onclick = (e) => {
+    e.stopPropagation();
+    isBlind = !isBlind; modeText.innerText = isBlind ? "ブラインド" : "視界あり"; draw();
+};
+
 window.onload = initGame;
 window.onresize = draw;
+
 </script>
 </body>
 </html>
