@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Brind_woofwoof</title>
+    <title>シンプル・スイカ割り (Ver.ios4.16)</title>
     <style>
         body { margin: 0; background: #fff; color: #000; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -22,59 +22,75 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.15）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.2aukinnsi）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
 // ==========================================
-// 1. サウンド設定 & ロック解除ロジック
+// 1. サウンド設定 (Base64 + Web Audio API 方式)
 // ==========================================
 const dogAudioData1 = "data:audio/wav;base64,UklGRnoAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVp6f39/f39/f39/f39/f39/f39/f39/f4CAgICAgICAgICAgICAgICAgICAgH9/f39/f39/f39/f39/f39/f39/f39/f4CAgICAgICAgICAgICAgICAgICA";
 const dogAudioData2 = "data:audio/wav;base64,UklGRnoAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVp6enp6enp6enp6enp6enp6enp6enp6enp6f39/f39/f39/f39/f39/f39/f39/f39/f39/enp6enp6enp6enp6enp6enp6enp6enp6enp6f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/";
 
-let dogWarnSound = new Audio();
-let gameOverSound = new Audio();
+let audioCtx = null;
+let dogBuffer = null;
+let gameOverBuffer = null;
 let soundReady = false;
 let isUnlocking = false;
-let audioCtx = null;
+
+// Base64データをAudioBufferに変換する
+async function getBufferFromBase64(base64) {
+    const response = await fetch(base64);
+    const arrayBuffer = await response.arrayBuffer();
+    return await audioCtx.decodeAudioData(arrayBuffer);
+}
 
 async function unlockAudio() {
     if (soundReady || isUnlocking) return;
-    
     isUnlocking = true;
-    console.log("try unlocking...");
-
+    
     try {
-        // 準備フェーズ: 意味のカタマリを try で囲む
-        dogWarnSound.src = dogAudioData1;
-        gameOverSound.src = dogAudioData2;
-        
-        // 1. 無音にしてから再生許可を取る
-        dogWarnSound.volume = 0;
-        gameOverSound.volume = 0;
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-        await dogWarnSound.play();
-        dogWarnSound.pause();
-        dogWarnSound.currentTime = 0;
+        // Base64から直接データを読み込む
+        [dogBuffer, gameOverBuffer] = await Promise.all([
+            getBufferFromBase64(dogAudioData1),
+            getBufferFromBase64(dogAudioData2)
+        ]);
 
-        await gameOverSound.play();
-        gameOverSound.pause();
-        gameOverSound.currentTime = 0;
+        // iOSの再生許可を得るための無音信号
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        g.gain.value = 0;
+        o.connect(g);
+        g.connect(audioCtx.destination);
+        o.start(0);
+        o.stop(0.01);
 
-        // 2. 成功したので音量を戻す
-        dogWarnSound.volume = 1.0;
-        gameOverSound.volume = 1.0;
-        
         soundReady = true;
-        console.log("unlock success!");
+        console.log("Web Audio Unlocked with Base64");
     } catch(e) {
-        console.log("unlock failed", e);
-        // 失敗しても次に備えてボリュームだけは戻す
-        dogWarnSound.volume = 1.0;
-        gameOverSound.volume = 1.0;
+        console.error("Unlock failed", e);
     } finally {
         isUnlocking = false;
     }
+}
+
+function playBuffer(buffer) {
+    if (!soundReady || !audioCtx || !buffer) return;
+    
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); // 音量を1.0に固定
+    
+    source.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    source.start(0);
 }
 
 async function playOscillator(f, t, d, v = 0.05) {
@@ -94,21 +110,9 @@ async function playOscillator(f, t, d, v = 0.05) {
     o.stop(now + d);
 }
 
-function playCustomSound(audioObj) {
-    if (!soundReady) return;
-    
-    // 鳴らす直前にボリュームを強制的に1.0に戻す
-    audioObj.volume = 1.0; 
-    audioObj.currentTime = 0;
-    
-    audioObj.play().catch(e => {
-        console.log("Play failed. Current volume:", audioObj.volume);
-    });
-}
-
 function checkDogSound() {
     let d = Math.abs(player.x - dog.x) + Math.abs(player.y - dog.y);
-    if (d === 1) playCustomSound(dogWarnSound);
+    if (d === 1) playBuffer(dogBuffer);
 }
 
 // ==========================================
@@ -188,7 +192,6 @@ function generateSimpleMaze() {
 }
 
 function movePlayer(dx, dy) {
-    // 音の準備中は移動をロック
     if (isUnlocking || !soundReady) return;
 
     const nx = player.x + dx, ny = player.y + dy;
@@ -198,7 +201,7 @@ function movePlayer(dx, dy) {
         player.x = nx; player.y = ny;
         currentSteps++;
         if (player.x === dog.x && player.y === dog.y) {
-            playCustomSound(gameOverSound);
+            playBuffer(gameOverBuffer);
             setTimeout(() => { alert("緑のイヌに噛みつかれた！"); initGame(); }, 100);
             return;
         }
@@ -263,15 +266,14 @@ function initGame() {
 let tsX = null, tsY = null;
 
 window.addEventListener('touchstart', async (e) => {
-    // 連打による拡大等を防ぐ
     if (e.touches.length > 1) e.preventDefault();
 
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     
-    // 音のロック解除を優先
     if (!soundReady && !isUnlocking) {
+        startMsg.innerText = "読込中...";
         await unlockAudio();
         startMsg.style.display = 'none';
         return; 
