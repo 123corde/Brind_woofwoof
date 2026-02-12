@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ii）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.nemuinngo）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -50,30 +50,39 @@ async function unlockAudio() {
     isUnlocking = true;
     
     try {
+        // AudioContextの作成
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        
+        // iOSのための再開処理
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
 
-        // Base64から直接データを読み込む
-        [dogBuffer, gameOverBuffer] = await Promise.all([
-            getBufferFromBase64(dogAudioData1),
-            getBufferFromBase64(dogAudioData2)
-        ]);
+        // 【重要】同時にやらず、1つずつ順番にデコードする
+        startMsg.innerText = "犬の音を読込中...";
+        dogBuffer = await getBufferFromBase64(dogAudioData1);
+        
+        startMsg.innerText = "終了音を読込中...";
+        gameOverBuffer = await getBufferFromBase64(dogAudioData2);
 
-        // iOSの再生許可を得るための無音信号
+        // 再生許可のためのダミー信号
         const o = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         g.gain.value = 0;
         o.connect(g);
         g.connect(audioCtx.destination);
         o.start(0);
-        o.stop(0.01);
+        o.stop(0.001);
 
         soundReady = true;
-        console.log("Web Audio Unlocked with Base64");
+        console.log("All sounds loaded sequentially.");
     } catch(e) {
-        console.error("Unlock failed", e);
+        console.error("Unlock Error:", e);
+        alert("エラーが発生しました: " + e.message);
+        // エラーが出た場合、何が起きたか画面に表示して止める
+        startMsg.innerText = "エラー: " + e.message;
     } finally {
         isUnlocking = false;
     }
