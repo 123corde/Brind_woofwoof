@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.8.1）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.8.12）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -183,7 +183,6 @@ async function playOscillator(f, t, d, v = 0.05) {
     
     o.start(now); 
     o.stop(now + d);
-}
 }
 
 function movePlayer(dx, dy) {
