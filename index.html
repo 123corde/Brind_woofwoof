@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.nos）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.nos1）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -37,37 +37,48 @@ let dogWarnSound = new Audio();
 let gameOverSound = new Audio();
 let noSound = new Audio();
 let soundReady = false;
+// 変数定義の部分に unlockInProgress を追加
+let unlockInProgress = false; // 二重実行防止用
 
 function unlockAudio() {
-    if (soundReady) return;
+    // すでに準備完了か、現在処理中なら何もしない
+    if (soundReady || unlockInProgress) return;
+    unlockInProgress = true;
     
     dogWarnSound.src = dogAudioData1;
     gameOverSound.src = dogAudioData2;
     noSound.src = dogAudioData3;
-    // 音量を0にして「再生許可」だけ取得する
-    dogWarnSound.volume = 0.1;
-    gameOverSound.volume = 0.1;
-    noSound.volume = 0.1;
+
+    // 最初の一回だけ、ごく小さな音で再生して「許可」を取る
+    dogWarnSound.volume = 0.01;
+    gameOverSound.volume = 0.01;
+    noSound.volume = 0.01;
     
-    // ユーザーが触った瞬間に再生命令を出す
     const p1 = dogWarnSound.play();
     const p2 = gameOverSound.play();
     const p3 = noSound.play();
 
     Promise.all([p1, p2, p3]).then(() => {
-        // 再生できたら即座に停止して音量を戻す
+        // 成功したら即座に停止してリセット
         dogWarnSound.pause();
         gameOverSound.pause();
         noSound.pause();
         dogWarnSound.currentTime = 0;
         gameOverSound.currentTime = 0;
         noSound.currentTime = 0;
+        
+        // 本番用の音量に戻す
         dogWarnSound.volume = 1.0;
         gameOverSound.volume = 1.0;
         noSound.volume = 1.0;
+        
         soundReady = true;
-        console.log("Sound Unlocked Silently!");
-    }).catch(e => console.log("Unlock failed", e));
+        unlockInProgress = false;
+        console.log("Sound Unlocked!");
+    }).catch(e => {
+        console.log("Unlock waiting...");
+        unlockInProgress = false; // 失敗（ユーザー操作判定外など）なら次回のタッチで再挑戦
+    });
 }
 
 function playCustomSound(audioObj) {
