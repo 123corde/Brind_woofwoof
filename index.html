@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios_nos）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios_noso）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -47,7 +47,7 @@ function unlockAudio() {
     // 音量を0にして「再生許可」だけ取得する
     dogWarnSound.volume = 0;
     gameOverSound.volume = 0;
-    noSound.volume = 0;
+    //noSound.volume = 0;
     
     // ユーザーが触った瞬間に再生命令を出す
     const p1 = dogWarnSound.play();
@@ -67,6 +67,7 @@ function unlockAudio() {
         noSound.volume = 1.0;
         soundReady = true;
         console.log("Sound Unlocked Silently!");
+        alert("Sound Unlocked Silently!");
     }).catch(e => console.log("Unlock failed", e));
 }
 
