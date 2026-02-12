@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>シンプル・スイカ割り (Ver.ios4.16)</title>
+    <title>シンプル・スイカ割り (Ver.ios4.17)</title>
     <style>
         body { margin: 0; background: #fff; color: #000; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -22,12 +22,12 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.2aukinnsi）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.17）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
 // ==========================================
-// 1. サウンド設定 (Base64 + Web Audio API 方式)
+// 1. サウンド設定 (完全メモリ変換 + Web Audio API)
 // ==========================================
 const dogAudioData1 = "data:audio/wav;base64,UklGRnoAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVp6f39/f39/f39/f39/f39/f39/f39/f4CAgICAgICAgICAgICAgICAgICAgH9/f39/f39/f39/f39/f39/f39/f39/f4CAgICAgICAgICAgICAgICAgICA";
 const dogAudioData2 = "data:audio/wav;base64,UklGRnoAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVp6enp6enp6enp6enp6enp6enp6enp6enp6f39/f39/f39/f39/f39/f39/f39/f39/f39/enp6enp6enp6enp6enp6enp6enp6enp6enp6f39/f39/f39/f39/f39/f39/f39/f39/f39/f39/";
@@ -38,11 +38,16 @@ let gameOverBuffer = null;
 let soundReady = false;
 let isUnlocking = false;
 
-// Base64データをAudioBufferに変換する
+// Base64をバイナリに直接変換（fetchを使わずiPadのブロックを回避）
 async function getBufferFromBase64(base64) {
-    const response = await fetch(base64);
-    const arrayBuffer = await response.arrayBuffer();
-    return await audioCtx.decodeAudioData(arrayBuffer);
+    const base64Data = base64.split(',')[1];
+    const binaryString = window.atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return await audioCtx.decodeAudioData(bytes.buffer);
 }
 
 async function unlockAudio() {
@@ -55,13 +60,13 @@ async function unlockAudio() {
         }
         if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-        // Base64から直接データを読み込む
+        // メモリ上で直接デコード
         [dogBuffer, gameOverBuffer] = await Promise.all([
             getBufferFromBase64(dogAudioData1),
             getBufferFromBase64(dogAudioData2)
         ]);
 
-        // iOSの再生許可を得るための無音信号
+        // iOS再生許可のためのダミー信号
         const o = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         g.gain.value = 0;
@@ -71,7 +76,7 @@ async function unlockAudio() {
         o.stop(0.01);
 
         soundReady = true;
-        console.log("Web Audio Unlocked with Base64");
+        console.log("Audio Buffer Ready (No-Fetch Mode)");
     } catch(e) {
         console.error("Unlock failed", e);
     } finally {
@@ -81,13 +86,10 @@ async function unlockAudio() {
 
 function playBuffer(buffer) {
     if (!soundReady || !audioCtx || !buffer) return;
-    
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
-    
     const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); // 音量を1.0に固定
-    
+    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
     source.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     source.start(0);
@@ -96,7 +98,6 @@ function playBuffer(buffer) {
 async function playOscillator(f, t, d, v = 0.05) {
     if (!audioCtx) return;
     if (audioCtx.state === 'suspended') await audioCtx.resume();
-
     const now = audioCtx.currentTime;
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
@@ -193,7 +194,6 @@ function generateSimpleMaze() {
 
 function movePlayer(dx, dy) {
     if (isUnlocking || !soundReady) return;
-
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         playOscillator(150, 'square', 0.1);
@@ -267,10 +267,7 @@ let tsX = null, tsY = null;
 
 window.addEventListener('touchstart', async (e) => {
     if (e.touches.length > 1) e.preventDefault();
-
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     
     if (!soundReady && !isUnlocking) {
         startMsg.innerText = "読込中...";
@@ -278,7 +275,6 @@ window.addEventListener('touchstart', async (e) => {
         startMsg.style.display = 'none';
         return; 
     }
-
     tsX = e.touches[0].clientX; 
     tsY = e.touches[0].clientY;
 }, { passive: false });
