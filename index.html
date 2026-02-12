@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>シンプル・スイカ割り (Ver.ios4.16)</title>
+    <title>シンプル・スイカ割り (Ver.ngo-fix)</title>
     <style>
         body { margin: 0; background: #fff; color: #000; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -22,16 +22,22 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ngo）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ngo-fix）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
 // ==========================================
-// 1. サウンド設定 (Base64 + Web Audio API 方式)
+// 1. サウンド設定 (URL読み込み + Web Audio API)
 // ==========================================
-// テスト用の外部音源URL（Base64を完全に排除）
 const DOG_URL = "https://actions.google.com/sounds/v1/animals/dog_bark.ogg";
 const GAMEOVER_URL = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg";
+
+// 【重要】消えていた変数定義を復活
+let audioCtx = null;
+let dogBuffer = null;
+let gameOverBuffer = null;
+let soundReady = false;
+let isUnlocking = false;
 
 async function unlockAudio() {
     if (soundReady || isUnlocking) return;
@@ -41,37 +47,35 @@ async function unlockAudio() {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        await audioCtx.resume();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-        // fetchでURLから直接読み込む（iPadが一番得意な方法）
+        // 逐次読み込み
         startMsg.innerText = "犬の音を読込中...";
         const res1 = await fetch(DOG_URL);
-        const buffer1 = await res1.arrayBuffer();
-        dogBuffer = await audioCtx.decodeAudioData(buffer1);
+        const arrayBuffer1 = await res1.arrayBuffer();
+        dogBuffer = await audioCtx.decodeAudioData(arrayBuffer1);
 
         startMsg.innerText = "終了音を読込中...";
         const res2 = await fetch(GAMEOVER_URL);
-        const buffer2 = await res2.arrayBuffer();
-        gameOverBuffer = await audioCtx.decodeAudioData(buffer2);
+        const arrayBuffer2 = await res2.arrayBuffer();
+        gameOverBuffer = await audioCtx.decodeAudioData(arrayBuffer2);
 
         soundReady = true;
-        console.log("Success!");
+        console.log("Audio Unlocked and Loaded");
     } catch(e) {
-        alert("エラー内容: " + e.message);
+        alert("読み込みエラー: " + e.message);
         startMsg.innerText = "エラー: " + e.name;
     } finally {
         isUnlocking = false;
     }
 }
+
 function playBuffer(buffer) {
     if (!soundReady || !audioCtx || !buffer) return;
-    
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
-    
     const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime); // 音量を1.0に固定
-    
+    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
     source.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     source.start(0);
@@ -80,7 +84,6 @@ function playBuffer(buffer) {
 async function playOscillator(f, t, d, v = 0.05) {
     if (!audioCtx) return;
     if (audioCtx.state === 'suspended') await audioCtx.resume();
-
     const now = audioCtx.currentTime;
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
@@ -177,7 +180,6 @@ function generateSimpleMaze() {
 
 function movePlayer(dx, dy) {
     if (isUnlocking || !soundReady) return;
-
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         playOscillator(150, 'square', 0.1);
@@ -244,17 +246,10 @@ function initGame() {
     draw();
 }
 
-// ==========================================
-// 3. イベント操作
-// ==========================================
 let tsX = null, tsY = null;
-
 window.addEventListener('touchstart', async (e) => {
     if (e.touches.length > 1) e.preventDefault();
-
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     
     if (!soundReady && !isUnlocking) {
         startMsg.innerText = "読込中...";
@@ -262,7 +257,6 @@ window.addEventListener('touchstart', async (e) => {
         startMsg.style.display = 'none';
         return; 
     }
-
     tsX = e.touches[0].clientX; 
     tsY = e.touches[0].clientY;
 }, { passive: false });
@@ -283,7 +277,6 @@ document.getElementById('toggleMode').onclick = (e) => {
 
 window.onload = initGame;
 window.onresize = draw;
-
 </script>
 </body>
 </html>
