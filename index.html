@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios_noっsso）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ipromtesto）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -56,9 +56,13 @@ function unlockAudio() {
     };
 
     // 3. 全ての音がロードされたら再生を試みる
-    Promise.all([waitLoad(dogWarnSound), waitLoad(gameOverSound), waitLoad(noSound)])
+   // 実験：どこまで進めるかチェック
+alert("1. 読み込みを開始します");
+
+Promise.all([waitLoad(dogWarnSound), waitLoad(gameOverSound), waitLoad(noSound)])
     .then(() => {
-        // ロード完了したので音量を0にして一瞬だけ再生
+        alert("2. ロードは完了しました。再生を試みます");
+
         dogWarnSound.volume = 0;
         gameOverSound.volume = 0;
         noSound.volume = 0;
@@ -70,25 +74,13 @@ function unlockAudio() {
         return Promise.all([p1, p2, p3]);
     })
     .then(() => {
-        // 再生成功！すぐにリセット
-        dogWarnSound.pause();
-        gameOverSound.pause();
-        noSound.pause();
-        dogWarnSound.currentTime = 0;
-        gameOverSound.currentTime = 0;
-        noSound.currentTime = 0;
-        dogWarnSound.volume = 1.0;
-        gameOverSound.volume = 1.0;
-        noSound.volume = 1.0;
+        alert("3. 再生成功！全て解禁されました");
         
-        soundReady = true;
-        startMsg.style.display = 'none'; // メッセージを消す
-        alert("Sound Unlocked Silently!");
+        dogWarnSound.pause();
+        // ...以下略
     })
     .catch(e => {
-        console.log("Unlock failed", e);
-        // エラー内容を表示（iPadのデバッグ用）
-        alert("再生エラー: " + e.message);
+        alert("エラー発生: " + e.name + " / " + e.message);
     });
 }
     
