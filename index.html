@@ -3,16 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>シンプル・スイカ割り (Ver.ngo-fix)</title>
+    <title>スイカ割り (Ver.final-zero)</title>
     <style>
         body { margin: 0; background: #fff; color: #000; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        #ui { 
-            position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; font-weight: bold;
-            line-height: 1.4; background: rgba(255, 255, 255, 0.7); padding: 5px; border-radius: 4px;
-        }
+        #ui { position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; font-weight: bold; background: rgba(255, 255, 255, 0.7); padding: 5px; border-radius: 4px; }
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; }
-        button { padding: 12px 20px; font-size: 14px; background: #333; color: white; border: 1px solid #000; border-radius: 5px; cursor: pointer; }
+        button { padding: 12px 20px; font-size: 14px; background: #333; color: white; border: none; border-radius: 5px; }
         .msg { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; width: 100%; pointer-events: none; }
     </style>
 </head>
@@ -22,65 +19,46 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ngo-fix）</div>
+    <div class="msg" id="start-msg">画面をタップして開始</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
 // ==========================================
-// 1. サウンド設定 (URL読み込み + Web Audio API)
+// 1. サウンド設定 (読み込み不要の合成方式)
 // ==========================================
-const DOG_URL = "https://actions.google.com/sounds/v1/animals/dog_bark.ogg";
-const GAMEOVER_URL = "https://actions.google.com/sounds/v1/alarms/beep_short.ogg";
-
-// 【重要】消えていた変数定義を復活
 let audioCtx = null;
-let dogBuffer = null;
-let gameOverBuffer = null;
 let soundReady = false;
-let isUnlocking = false;
 
-async function unlockAudio() {
-    if (soundReady || isUnlocking) return;
-    isUnlocking = true;
-    
-    try {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-        // 逐次読み込み
-        startMsg.innerText = "犬の音を読込中...";
-        const res1 = await fetch(DOG_URL);
-        const arrayBuffer1 = await res1.arrayBuffer();
-        dogBuffer = await audioCtx.decodeAudioData(arrayBuffer1);
-
-        startMsg.innerText = "終了音を読込中...";
-        const res2 = await fetch(GAMEOVER_URL);
-        const arrayBuffer2 = await res2.arrayBuffer();
-        gameOverBuffer = await audioCtx.decodeAudioData(arrayBuffer2);
-
-        soundReady = true;
-        console.log("Audio Unlocked and Loaded");
-    } catch(e) {
-        alert("読み込みエラー: " + e.message);
-        startMsg.innerText = "エラー: " + e.name;
-    } finally {
-        isUnlocking = false;
-    }
+// 犬の鳴き声を合成 (「ワン！」という短いノイズ)
+function playDogSound() {
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+    const n = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    n.type = 'sawtooth';
+    n.frequency.setValueAtTime(100, now);
+    n.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+    g.gain.setValueAtTime(0.1, now);
+    g.gain.linearRampToValueAtTime(0, now + 0.1);
+    n.connect(g); g.connect(audioCtx.destination);
+    n.start(); n.stop(now + 0.1);
 }
 
-function playBuffer(buffer) {
-    if (!soundReady || !audioCtx || !buffer) return;
-    const source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    const gainNode = audioCtx.createGain();
-    gainNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
-    source.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
-    source.start(0);
+// ゲームオーバー音を合成 (不協和音)
+function playGameOverSound() {
+    if (!audioCtx) return;
+    [150, 160, 170].forEach(f => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.frequency.value = f;
+        g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + 1);
+    });
 }
 
+// 共通の電子音 (壁・コイン)
 async function playOscillator(f, t, d, v = 0.05) {
     if (!audioCtx) return;
     if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -91,15 +69,16 @@ async function playOscillator(f, t, d, v = 0.05) {
     o.frequency.setValueAtTime(f, now);
     g.gain.setValueAtTime(v, now);
     g.gain.exponentialRampToValueAtTime(0.01, now + d);
-    o.connect(g);
-    g.connect(audioCtx.destination);
-    o.start(now);
-    o.stop(now + d);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(now); o.stop(now + d);
 }
 
-function checkDogSound() {
-    let d = Math.abs(player.x - dog.x) + Math.abs(player.y - dog.y);
-    if (d === 1) playBuffer(dogBuffer);
+async function unlockAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    await audioCtx.resume();
+    soundReady = true; // 読み込みがないので即OK
 }
 
 // ==========================================
@@ -129,85 +108,49 @@ function generateSimpleMaze() {
             }
         }
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-        let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
         let q = [{x: 1, y: 1, d: 0}]; dists[1][1] = 0;
-        let candidates = [];
-        let allWalkable = [];
+        let candidates = [], allWalkable = [];
         while(q.length > 0) {
-            let curr = q.shift();
-            allWalkable.push(curr);
-            if(curr.d >= 20 && curr.d <= 35) candidates.push(curr);
+            let curr = q.shift(); allWalkable.push(curr);
+            if(curr.d >= 15) candidates.push(curr);
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = curr.x + dx, ny = curr.y + dy;
                 if(map[ny][nx] === 0 && dists[ny][nx] === -1) {
                     dists[ny][nx] = curr.d + 1;
-                    parent[ny][nx] = {x: curr.x, y: curr.y};
                     q.push({x: nx, y: ny, d: curr.d + 1});
                 }
             }
         }
         if(candidates.length > 0) {
             let goal = candidates[Math.floor(Math.random()*candidates.length)];
-            map[goal.y][goal.x] = 2;
-            minDistance = goal.d;
-            let shortestPathNodes = new Set();
-            let pNode = goal;
-            while(pNode) {
-                shortestPathNodes.add(`${pNode.x},${pNode.y}`);
-                pNode = parent[pNode.y][pNode.x];
-            }
-            let dogCandidates = allWalkable.filter(p => !shortestPathNodes.has(`${p.x},${p.y}`) && (p.x !== goal.x || p.y !== goal.y));
-            if(dogCandidates.length === 0) continue; 
-            dog = dogCandidates[Math.floor(Math.random() * dogCandidates.length)];
-            coinPositions = [];
-            let currC = parent[goal.y][goal.x];
-            let tempPath = [];
-            while(currC && (currC.x !== 1 || currC.y !== 1)) {
-                tempPath.push({x: currC.x, y: currC.y});
-                currC = parent[currC.y][currC.x];
-            }
-            tempPath.reverse(); 
-            tempPath.forEach((p, index) => {
-                if((index + 1) % 2 === 0) { 
-                    map[p.y][p.x] = 3;
-                    coinPositions.push({x: p.x, y: p.y, order: index});
-                }
-            });
+            map[goal.y][goal.x] = 2; minDistance = dists[goal.y][goal.x];
+            dog = allWalkable[Math.floor(Math.random() * allWalkable.length)];
             found = true;
         }
     }
 }
 
 function movePlayer(dx, dy) {
-    if (isUnlocking || !soundReady) return;
+    if (!soundReady) return;
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         playOscillator(150, 'square', 0.1);
     } else {
-        player.x = nx; player.y = ny;
-        currentSteps++;
+        player.x = nx; player.y = ny; currentSteps++;
         if (player.x === dog.x && player.y === dog.y) {
-            playBuffer(gameOverBuffer);
-            setTimeout(() => { alert("緑のイヌに噛みつかれた！"); initGame(); }, 100);
+            playGameOverSound();
+            setTimeout(() => { alert("イヌに捕まった！"); initGame(); }, 100);
             return;
         }
         if (map[ny][nx] === 2) {
             playOscillator(800, 'sine', 0.5);
-            setTimeout(() => { alert(`成功！歩数: ${currentSteps}`); initGame(); }, 100);
+            setTimeout(() => { alert("成功！"); initGame(); }, 100);
             return;
-        } else if (map[ny][nx] === 3) {
-            const hitCoin = coinPositions.find(c => c.x === nx && c.y === ny);
-            if (hitCoin) {
-                const pitch = Math.min(800 + (currentPitchIndex * 50), 2000);
-                playOscillator(pitch, 'sine', 0.15);
-                currentPitchIndex++;
-                coinPositions = coinPositions.filter(c => {
-                    if (c.order <= hitCoin.order) { map[c.y][c.x] = 0; return false; }
-                    return true;
-                });
-            }
         }
-        checkDogSound();
+        // 犬が隣にいたら音を出す
+        if (Math.abs(player.x - dog.x) + Math.abs(player.y - dog.y) === 1) {
+            playDogSound();
+        }
     }
     distText.innerText = `歩数: ${currentSteps} / 最短: ${minDistance}`;
     draw();
@@ -218,17 +161,10 @@ function draw() {
     const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!isBlind) {
-        ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
         for(let y=0; y<ROWS; y++) {
             for(let x=0; x<COLS; x++) {
-                if (map[y][x] !== 1) {
-                    if (y > 0 && map[y-1][x] === 1) { ctx.beginPath(); ctx.moveTo(x*size, y*size); ctx.lineTo((x+1)*size, y*size); ctx.stroke(); }
-                    if (y < ROWS-1 && map[y+1][x] === 1) { ctx.beginPath(); ctx.moveTo(x*size, (y+1)*size); ctx.lineTo((x+1)*size, (y+1)*size); ctx.stroke(); }
-                    if (x > 0 && map[y][x-1] === 1) { ctx.beginPath(); ctx.moveTo(x*size, y*size); ctx.lineTo(x*size, (y+1)*size); ctx.stroke(); }
-                    if (x < COLS-1 && map[y][x+1] === 1) { ctx.beginPath(); ctx.moveTo((x+1)*size, y*size); ctx.lineTo((x+1)*size, (y+1)*size); ctx.stroke(); }
-                    if (map[y][x] === 2) { ctx.fillStyle = "#f00"; ctx.fillRect(x*size + size*0.1, y*size + size*0.1, size*0.8, size*0.8); }
-                    if (map[y][x] === 3) { ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(x*size + size/2, y*size + size/2, size/6, 0, Math.PI*2); ctx.fill(); }
-                }
+                if (map[y][x] === 1) { ctx.fillStyle = "#ccc"; ctx.fillRect(x*size, y*size, size, size); }
+                if (map[y][x] === 2) { ctx.fillStyle = "#f00"; ctx.fillRect(x*size, y*size, size, size); }
             }
         }
         ctx.fillStyle = '#22cc22'; ctx.beginPath(); ctx.arc(dog.x*size + size/2, dog.y*size + size/2, size/4, 0, Math.PI*2); ctx.fill();
@@ -241,24 +177,17 @@ function draw() {
 function initGame() {
     generateSimpleMaze();
     player = { x: 1, y: 1 };
-    currentSteps = 0; currentPitchIndex = 0;
-    distText.innerText = `歩数: 0 / 最短: ${minDistance}`;
+    currentSteps = 0;
     draw();
 }
 
 let tsX = null, tsY = null;
 window.addEventListener('touchstart', async (e) => {
-    if (e.touches.length > 1) e.preventDefault();
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    
-    if (!soundReady && !isUnlocking) {
-        startMsg.innerText = "読込中...";
+    if (!soundReady) {
         await unlockAudio();
         startMsg.style.display = 'none';
-        return; 
     }
-    tsX = e.touches[0].clientX; 
-    tsY = e.touches[0].clientY;
+    tsX = e.touches[0].clientX; tsY = e.touches[0].clientY;
 }, { passive: false });
 
 window.addEventListener('touchend', e => {
@@ -271,10 +200,8 @@ window.addEventListener('touchend', e => {
 }, { passive: false });
 
 document.getElementById('toggleMode').onclick = (e) => {
-    e.stopPropagation();
     isBlind = !isBlind; modeText.innerText = isBlind ? "ブラインド" : "視界あり"; draw();
 };
-
 window.onload = initGame;
 window.onresize = draw;
 </script>
