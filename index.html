@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.1）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.ios4.12）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -239,6 +239,14 @@ document.getElementById('toggleMode').onclick = (e) => {
     isBlind = !isBlind; modeText.innerText = isBlind ? "ブラインド" : "視界あり"; draw();
 };
 
+function initGame() {
+    generateSimpleMaze();
+    player = { x: 1, y: 1 };
+    currentSteps = 0; currentPitchIndex = 0;
+    distText.innerText = `歩数: 0 / 最短: ${minDistance}`;
+    draw();
+}
+
 // ==========================================
 // 3. イベント操作 (ここが重要)
 // ==========================================
@@ -269,14 +277,6 @@ window.addEventListener('touchend', e => {
     }
     tsX = null; tsY = null;
 }, { passive: false });
-
-function initGame() {
-    generateSimpleMaze();
-    player = { x: 1, y: 1 };
-    currentSteps = 0; currentPitchIndex = 0;
-    distText.innerText = `歩数: 0 / 最短: ${minDistance}`;
-    draw();
-}
 
 window.onload = initGame;
 window.onresize = draw;
