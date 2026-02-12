@@ -149,16 +149,29 @@ function generateSimpleMaze() {
     }
 }
 
-function playOscillator(f, t, d, v = 0.05) {
+async function playOscillator(f, t, d, v = 0.05) {
     if (!audioCtx) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    // 【重要】iOS対策：再生直前に状態をチェックし、中断していたら復帰を待つ
+    if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+    }
+
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
+    
+    o.type = t; 
+    o.frequency.setValueAtTime(f, audioCtx.currentTime);
+    
     g.gain.setValueAtTime(v, audioCtx.currentTime);
+    // iOSで音がプツッと切れないよう、減衰の時間を少し調整
     g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + d);
+    
+    o.connect(g); 
+    g.connect(audioCtx.destination);
+    
+    o.start(); 
+    o.stop(audioCtx.currentTime + d);
 }
 
 function checkDogSound() {
