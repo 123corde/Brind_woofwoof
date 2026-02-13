@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 - Evolution</title>
+    <title>スイカ割り迷宮 - Speedrun Edition</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -88,7 +88,7 @@ async function playGoalSound() {
 let isBlind = true; 
 let gameStarted = false;
 let currentLevel = 1; 
-let ROWS = 8, COLS = 8; // 動的に変更
+let ROWS = 8, COLS = 8; 
 
 const startContainer = document.getElementById('start-container');
 const startBtn = document.getElementById('start-btn');
@@ -124,16 +124,16 @@ let currentSteps = 0, minDistance = 0, currentPitchIndex = 0;
 let coinPositions = []; 
 
 function generateSimpleMaze() {
-    // レベルに応じてサイズ計算 (8, 10, 12...26)
-    ROWS = COLS = 8 + (currentLevel - 1) * 2;
+    // レベルに応じてサイズ計算 (L1:8, L2:10 ... L10:26)
+    // 20x20までにしたい場合は (6 + currentLevel * 2) 等に調整
+    ROWS = COLS = 6 + (currentLevel * 2); 
     
     let found = false;
     while (!found) {
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
         let x = 1, y = 1; map[y][x] = 0;
         
-        // サイズに合わせて掘り進める回数を調整
-        let fillAmount = ROWS * COLS * 0.5;
+        let fillAmount = ROWS * COLS * 0.6;
         for(let i=0; i < fillAmount; i++) {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
             let [dx, dy] = dirs[Math.floor(Math.random()*4)];
@@ -151,7 +151,6 @@ function generateSimpleMaze() {
         while(q.length > 0) {
             let curr = q.shift();
             allWalkable.push(curr);
-            // 最低限の距離を確保（サイズに合わせて緩和）
             if(curr.d >= ROWS) candidates.push(curr);
             
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
@@ -234,16 +233,20 @@ function movePlayer(dx, dy) {
 
         if (map[ny][nx] === 2) {
             playGoalSound();
-            setTimeout(() => { 
-                if(currentLevel >= 10) {
+            // --- クリア時のアラート制御 ---
+            if(currentLevel >= 10) {
+                setTimeout(() => {
                     alert("✨✨ おめでとう！ ✨✨\n全10ステージを完全制覇しました！");
                     currentLevel = 1;
-                } else {
-                    alert(`Level ${currentLevel} クリア！`); 
-                    currentLevel++; 
-                }
-                showStartMenu();
-            }, 600);
+                    showStartMenu();
+                }, 600);
+            } else {
+                // レベル1-9はアラートなしですぐに次へ
+                currentLevel++; 
+                setTimeout(() => {
+                    showStartMenu();
+                }, 600);
+            }
             return;
         } else if (map[ny][nx] === 3) {
             const hitCoin = coinPositions.find(c => c.x === nx && c.y === ny);
