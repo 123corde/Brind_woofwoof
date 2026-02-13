@@ -19,7 +19,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面を一度タップ（指を離す）して開始</div>
+    <div class="msg" id="start-msg">画面を一度タップして開始</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -32,82 +32,57 @@ const dogAudioData3 = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKw
 
 let dogWarnSound = new Audio();
 let gameOverSound = new Audio();
-let noSound = new Audio();
-let audioCtx = null;
 let soundReady = false;
 let isUnlocking = false;
 
-// 解禁の儀式
 function unlockAudio() {
     if (soundReady || isUnlocking) return;
     isUnlocking = true;
 
-    alert("iOS：音源を解禁します。");
+    alert("iOS：音源解禁を開始します。");
 
-    try {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') audioCtx.resume();
+    // 【重要】本命の音源は最初から volume=1.0 (デフォルト) で固定
+    // 許可を取るためだけに、別の使い捨てオブジェクトを作る
+    let unlocker = new Audio();
+    unlocker.src = dogAudioData3;
+    
+    // 音量は一切いじらず、そのまま play()
+    // （一瞬音が聞こえるかもしれませんが、これが最も確実です）
+    unlocker.play().then(() => {
+        // 解禁成功！
+        unlocker.pause();
+        unlocker = null; // 使い捨てを破棄
 
-        noSound.src = dogAudioData3;
-        noSound.volume = 0.01;
+        // 本命にデータを流し込む（ここで初めて src を入れる）
+        dogWarnSound.src = dogAudioData1;
+        gameOverSound.src = dogAudioData2;
         
-        const playPromise = noSound.play();
+        // iOSに「準備しろ」と命令。音量は触らない（1.0のまま）
+        dogWarnSound.load();
+        gameOverSound.load();
 
-        if (playPromise !== undefined) {
-            playPromise.then(() => {
-                noSound.pause();
-                noSound.currentTime = 0;
-                
-                // --- 【重要】他音源のセットとロード強制 ---
-                dogWarnSound.src = dogAudioData1;
-                gameOverSound.src = dogAudioData2;
-                
-                // iOSに「今すぐデータを準備しろ」と命じる
-                dogWarnSound.load();
-                gameOverSound.load();
-                
-                dogWarnSound.volume = 1.0;
-                gameOverSound.volume = 1.0;
-
-                soundReady = true;
-                isUnlocking = false;
-                if (document.getElementById('start-msg')) {
-                    document.getElementById('start-msg').style.display = 'none';
-                }
-                alert("解禁成功！");
-            }).catch(e => {
-                alert("再生エラー: " + e.message);
-                isUnlocking = false;
-            });
-        }
-    } catch (e) {
-        alert("システムエラー: " + e.message);
+        soundReady = true;
         isUnlocking = false;
-    }
+        
+        if (document.getElementById('start-msg')) {
+            document.getElementById('start-msg').style.display = 'none';
+        }
+        alert("成功！これで音量は1.0のまま固定されました。");
+    }).catch(e => {
+        alert("タップが弱かったようです。もう一度！");
+        isUnlocking = false;
+    });
 }
 
-// 再生関数（ロード待ち対応版）
 function playCustomSound(audioObj) {
     if (!soundReady) return;
-
-    // iOS対策：準備ができていなければロード
-    if (audioObj.readyState < 2) { 
-        audioObj.load();
-    }
-
+    // volumeプロパティには一切触れず、再生位置だけ戻して鳴らす
     audioObj.currentTime = 0;
-    const playPromise = audioObj.play();
-
-    if (playPromise !== undefined) {
-        playPromise.catch(e => {
-            console.log("再生失敗:", e.message);
-            // 失敗した時だけ小さくアラートを出す（デバッグ用）
-            // alert("鳴りませんでした");
-        });
-    }
+    audioObj.play().catch(e => console.log("再生失敗"));
 }
+
+// ...（以下、ゲームロジックはそのまま）...
+</script>
 
 // 共通電子音
 async function playOscillator(f, t, d, v = 0.05) {
