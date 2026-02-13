@@ -42,31 +42,31 @@ function unlockAudio() {
     if (soundReady || isUnlocking) return;
     isUnlocking = true;
 
-    // ソースの代入
     dogWarnSound.src = dogAudioData1;
     gameOverSound.src = dogAudioData2;
 
-    // 指が離れた瞬間に再生
+    // 再生開始
     const p1 = dogWarnSound.play();
     const p2 = gameOverSound.play();
 
     Promise.all([p1, p2]).then(() => {
-        // 成功したら停止して巻き戻す
-        dogWarnSound.pause();
-        gameOverSound.pause();
-        dogWarnSound.currentTime = 0;
-        gameOverSound.currentTime = 0;
+        // 【修正】少しだけ（0.1秒）待ってから止める
+        setTimeout(() => {
+            dogWarnSound.pause();
+            gameOverSound.pause();
+            dogWarnSound.currentTime = 0;
+            gameOverSound.currentTime = 0;
+            
+            soundReady = true;
+            isUnlocking = false;
 
-        soundReady = true;
-        isUnlocking = false;
+            if (startMsg) startMsg.style.display = 'none';
+            console.log("音源解禁完了"); 
+        }, 100); // 100ミリ秒だけ待つ
         
-        if (document.getElementById('start-msg')) {
-            document.getElementById('start-msg').style.display = 'none';
-        }
-        //alert("音源解禁完了！(1.0固定モード)");
     }).catch(e => {
-        //alert("許可失敗: もっとしっかりタップ（離す）してください");
         isUnlocking = false;
+        console.log("Unlock failed", e);
     });
 }
 
