@@ -78,6 +78,10 @@ const playerImg = new Image();
 const PLAYER_IMAGE_URL = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 playerImg.src = PLAYER_IMAGE_URL;
 
+const dogImg = new Image();
+// ★ここに番犬の画像URLを貼ってください
+const DOG_IMAGE_URL = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
+dogImg.src = DOG_IMAGE_URL;
 // ==========================================
 // 1. サウンド設定
 // ==========================================
@@ -354,9 +358,20 @@ function draw() {
                 }
             }
         }
-        ctx.fillStyle = '#8B4513';
-        dogs.forEach(d => { ctx.beginPath(); ctx.arc(offsetX + d.x*size + size/2, offsetY + d.y*size + size/2, size/4, 0, Math.PI*2); ctx.fill(); });
+       // --- 番犬の描画 ---
+        dogs.forEach(d => {
+            if (dogImg.complete && dogImg.naturalWidth !== 0) {
+                let p = size * 0.05;
+                ctx.drawImage(dogImg, offsetX + d.x*size + p, offsetY + d.y*size + p, size - p*2, size - p*2);
+            } else {
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(offsetX + d.x*size + size/2, offsetY + d.y*size + size/2, size/3, 0, Math.PI*2);
+                ctx.fill();
+            }
+        });
         
+        // --- プレイヤーの描画 ---
         if (playerImg.complete && playerImg.naturalWidth !== 0) {
             let p = size * 0.1;
             ctx.drawImage(playerImg, offsetX + player.x * size + p, offsetY + player.y * size + p, size - p*2, size - p*2);
