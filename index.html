@@ -21,7 +21,7 @@
     <div id="controls">
         <button id="toggleMode">表示/非表示</button>
     </div>
-    <div //class="msg" id="start-msg">画面を一度タップ（指を離す）して開始</div>
+    <div class="msg" id="start-msg">画面を一度タップ（指を離す）して開始</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -63,9 +63,9 @@ function unlockAudio() {
         if (document.getElementById('start-msg')) {
             document.getElementById('start-msg').style.display = 'none';
         }
-        alert("音源解禁完了！(1.0固定モード)");
+        //alert("音源解禁完了！(1.0固定モード)");
     }).catch(e => {
-        alert("許可失敗: もっとしっかりタップ（離す）してください");
+        //alert("許可失敗: もっとしっかりタップ（離す）してください");
         isUnlocking = false;
     });
 }
