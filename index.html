@@ -53,8 +53,9 @@
     <div id="game-desc">
         ⚠️目を瞑って、スマホで疲れた目を休めながらプレイしてください⚠️<br>
         　<br>    
+        ・上下左右にスワイプで1マス移動<br>
         ・手探りでゴールを目指せ<br>
-        ・コインはゴールに近づくほど高音になるよ<br>
+        ・コインはゴールに近いほど高音になるよ<br>
         ・迷路内で待ち構えている犬に気をつけて
     </div>
 </div>
@@ -310,6 +311,13 @@ function showStartMenu() {
     gameStarted = false;
     levelDisplay.innerText = `Level ${currentLevel}`;
     startBtn.innerText = currentLevel === 1 ? "ゲームを開始する" : `Level ${currentLevel} を開始`;
+    
+    // Level 1の時だけ説明を表示
+    const desc = document.getElementById('game-desc');
+    if (desc) { //念のため存在確認
+        desc.style.display = (currentLevel === 1) ? 'block' : 'none';
+    }
+    
     startContainer.style.display = 'flex';
 }
 
