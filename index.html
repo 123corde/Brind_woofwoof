@@ -22,7 +22,7 @@
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls"><button id="toggleMode">表示/非表示</button></div>
-    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.nos）</div>
+    <div class="msg" id="start-msg">画面をタップして開始<br>（Ver.nost）</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -54,234 +54,84 @@ function unlockAudio() {
     const p2 = gameOverSound.play();
     //const p3 = noSound.play();
 
+
+
+let dogWarnSound = new Audio();
+let gameOverSound = new Audio();
+let soundReady = false;
+let isUnlocking = false;
+
+function unlockAudio() {
+    if (soundReady || isUnlocking) return;
+    isUnlocking = true;
+
+    // iOS対策：音量をいじらず「標準(1.0)」のまま一度鳴らすのが一番安全
+    dogWarnSound.src = dogAudioData1;
+    gameOverSound.src = dogAudioData2;
+
+    // ユーザーの指が離れたこの瞬間に再生命令を出す
+    const p1 = dogWarnSound.play();
+    const p2 = gameOverSound.play();
+
     Promise.all([p1, p2]).then(() => {
-        // 再生できたら即座に停止して音量を戻す
+        // 成功したら、音量は触らずに「停止」と「巻き戻し」だけ行う
         dogWarnSound.pause();
         gameOverSound.pause();
-        //noSound.pause();
         dogWarnSound.currentTime = 0;
         gameOverSound.currentTime = 0;
-        //noSound.currentTime = 0;
-        dogWarnSound.volume = 1.0;
-        gameOverSound.volume = 1.0;
-        //noSound.volume = 1.0;
+
         soundReady = true;
-        console.log("Sound Unlocked Silently!");
-    }).catch(e => console.log("Unlock failed", e));
+        isUnlocking = false;
+        
+        if (document.getElementById('start-msg')) {
+            document.getElementById('start-msg').style.display = 'none';
+        }
+        alert("音源解禁完了！(1.0固定モード)");
+    }).catch(e => {
+        // ここでエラーが出る場合は、まだ「ユーザー操作」と認められていない
+        alert("許可失敗: もっとしっかりタップ（離す）してください");
+        isUnlocking = false;
+    });
 }
 
 function playCustomSound(audioObj) {
     if (!soundReady) return;
     audioObj.currentTime = 0;
-    audioObj.play().catch(e => console.log("Play failed"));
+    audioObj.play().catch(e => console.log("再生失敗"));
 }
 
 // ==========================================
-// 2. ゲームロジック
+// 2. イベントリスナー（ここが肝！）
 // ==========================================
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const startMsg = document.getElementById('start-msg');
-const modeText = document.getElementById('mode-text');
-const distText = document.getElementById('dist-text');
-const ROWS = 13, COLS = 13;
+let tsX = null, tsY = null;
 
-let map = []; 
-let player = { x: 1, y: 1 };
-let dog = { x: 0, y: 0 };
-let isBlind = false;
-let audioCtx = null;
-let currentSteps = 0, minDistance = 0, currentPitchIndex = 0;
-let coinPositions = []; 
-
-function generateSimpleMaze() {
-    let found = false;
-    while (!found) {
-        map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-        let x = 1, y = 1; map[y][x] = 0;
-        for(let i=0; i<75; i++) {
-            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-            let [dx, dy] = dirs[Math.floor(Math.random()*4)];
-            if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) {
-                x += dx; y += dy; map[y][x] = 0;
-            }
-        }
-        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-        let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-        let q = [{x: 1, y: 1, d: 0}]; dists[1][1] = 0;
-        let candidates = [];
-        let allWalkable = [];
-        while(q.length > 0) {
-            let curr = q.shift();
-            allWalkable.push(curr);
-            if(curr.d >= 20 && curr.d <= 35) candidates.push(curr);
-            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                let nx = curr.x + dx, ny = curr.y + dy;
-                if(map[ny][nx] === 0 && dists[ny][nx] === -1) {
-                    dists[ny][nx] = curr.d + 1;
-                    parent[ny][nx] = {x: curr.x, y: curr.y};
-                    q.push({x: nx, y: ny, d: curr.d + 1});
-                }
-            }
-        }
-        if(candidates.length > 0) {
-            let goal = candidates[Math.floor(Math.random()*candidates.length)];
-            map[goal.y][goal.x] = 2;
-            minDistance = goal.d;
-            let shortestPathNodes = new Set();
-            let pNode = goal;
-            while(pNode) {
-                shortestPathNodes.add(`${pNode.x},${pNode.y}`);
-                pNode = parent[pNode.y][pNode.x];
-            }
-            let dogCandidates = allWalkable.filter(p => !shortestPathNodes.has(`${p.x},${p.y}`) && (p.x !== goal.x || p.y !== goal.y));
-            if(dogCandidates.length === 0) continue; 
-            dog = dogCandidates[Math.floor(Math.random() * dogCandidates.length)];
-            coinPositions = [];
-            let currC = parent[goal.y][goal.x];
-            let tempPath = [];
-            while(currC && (currC.x !== 1 || currC.y !== 1)) {
-                tempPath.push({x: currC.x, y: currC.y});
-                currC = parent[currC.y][currC.x];
-            }
-            tempPath.reverse(); 
-            tempPath.forEach((p, index) => {
-                if((index + 1) % 2 === 0) { 
-                    map[p.y][p.x] = 3;
-                    coinPositions.push({x: p.x, y: p.y, order: index});
-                }
-            });
-            found = true;
-        }
-    }
-}
-
-async function playOscillator(f, t, d, v = 0.05) {
-    if (!audioCtx) return;
-
-    // 【重要】iOS対策：再生直前に状態をチェックし、中断していたら復帰を待つ
-    if (audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-    }
-
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    
-    o.type = t; 
-    o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    
-    g.gain.setValueAtTime(v, audioCtx.currentTime);
-    // iOSで音がプツッと切れないよう、減衰の時間を少し調整
-    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
-    
-    o.connect(g); 
-    g.connect(audioCtx.destination);
-    
-    o.start(); 
-    o.stop(audioCtx.currentTime + d);
-}
-
-function checkDogSound() {
-    let d = Math.abs(player.x - dog.x) + Math.abs(player.y - dog.y);
-    if (d === 1) playCustomSound(dogWarnSound);
-}
-
-function movePlayer(dx, dy) {
-    const nx = player.x + dx, ny = player.y + dy;
-    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
-        playOscillator(150, 'square', 0.1);
-        if (navigator.vibrate) navigator.vibrate(50);
-    } else {
-        player.x = nx; player.y = ny;
-        currentSteps++;
-        if (player.x === dog.x && player.y === dog.y) {
-            playCustomSound(gameOverSound);
-            setTimeout(() => { alert("緑のイヌに噛みつかれた！"); initGame(); }, 100);
-            return;
-        }
-        if (map[ny][nx] === 2) {
-            playOscillator(800, 'sine', 0.5);
-            setTimeout(() => { alert(`成功！歩数: ${currentSteps}`); initGame(); }, 100);
-            return;
-        } else if (map[ny][nx] === 3) {
-            const hitCoin = coinPositions.find(c => c.x === nx && c.y === ny);
-            if (hitCoin) {
-                const pitch = Math.min(800 + (currentPitchIndex * 50), 2000);
-                playOscillator(pitch, 'sine', 0.15);
-                currentPitchIndex++;
-                coinPositions = coinPositions.filter(c => {
-                    if (c.order <= hitCoin.order) { map[c.y][c.x] = 0; return false; }
-                    return true;
-                });
-            }
-        }
-        checkDogSound();
-    }
-    distText.innerText = `歩数: ${currentSteps} / 最短: ${minDistance}`;
-    draw();
-}
-
-function draw() {
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!isBlind) {
-        ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
-        for(let y=0; y<ROWS; y++) {
-            for(let x=0; x<COLS; x++) {
-                if (map[y][x] !== 1) {
-                    if (y > 0 && map[y-1][x] === 1) { ctx.beginPath(); ctx.moveTo(x*size, y*size); ctx.lineTo((x+1)*size, y*size); ctx.stroke(); }
-                    if (y < ROWS-1 && map[y+1][x] === 1) { ctx.beginPath(); ctx.moveTo(x*size, (y+1)*size); ctx.lineTo((x+1)*size, (y+1)*size); ctx.stroke(); }
-                    if (x > 0 && map[y][x-1] === 1) { ctx.beginPath(); ctx.moveTo(x*size, y*size); ctx.lineTo(x*size, (y+1)*size); ctx.stroke(); }
-                    if (x < COLS-1 && map[y][x+1] === 1) { ctx.beginPath(); ctx.moveTo((x+1)*size, y*size); ctx.lineTo((x+1)*size, (y+1)*size); ctx.stroke(); }
-                    if (map[y][x] === 2) { ctx.fillStyle = "#f00"; ctx.fillRect(x*size + size*0.1, y*size + size*0.1, size*0.8, size*0.8); }
-                    if (map[y][x] === 3) { ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(x*size + size/2, y*size + size/2, size/6, 0, Math.PI*2); ctx.fill(); }
-                }
-            }
-        }
-        ctx.fillStyle = '#22cc22'; ctx.beginPath(); ctx.arc(dog.x*size + size/2, dog.y*size + size/2, size/4, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#0077ff'; ctx.beginPath(); ctx.arc(player.x*size + size/2, player.y*size + size/2, size/3, 0, Math.PI*2); ctx.fill();
-    } else {
-        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-}
-
-document.getElementById('toggleMode').onclick = (e) => {
-    e.stopPropagation();
-    isBlind = !isBlind; modeText.innerText = isBlind ? "ブラインド" : "視界あり"; draw();
-};
-
-let tsX, tsY;
+// 触れた時は座標を覚えるだけ（音は鳴らさない）
 window.addEventListener('touchstart', e => {
-    // 最初のタッチで全ての音声を許可する「儀式」を実行
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    unlockAudio();
-    
-    startMsg.style.display = 'none';
-    tsX = e.touches[0].clientX; tsY = e.touches[0].clientY;
+    tsX = e.touches[0].clientX;
+    tsY = e.touches[0].clientY;
 }, { passive: false });
 
+// 指が離れた瞬間に解禁と移動を実行
 window.addEventListener('touchend', e => {
-    if (tsX === null || tsY === null) return;
-    const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
-    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
-        if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1);
+    // 【最優先】音がまだなら、ここで解禁！
+    if (!soundReady) {
+        unlockAudio();
     }
+
+    if (tsX === null || tsY === null) return;
+    const dx = e.changedTouches[0].clientX - tsX;
+    const dy = e.changedTouches[0].clientY - tsY;
+
+    // 移動の処理（スワイプ距離が短い場合はクリックとみなして音だけ解禁）
+    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+        // movePlayer(dx, dy) などの移動関数を呼ぶ
+    }
+
     tsX = null; tsY = null;
 }, { passive: false });
 
-function initGame() {
-    generateSimpleMaze();
-    player = { x: 1, y: 1 };
-    currentSteps = 0; currentPitchIndex = 0;
-    distText.innerText = `歩数: 0 / 最短: ${minDistance}`;
-    draw();
-}
+// ...（以下、描画や迷路生成などのロジック）...
 
-window.onload = initGame;
-window.onresize = draw;
 </script>
 </body>
 </html>
