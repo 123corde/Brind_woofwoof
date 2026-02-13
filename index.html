@@ -238,7 +238,18 @@ function generateSimpleMaze() {
             while(pNode) { shortestPathNodes.add(`${pNode.x},${pNode.y}`); pNode = parent[pNode.y][pNode.x]; }
             dogs = [];
             let dogCount = Math.max(0, currentLevel - 1); 
-            let dogCandidates = allWalkable.filter(p => !shortestPathNodes.has(`${p.x},${p.y}`) && !(p.x === player.x && p.y === player.y));
+            let dogCandidates = allWalkable.filter(p => {
+                // 最短ルート上ではない
+                const notOnPath = !shortestPathNodes.has(`${p.x},${p.y}`);
+                // プレイヤーの初期位置ではない
+                const notOnStart = !(p.x === player.x && p.y === player.y);
+                // プレイヤーの隣接マス（上下左右ナナメ）ではない
+                const distToStart = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
+                const notAdjacent = distToStart > 1; 
+
+                return notOnPath && notOnStart && notAdjacent;
+            });
+            
             for(let i=0; i < dogCount; i++) {
                 if(dogCandidates.length === 0) break;
                 let idx = Math.floor(Math.random() * dogCandidates.length);
