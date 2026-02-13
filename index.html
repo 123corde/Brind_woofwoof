@@ -3,26 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り (Ver.iOS-Button-Fixed)</title>
+    <title>スイカ割り (Ver.Blind-Start)</title>
     <style>
-        body { margin: 0; background: #fff; color: #000; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        #ui { position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; font-weight: bold; background: rgba(255, 255, 255, 0.7); padding: 5px; border-radius: 4px; }
+        #ui { position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; font-weight: bold; background: rgba(255, 255, 255, 0.7); color: #000; padding: 5px; border-radius: 4px; }
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; }
         button { padding: 12px 20px; font-size: 14px; background: #333; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
         
-        /* スタートボタンのコンテナとデザイン */
         #start-container { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(255,255,255,0.8); /* 背景を少し暗くして目立たせる */
+            background: rgba(0,0,0,0.9); 
             display: flex; justify-content: center; align-items: center; z-index: 100; 
         }
         #start-btn { 
             padding: 20px 40px; font-size: 20px; font-weight: bold; color: white; 
-            background-color: #007bff; border: none; border-radius: 8px; 
-            box-shadow: 0 4px #0056b3; cursor: pointer; touch-action: manipulation;
+            background-color: #28a745; border: none; border-radius: 8px; 
+            box-shadow: 0 4px #1e7e34; cursor: pointer; touch-action: manipulation;
         }
-        #start-btn:active { box-shadow: 0 1px #0056b3; transform: translate(0, 3px); }
+        #start-btn:active { box-shadow: 0 1px #1e7e34; transform: translate(0, 3px); }
     </style>
 </head>
 <body>
@@ -31,7 +30,7 @@
     </div>
 
     <div id="ui">
-        <div id="mode-text">視界あり</div>
+        <div id="mode-text">ブラインド</div>
         <div id="dist-text">歩数: 0 / 最短: --</div>
     </div>
     <div id="controls">
@@ -52,31 +51,20 @@ let soundReady = false;
 let isUnlocking = false;
 let audioCtx = null;
 
-// 音源の解禁処理
 function unlockAudio() {
     if (soundReady || isUnlocking) return;
     isUnlocking = true;
-
     dogWarnSound.src = dogAudioData1;
     gameOverSound.src = dogAudioData2;
-
     const p1 = dogWarnSound.play();
     const p2 = gameOverSound.play();
-
     Promise.all([p1, p2]).then(() => {
         setTimeout(() => {
-            dogWarnSound.pause();
-            gameOverSound.pause();
-            dogWarnSound.currentTime = 0;
-            gameOverSound.currentTime = 0;
-            soundReady = true;
-            isUnlocking = false;
-            console.log("音源解禁完了"); 
+            dogWarnSound.pause(); gameOverSound.pause();
+            dogWarnSound.currentTime = 0; gameOverSound.currentTime = 0;
+            soundReady = true; isUnlocking = false;
         }, 1);
-    }).catch(e => {
-        isUnlocking = false;
-        console.log("Unlock failed", e);
-    });
+    }).catch(e => { isUnlocking = false; });
 }
 
 function playCustomSound(audioObj) {
@@ -86,26 +74,27 @@ function playCustomSound(audioObj) {
 }
 
 // ==========================================
-// 2. スタートボタンのクリックイベント (追加箇所)
+// 2. ゲーム状態管理（ブラインド開始設定）
 // ==========================================
+let isBlind = true; // 初期状態をブラインドに設定
+let gameStarted = false;
+
 document.getElementById('start-btn').addEventListener('click', function() {
-    // コンテナごと消す
     document.getElementById('start-container').style.display = 'none';
-
-    // AudioContextの初期化
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
-
-    // 音源解禁
-    unlockAudio();
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     
-    // ゲーム開始
+    unlockAudio();
+    gameStarted = true;
     initGame();
 });
+
+// 表示非表示ボタンの処理
+document.getElementById('toggleMode').onclick = (e) => {
+    isBlind = !isBlind; 
+    modeText.innerText = isBlind ? "ブラインド" : "視界あり"; 
+    draw();
+};
 
 // ==========================================
 // 3. ゲームロジック
@@ -119,7 +108,6 @@ const ROWS = 13, COLS = 13;
 let map = []; 
 let player = { x: 1, y: 1 };
 let dog = { x: 0, y: 0 };
-let isBlind = false;
 let currentSteps = 0, minDistance = 0, currentPitchIndex = 0;
 let coinPositions = []; 
 
@@ -159,26 +147,17 @@ function generateSimpleMaze() {
             minDistance = goal.d;
             let shortestPathNodes = new Set();
             let pNode = goal;
-            while(pNode) {
-                shortestPathNodes.add(`${pNode.x},${pNode.y}`);
-                pNode = parent[pNode.y][pNode.x];
-            }
+            while(pNode) { shortestPathNodes.add(`${pNode.x},${pNode.y}`); pNode = parent[pNode.y][pNode.x]; }
             let dogCandidates = allWalkable.filter(p => !shortestPathNodes.has(`${p.x},${p.y}`) && (p.x !== goal.x || p.y !== goal.y));
             if(dogCandidates.length === 0) continue; 
             dog = dogCandidates[Math.floor(Math.random() * dogCandidates.length)];
             coinPositions = [];
             let currC = parent[goal.y][goal.x];
             let tempPath = [];
-            while(currC && (currC.x !== 1 || currC.y !== 1)) {
-                tempPath.push({x: currC.x, y: currC.y});
-                currC = parent[currC.y][currC.x];
-            }
+            while(currC && (currC.x !== 1 || currC.y !== 1)) { tempPath.push({x: currC.x, y: currC.y}); currC = parent[currC.y][currC.x]; }
             tempPath.reverse(); 
             tempPath.forEach((p, index) => {
-                if((index + 1) % 2 === 0) { 
-                    map[p.y][p.x] = 3;
-                    coinPositions.push({x: p.x, y: p.y, order: index});
-                }
+                if((index + 1) % 2 === 0) { map[p.y][p.x] = 3; coinPositions.push({x: p.x, y: p.y, order: index}); }
             });
             found = true;
         }
@@ -190,17 +169,15 @@ async function playOscillator(f, t, d, v = 0.05) {
     if (audioCtx.state === 'suspended') await audioCtx.resume();
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    o.type = t; 
-    o.frequency.setValueAtTime(f, audioCtx.currentTime);
+    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
     g.gain.setValueAtTime(v, audioCtx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
-    o.connect(g); 
-    g.connect(audioCtx.destination);
-    o.start(); 
-    o.stop(audioCtx.currentTime + d);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + d);
 }
 
 function movePlayer(dx, dy) {
+    if(!gameStarted) return;
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         playOscillator(150, 'square', 0.1);
@@ -240,6 +217,8 @@ function draw() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // ブラインドでない時のみ描画
     if (!isBlind) {
         ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
         for(let y=0; y<ROWS; y++) {
@@ -255,13 +234,11 @@ function draw() {
         ctx.fillStyle = '#22cc22'; ctx.beginPath(); ctx.arc(dog.x*size + size/2, dog.y*size + size/2, size/4, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle = '#0077ff'; ctx.beginPath(); ctx.arc(player.x*size + size/2, player.y*size + size/2, size/3, 0, Math.PI*2); ctx.fill();
     } else {
-        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // ブラインド時は真っ暗
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 }
-
-document.getElementById('toggleMode').onclick = (e) => {
-    isBlind = !isBlind; modeText.innerText = isBlind ? "ブラインド" : "視界あり"; draw();
-};
 
 let tsX = null, tsY = null;
 window.addEventListener('touchstart', e => {
@@ -281,6 +258,9 @@ function initGame() {
     generateSimpleMaze();
     player = { x: 1, y: 1 };
     currentSteps = 0; currentPitchIndex = 0;
+    // 成功・失敗後のリセットでもブラインド状態を維持
+    isBlind = true;
+    modeText.innerText = "ブラインド";
     if (distText) distText.innerText = `歩数: 0 / 最短: ${minDistance}`;
     draw();
 }
