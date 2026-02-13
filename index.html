@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り (Ver.iOS-Power-Unlock)</title>
+    <title>スイカ割り (Ver.iOS-Final-Load)</title>
     <style>
         body { margin: 0; background: #fff; color: #000; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -37,27 +37,22 @@ let audioCtx = null;
 let soundReady = false;
 let isUnlocking = false;
 
+// 解禁の儀式
 function unlockAudio() {
     if (soundReady || isUnlocking) return;
     isUnlocking = true;
 
-    // iOS対策: アラートを最初に出して、OKボタンのクリックを「ユーザー操作」として活用する
     alert("iOS：音源を解禁します。");
 
     try {
-        // Web Audio APIの初期化
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
 
-        // noSound(data3) で再生権限を奪取
         noSound.src = dogAudioData3;
         noSound.volume = 0.01;
         
-        // play()の実行。iOSはここでPromiseを待つとフリーズしやすいので注意して扱う
         const playPromise = noSound.play();
 
         if (playPromise !== undefined) {
@@ -65,13 +60,16 @@ function unlockAudio() {
                 noSound.pause();
                 noSound.currentTime = 0;
                 
-                // 他の音源を準備
+                // --- 【重要】他音源のセットとロード強制 ---
                 dogWarnSound.src = dogAudioData1;
                 gameOverSound.src = dogAudioData2;
                 
+                // iOSに「今すぐデータを準備しろ」と命じる
+                dogWarnSound.load();
+                gameOverSound.load();
+                
                 dogWarnSound.volume = 1.0;
                 gameOverSound.volume = 1.0;
-                noSound.volume = 1.0;
 
                 soundReady = true;
                 isUnlocking = false;
@@ -90,15 +88,28 @@ function unlockAudio() {
     }
 }
 
+// 再生関数（ロード待ち対応版）
 function playCustomSound(audioObj) {
     if (!soundReady) return;
+
+    // iOS対策：準備ができていなければロード
+    if (audioObj.readyState < 2) { 
+        audioObj.load();
+    }
+
     audioObj.currentTime = 0;
-    audioObj.play().catch(e => {
-        // 万が一、途中で許可が切れた場合
-        console.log("再再生に失敗");
-    });
+    const playPromise = audioObj.play();
+
+    if (playPromise !== undefined) {
+        playPromise.catch(e => {
+            console.log("再生失敗:", e.message);
+            // 失敗した時だけ小さくアラートを出す（デバッグ用）
+            // alert("鳴りませんでした");
+        });
+    }
 }
 
+// 共通電子音
 async function playOscillator(f, t, d, v = 0.05) {
     if (!audioCtx) return;
     if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -124,14 +135,14 @@ const distText = document.getElementById('dist-text');
 const ROWS = 13, COLS = 13;
 
 let map = [], player = { x: 1, y: 1 }, dog = { x: 0, y: 0 };
-let isBlind = false, currentSteps = 0, minDistance = 0, currentPitchIndex = 0, coinPositions = [];
+let isBlind = false, currentSteps = 0, minDistance = 0;
 
 function generateSimpleMaze() {
     let found = false;
     while (!found) {
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
         let x = 1, y = 1; map[y][x] = 0;
-        for(let i=0; i<75; i++) {
+        for(let i=0; i<80; i++) {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
             let [dx, dy] = dirs[Math.floor(Math.random()*4)];
             if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) { x += dx; y += dy; map[y][x] = 0; }
@@ -152,7 +163,7 @@ function generateSimpleMaze() {
         if(allWalkable.length > 20) {
             let goal = allWalkable[allWalkable.length - 1];
             map[goal.y][goal.x] = 2; minDistance = dists[goal.y][goal.x];
-            dog = allWalkable[Math.floor(Math.random() * allWalkable.length)];
+            dog = allWalkable[Math.floor(Math.random() * (allWalkable.length - 5)) + 5];
             found = true;
         }
     }
@@ -174,7 +185,9 @@ function movePlayer(dx, dy) {
             setTimeout(() => { alert("成功！"); initGame(); }, 100);
             return;
         }
-        if (Math.abs(player.x - dog.x) + Math.abs(player.y - dog.y) === 1) {
+        // 犬との距離を判定
+        let d = Math.abs(player.x - dog.x) + Math.abs(player.y - dog.y);
+        if (d === 1) {
             playCustomSound(dogWarnSound);
         }
     }
@@ -205,24 +218,16 @@ function initGame() {
 }
 
 let tsX = null, tsY = null;
-
-// iOS向けにイベントを整理
 window.addEventListener('touchstart', e => {
     tsX = e.touches[0].clientX;
     tsY = e.touches[0].clientY;
 }, { passive: false });
 
 window.addEventListener('touchend', e => {
-    // 最初の1回だけ音源を解禁
-    if (!soundReady) {
-        unlockAudio();
-    }
-
+    if (!soundReady) unlockAudio();
     if (tsX === null || tsY === null) return;
     const dx = e.changedTouches[0].clientX - tsX;
     const dy = e.changedTouches[0].clientY - tsY;
-    
-    // スワイプ判定
     if (Math.abs(dx) > 25 || Math.abs(dy) > 25) {
         if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); 
         else movePlayer(0, dy > 0 ? 1 : -1);
