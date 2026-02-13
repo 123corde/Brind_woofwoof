@@ -34,13 +34,29 @@
             box-shadow: 0 4px #1e7e34; cursor: pointer; touch-action: manipulation;
         }
         #start-btn:active { box-shadow: 0 1px #1e7e34; transform: translate(0, 3px); }
+        #game-desc {
+        margin-top: 20px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #555;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.6);
+        padding: 10px;
+        border-radius: 5px;
+    　}
     </style>
 </head>
 <body>
-    <div id="start-container">
-        <div id="level-display">Level 1</div>
-        <button id="start-btn">ゲームを開始する</button>
+<div id="start-container">
+    <div id="level-display">Level 1</div>
+    <button id="start-btn">ゲームを開始する</button>
+    <div id="game-desc">
+        音を頼りに進む「ブラインド迷宮」です。<br>
+        ・足音やコインの音、犬の唸り声を聴こう<br>
+        ・全てのコインを拾ってゴールを目指せ！<br>
+        ・茶色の犬に捕まるとゲームオーバー
     </div>
+</div>
 
     <div id="ui">
         <div id="mode-text">ブラインド</div>
