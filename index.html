@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り (Ver.Blind-Start)</title>
+    <title>スイカ割り (Ver.Luxury-Goal)</title>
     <style>
         body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -57,7 +57,7 @@ function unlockAudio() {
     dogWarnSound.src = dogAudioData1;
     gameOverSound.src = dogAudioData2;
     const p1 = dogWarnSound.play();
-    const p2 = gameOverSound.play();
+    const p2 = gameOverSound.soundReady ? dogWarnSound.play() : gameOverSound.play();
     Promise.all([p1, p2]).then(() => {
         setTimeout(() => {
             dogWarnSound.pause(); gameOverSound.pause();
@@ -73,23 +73,31 @@ function playCustomSound(audioObj) {
     audioObj.play().catch(e => console.log("再生失敗"));
 }
 
+// 豪華なゴール音（アルペジオ）
+async function playGoalSound() {
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    notes.forEach((freq, i) => {
+        setTimeout(() => {
+            playOscillator(freq, 'triangle', 0.4, 0.1);
+        }, i * 150);
+    });
+}
+
 // ==========================================
-// 2. ゲーム状態管理（ブラインド開始設定）
+// 2. ゲーム状態管理
 // ==========================================
-let isBlind = true; // 初期状態をブラインドに設定
+let isBlind = true; 
 let gameStarted = false;
 
 document.getElementById('start-btn').addEventListener('click', function() {
     document.getElementById('start-container').style.display = 'none';
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    
     unlockAudio();
     gameStarted = true;
     initGame();
 });
 
-// 表示非表示ボタンの処理
 document.getElementById('toggleMode').onclick = (e) => {
     isBlind = !isBlind; 
     modeText.innerText = isBlind ? "ブラインド" : "視界あり"; 
@@ -190,8 +198,8 @@ function movePlayer(dx, dy) {
             return;
         }
         if (map[ny][nx] === 2) {
-            playOscillator(800, 'sine', 0.5);
-            setTimeout(() => { alert(`成功！歩数: ${currentSteps}`); initGame(); }, 100);
+            playGoalSound(); // ここを豪華な音に変更
+            setTimeout(() => { alert(`成功！歩数: ${currentSteps}`); initGame(); }, 600);
             return;
         } else if (map[ny][nx] === 3) {
             const hitCoin = coinPositions.find(c => c.x === nx && c.y === ny);
@@ -217,8 +225,6 @@ function draw() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // ブラインドでない時のみ描画
     if (!isBlind) {
         ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
         for(let y=0; y<ROWS; y++) {
@@ -234,9 +240,7 @@ function draw() {
         ctx.fillStyle = '#22cc22'; ctx.beginPath(); ctx.arc(dog.x*size + size/2, dog.y*size + size/2, size/4, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle = '#0077ff'; ctx.beginPath(); ctx.arc(player.x*size + size/2, player.y*size + size/2, size/3, 0, Math.PI*2); ctx.fill();
     } else {
-        // ブラインド時は真っ暗
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 }
 
@@ -258,13 +262,11 @@ function initGame() {
     generateSimpleMaze();
     player = { x: 1, y: 1 };
     currentSteps = 0; currentPitchIndex = 0;
-    // 成功・失敗後のリセットでもブラインド状態を維持
     isBlind = true;
     modeText.innerText = "ブラインド";
     if (distText) distText.innerText = `歩数: 0 / 最短: ${minDistance}`;
     draw();
 }
-
 window.onresize = draw;
 </script>
 </body>
