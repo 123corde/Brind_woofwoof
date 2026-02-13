@@ -21,7 +21,7 @@
     <div id="controls">
         <button id="toggleMode">表示/非表示</button>
     </div>
-    <div class="msg" id="start-msg">画面を一度タップ（指を離す）して開始</div>
+    <div //class="msg" id="start-msg">画面を一度タップ（指を離す）して開始</div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -243,7 +243,7 @@ window.addEventListener('touchend', e => {
     // 最初の1回だけ音源を解禁
    if (!soundReady) {
         unlockAudio();
-        return; 
+        //return; 
     }
 
 
