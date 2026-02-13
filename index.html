@@ -67,7 +67,7 @@
         <div id="mode-text">ブラインド</div>
         <div id="total-steps">総歩数: 0</div>
         <div id="total-coins">総獲得コイン: 0</div>
-        <div id="dev-count" style="font-size: 0.8em; color: #aaa; margin-top: 4px;">Dev Mode: 0回</div>
+        <div id="dev-count" style="font-size: 0.8em; color: #aaa; margin-top: 4px;">Dev mode: 0回</div>
     </div>
 
     <div id="controls">
@@ -279,15 +279,28 @@ function movePlayer(dx, dy) {
         totalSteps++;
         updateUI();
 
-        if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-            playCustomSound(gameOverSound);
-            setTimeout(() => { 
-                alert(`失敗... 番犬に捕まりました。`); 
-                currentLevel = 1; 
-                showStartMenu(); 
-            }, 100);
-            return;
-        }
+        // 犬に捕まった時の処理
+if (dogs.some(d => d.x === player.x && d.y === player.y)) {
+    playCustomSound(gameOverSound);
+    
+    // メッセージのリスト
+    const messages = [
+        "ガブリ！イッヌの愛情が強すぎてゲームオーバーです。",
+        "2ガブッ！イッヌの烈烈な歓迎（物理）を受けて再起不能です。",
+        "3ワフッ！この迷宮の真の主はイッヌだったようです。",
+        "4あ痛っ！イッヌがあなたを巨大な骨付き肉と勘違いしたようです。"
+    ];
+    
+    // ランダムに1つ選ぶ
+    const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+
+    setTimeout(() => { 
+        alert(randomMsg); 
+        currentLevel = 1; 
+        showStartMenu(); 
+    }, 100);
+    return;
+}
         if (map[ny][nx] === 2) {
             playGoalSound();
             isBlind = false; 
