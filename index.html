@@ -293,6 +293,22 @@ function showStartMenu() {
     gameStarted = false;
     levelDisplay.innerText = `Level ${currentLevel}`;
     startBtn.innerText = currentLevel === 1 ? "ゲームを開始する" : `Level ${currentLevel} を開始`;
+    
+    // Level 1の時だけ説明を表示し、それ以外は非表示にする
+    const desc = document.getElementById('game-desc');
+    if (currentLevel === 1) {
+        desc.style.display = 'block';
+    } else {
+        desc.style.display = 'none';
+    }
+    
+    startContainer.style.display = 'flex';
+}
+    
+function showStartMenu() {
+    gameStarted = false;
+    levelDisplay.innerText = `Level ${currentLevel}`;
+    startBtn.innerText = currentLevel === 1 ? "ゲームを開始する" : `Level ${currentLevel} を開始`;
     startContainer.style.display = 'flex';
 }
 
