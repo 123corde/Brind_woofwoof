@@ -81,9 +81,6 @@ function playCustomSound(audioObj) {
     audioObj.play().catch(e => console.log("再生失敗"));
 }
 
-// ...（以下、ゲームロジックはそのまま）...
-</script>
-
 // 共通電子音
 async function playOscillator(f, t, d, v = 0.05) {
     if (!audioCtx) return;
