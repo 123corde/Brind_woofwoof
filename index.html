@@ -57,9 +57,9 @@
             ⚠️<b>目を瞑って、スマホで疲れた目を休めながらプレイしてください</b>⚠️<br>
             <br>    
             ・上下左右にスワイプで1マス移動<br>
-            ・手探りでゴールを目指せ<br>
+            ・暗闇のを手探りで進みゴールを目指せ<br>
             ・コインはゴールに近いほど高音になるよ<br>
-            ・迷路内で待ち構えている<b>イッヌに気を付けて</b>
+            ・迷路内で待ち構えているイッヌに気を付けて
         </div>
     </div>
 
@@ -156,9 +156,9 @@ const startBtn = document.getElementById('start-btn');
 const levelDisplay = document.getElementById('level-display');
 
 function updateUI() {
-    document.getElementById('total-steps').innerText = `総歩数: ${totalSteps}`;
-    document.getElementById('total-coins').innerText = `総獲得コイン: ${totalCoins}`;
-    document.getElementById('dev-count').innerText = `Dev Mode: ${devModeCount}回`;
+    document.getElementById('total-steps').innerText = `総歩数:  ${totalSteps}歩`;
+    document.getElementById('total-coins').innerText = `総獲得コイン:  ${totalCoins}枚`;
+    document.getElementById('dev-count').innerText = `Dev Mode:  ${devModeCount}回`;
 }
 
 startBtn.addEventListener('click', function() {
