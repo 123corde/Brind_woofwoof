@@ -52,7 +52,10 @@
             ・上下左右にスワイプで1マス移動<br>
             ・暗闇を手探りで進みゴールを目指せ<br>
             ・コインはゴールに近いほど高音になるよ<br>
-            ・迷路内で待ち構えているイッヌに気を付けて 3.2
+            ・迷路内で待ち構えているイッヌに気を付けて<br>
+            <br>
+            <br>
+            ver.3.3
         </div>
     </div>
 
@@ -179,6 +182,7 @@ let coinPositions = [];
 // ==========================================
 // 3. 迷路生成 & 犬の厳格配置ロジック
 // ==========================================
+
 function generateSimpleMaze() {
     // 確実な配置のためサイズを少し広めに確保
     ROWS = COLS = 10 + (currentLevel * 2); 
@@ -191,7 +195,8 @@ function generateSimpleMaze() {
         player = { x: startX, y: startY };
         let x = startX, y = startY; map[y][x] = 0;
         
-        let fillAmount = ROWS * COLS * (0.6 - (currentLevel * 0.01)); 
+        // 迷路の削り（少し複雑にするためにfillAmountを調整）
+        let fillAmount = ROWS * COLS * 0.5; 
         for(let i=0; i < fillAmount; i++) {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
             let [dx, dy] = dirs[Math.floor(Math.random()*4)];
@@ -200,14 +205,21 @@ function generateSimpleMaze() {
             }
         }
 
+        // --- 距離計算 (BFS) ---
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
         let q = [{x: startX, y: startY, d: 0}]; dists[startY][startX] = 0;
         let allWalkable = [];
+        let maxDist = 0;
+        let farthestNode = {x: startX, y: startY};
 
         while(q.length > 0) {
             let curr = q.shift();
             allWalkable.push(curr);
+            if (curr.d > maxDist) {
+                maxDist = curr.d;
+                farthestNode = {x: curr.x, y: curr.y};
+            }
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = curr.x + dx, ny = curr.y + dy;
                 if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
@@ -218,78 +230,88 @@ function generateSimpleMaze() {
             }
         }
 
-        let minThreshold = ROWS * 1.2 + (currentLevel); 
-        let goalCandidates = allWalkable.filter(p => dists[p.y][p.x] >= minThreshold);
+        // 4. 【改善】ゴールを迷路の最深部（最も遠い場所）に設定
+        let goal = farthestNode;
+        map[goal.y][goal.x] = 2; 
 
-        if(goalCandidates.length > 0) {
-            let goal = goalCandidates[Math.floor(Math.random()*goalCandidates.length)];
-            map[goal.y][goal.x] = 2; 
-            let shortestPathNodes = new Set();
-            let pNode = goal;
-            while(pNode) { shortestPathNodes.add(`${pNode.x},${pNode.y}`); pNode = parent[pNode.y][pNode.x]; }
+        let shortestPathNodes = new Set();
+        let pNode = goal;
+        while(pNode) { 
+            shortestPathNodes.add(`${pNode.x},${pNode.y}`); 
+            pNode = parent[pNode.y][pNode.x]; 
+        }
 
-            // 犬の配置：袋小路 or 四方開拓地のみ
-            dogs = [];
-            let dogCount = Math.max(0, currentLevel - 1); 
-            let validDogSpots = allWalkable.filter(p => {
-                if (shortestPathNodes.has(`${p.x},${p.y}`)) return false;
-                if (p.x === player.x && p.y === player.y) return false;
-                if (Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y)) <= 1) return false;
+        // 5. 犬の配置（厳格ルール：袋小路 or 四方通路）
+        dogs = [];
+        let dogCount = Math.max(0, currentLevel - 1); 
+        
+        let validDogSpots = allWalkable.filter(p => {
+            // ゴールへの道、スタート地点、隣接マスはNG
+            if (shortestPathNodes.has(`${p.x},${p.y}`)) return false;
+            if (p.x === player.x && p.y === player.y) return false;
+            if (Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y)) <= 1) return false;
 
-                let wallC = 0, pathC = 0;
-                let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-                dirs.forEach(d => {
+            let wallC = 0, pathC = 0;
+            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            dirs.forEach(d => {
+                let nx = p.x + d[0], ny = p.y + d[1];
+                if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS || map[ny][nx] === 1) wallC++;
+                else if (map[ny][nx] === 0) pathC++;
+            });
+
+            // 条件：袋小路(3面壁) または 十字路(0面壁)
+            if (wallC === 3 || pathC === 4) {
+                // 分岐の出口隣接NG
+                let isAdjToJunction = false;
+                for(let d of dirs) {
                     let nx = p.x + d[0], ny = p.y + d[1];
-                    if (ny < 0 || ny >= ROWS || nx < 0 || nx >= COLS || map[ny][nx] === 1) wallC++;
-                    else if (map[ny][nx] === 0) pathC++;
-                });
-
-                // 条件：袋小路(wallC=3) もしくは 四方通路(pathC=4)
-                if (wallC === 3 || pathC === 4) {
-                    // 分岐(3方向以上)のすぐ隣はNG
-                    let isAdjToJunction = false;
-                    for(let d of dirs) {
-                        let nx = p.x + d[0], ny = p.y + d[1];
-                        if (map[ny] && map[ny][nx] === 0) {
-                            let nPath = 0;
-                            for(let nd of dirs) if (map[ny+nd[1]] && map[ny+nd[1]][nx+nd[0]] === 0) nPath++;
-                            if (nPath >= 3) { isAdjToJunction = true; break; }
-                        }
+                    if (map[ny] && map[ny][nx] === 0) {
+                        let nPath = 0;
+                        for(let nd of dirs) if (map[ny+nd[1]] && map[ny+nd[1]][nx+nd[0]] === 0) nPath++;
+                        if (nPath >= 3) { isAdjToJunction = true; break; }
                     }
-                    return !isAdjToJunction;
                 }
-                return false;
-            });
-
-            // 袋小路を優先
-            validDogSpots.sort((a, b) => {
-                let wallA = 0, wallB = 0;
-                [[0,1],[0,-1],[1,0],[-1,0]].forEach(d => {
-                    if (map[a.y+d[1]] && map[a.y+d[1]][a.x+d[0]] === 1) wallA++;
-                    if (map[b.y+d[1]] && map[b.y+d[1]][b.x+d[0]] === 1) wallB++;
-                });
-                return wallB - wallA;
-            });
-
-            if (validDogSpots.length >= dogCount) {
-                for(let i=0; i < dogCount; i++) {
-                    let idx = Math.floor(Math.random() * Math.min(validDogSpots.length, dogCount + 2));
-                    dogs.push(validDogSpots[idx]);
-                    validDogSpots.splice(idx, 1);
-                }
-                coinPositions = [];
-                let currC = parent[goal.y][goal.x];
-                let tempPath = [];
-                while(currC && (currC.x !== player.x || currC.y !== player.y)) { tempPath.push({x: currC.x, y: currC.y}); currC = parent[currC.y][currC.x]; }
-                tempPath.reverse().forEach((p, index) => {
-                    if((index + 1) % 4 === 0) { map[p.y][p.x] = 3; coinPositions.push({x: p.x, y: p.y, order: index}); }
-                });
-                found = true;
+                return !isAdjToJunction;
             }
+            return false;
+        });
+
+        // 袋小路を優先
+        validDogSpots.sort((a, b) => {
+            let wallA = 0, wallB = 0;
+            [[0,1],[0,-1],[1,0],[-1,0]].forEach(d => {
+                if (map[a.y+d[1]] && map[a.y+d[1]][a.x+d[0]] === 1) wallA++;
+                if (map[b.y+d[1]] && map[b.y+d[1]][b.x+d[0]] === 1) wallB++;
+            });
+            return wallB - wallA;
+        });
+
+        // 犬の数が確保できれば確定
+        if (validDogSpots.length >= dogCount) {
+            for(let i=0; i < dogCount; i++) {
+                dogs.push(validDogSpots[i]);
+                validDogSpots.splice(i, 1);
+            }
+            // コインの配置
+            coinPositions = [];
+            let currC = parent[goal.y][goal.x];
+            let tempPath = [];
+            while(currC && (currC.x !== player.x || currC.y !== player.y)) { 
+                tempPath.push({x: currC.x, y: currC.y}); 
+                currC = parent[currC.y][currC.x]; 
+            }
+            tempPath.reverse().forEach((p, index) => {
+                if((index + 1) % 4 === 0) { map[p.y][p.x] = 3; coinPositions.push({x: p.x, y: p.y, order: index}); }
+            });
+            found = true;
         }
     }
 }
 
+
+
+
+    
 // ==========================================
 // 4. 操作・描画ロジック
 // ==========================================
