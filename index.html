@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 - Recursive Division Edition</title>
+    <title>スイカ割り迷宮 - Full Edition</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
         
         #ui { 
             position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; 
-            font-weight: bold; background: #333; color: #fff; 
+            font-weight: bold; 
+            background: #333; 
+            color: #fff; 
             padding: 10px; border-radius: 6px; border: 1px solid #555;
             min-width: 160px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
@@ -35,8 +37,15 @@
         #start-btn:active { box-shadow: 0 1px #1e7e34; transform: translate(0, 3px); }
         
         #game-desc {
-            margin-top: 20px; font-size: 14px; line-height: 1.6; color: #555; text-align: center;
-            background: rgba(255, 255, 255, 0.6); padding: 15px; border-radius: 10px; border: 1px dashed #ccc;
+            margin-top: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #555;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px dashed #ccc;
         }
     </style>
 </head>
@@ -45,10 +54,15 @@
         <div id="level-display">Level 1</div>
         <button id="start-btn">ゲームを開始する</button>
         <div id="game-desc">
-            <b>領域分割迷宮</b><br>
-            ・上下左右にスワイプで移動<br>
-            ・犬は<b>「行き止まり」</b>か<b>「四方が道」</b>に潜みます<br>
-            ・ゴールは迷路の最も深い場所にあります
+            <b>画面を見なくてもOK</b><br>😪<b>目を瞑って、寝落ちする体勢でプレイすることを推奨します</b>😴<br>
+            <br>    
+            ・上下左右にスワイプで1マス移動<br>
+            ・暗闇を手探りで進みゴールを目指せ<br>
+            ・コインはゴールに近いほど高音になるよ<br>
+            ・迷路内で待ち構えているイッヌに気を付けて<br>
+            <br>
+            <br>
+            ver.4.0
         </div>
     </div>
 
@@ -59,13 +73,14 @@
         <div id="dev-count" style="font-size: 0.8em; color: #aaa; margin-top: 4px;">Dev mode: 0回</div>
     </div>
 
-    <div id="controls"><button id="toggleMode">Developer mode</button></div>
+    <div id="controls">
+        <button id="toggleMode">Developer mode</button>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
 <script>
-    
-    
-    // ==========================================
+// ==========================================
 // 0. 画像設定
 // ==========================================
 const playerImg = new Image();
@@ -102,218 +117,299 @@ function unlockAudio() {
     }).catch(e => {});
 }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    function playCustomSound(audioObj) { if (soundReady && audioObj.src) { audioObj.currentTime = 0; audioObj.play().catch(e=>{}); } }
-async function playGoalSound() { [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4, 0.1), i * 150)); }
-async function playOscillator(f, t, d, v = 0.05) {
-    if (!audioCtx) return;
-    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    g.gain.setValueAtTime(v, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
+function playCustomSound(audioObj) {
+    if (!soundReady || !audioObj.src) return;
+    audioObj.currentTime = 0;
+    audioObj.play().catch(e => {});
 }
 
-// ゲーム状態
-let isBlind = true, gameStarted = false, currentLevel = 1;
-let ROWS, COLS, map, player, dogs, coinPositions, currentPitchIndex = 0;
-let totalSteps = 0, totalCoins = 0, devModeCount = 0;
+async function playGoalSound() {
+    const notes = [523.25, 659.25, 783.99, 1046.50]; 
+    notes.forEach((freq, i) => {
+        setTimeout(() => { playOscillator(freq, 'triangle', 0.4, 0.1); }, i * 150);
+    });
+}
+
+async function playOscillator(f, t, d, v = 0.05) {
+    if (!audioCtx) return;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
+    g.gain.setValueAtTime(v, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + d);
+}
+
+// ==========================================
+// 2. ゲーム状態管理
+// ==========================================
+let isBlind = true; 
+let gameStarted = false;
+let currentLevel = 1; 
+let ROWS = 8, COLS = 8; 
+
+// ★累計データ変数★
+let totalSteps = 0;
+let totalCoins = 0;
+let devModeCount = 0;
 
 const startContainer = document.getElementById('start-container');
 const startBtn = document.getElementById('start-btn');
+const levelDisplay = document.getElementById('level-display');
 
 function updateUI() {
-    document.getElementById('total-steps').innerText = `総歩数: ${totalSteps}歩`;
-    document.getElementById('total-coins').innerText = `総獲得コイン: ${totalCoins}枚`;
-    document.getElementById('dev-count').innerText = `Dev Mode: ${devModeCount}回`;
+    document.getElementById('total-steps').innerText = `総歩数:  ${totalSteps}歩`;
+    document.getElementById('total-coins').innerText = `総獲得コイン:  ${totalCoins}枚`;
+    document.getElementById('dev-count').innerText = `Dev Mode:  ${devModeCount}回`;
 }
+
+startBtn.addEventListener('click', function() {
+    startContainer.style.display = 'none';
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    unlockAudio();
+    gameStarted = true;
+    isBlind = true;
+    document.getElementById('mode-text').innerText = "ブラインド";
+    initGame();
+});
+
+document.getElementById('toggleMode').onclick = (e) => {
+    isBlind = !isBlind; 
+    document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "オープン"; 
+    
+    if (!isBlind) {
+        devModeCount++;
+        updateUI();
+    }
+    draw();
+};
 
 // ==========================================
-// 領域分割法による迷路生成
+// 3. ゲームロジック
 // ==========================================
-function generateRecursiveMaze() {
-    // 領域分割法を綺麗に行うためサイズを奇数に
-    const size = 11 + (Math.floor(currentLevel / 2) * 2);
-    ROWS = COLS = size;
-    
-    // 全てを道(0)で初期化し、周囲を壁(1)で囲む
-    map = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
-    for(let i=0; i<COLS; i++) { map[0][i] = 1; map[ROWS-1][i] = 1; }
-    for(let i=0; i<ROWS; i++) { map[i][0] = 1; map[i][COLS-1] = 1; }
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-    // 分割開始
-    divide(1, 1, COLS - 2, ROWS - 2);
+let map = []; 
+let player = { x: 0, y: 0 };
+let dogs = []; 
+let currentPitchIndex = 0;
+let coinPositions = []; 
 
-    // スタート地点は常に左上(1,1)付近（道であること保証）
-    player = { x: 1, y: 1 };
-    
-    // 距離計算とゴール選定
-    let bfsResult = bfs(player.x, player.y);
-    let goal = bfsResult.maxNode;
-    map[goal.y][goal.x] = 2; // Goal
-
-    // 最短ルート算出（犬を置かないため）
-    let shortestPathNodes = new Set();
-    let pNode = goal;
-    while(pNode) { 
-        shortestPathNodes.add(`${pNode.x},${pNode.y}`); 
-        pNode = bfsResult.parent[pNode.y][pNode.x]; 
-    }
-
-    // 犬の配置
-    dogs = [];
-    let dogCandidates = [];
-    for(let y=1; y<ROWS-1; y++) {
-        for(let x=1; x<COLS-1; x++) {
-            if(map[y][x] !== 0 || shortestPathNodes.has(`${x},${y}`)) continue;
-            
-            let walls = 0, paths = 0;
-            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx,dy]) => {
-                if(map[y+dy][x+dx] === 1) walls++; else paths++;
-            });
-            // 条件：袋小路(walls=3) または 四方道(paths=4)
-            if(walls === 3 || paths === 4) dogCandidates.push({x, y, weight: walls});
-        }
-    }
-    // 袋小路(weight=3)を優先してソート
-    dogCandidates.sort((a,b) => b.weight - a.weight);
-    let dogCount = Math.max(0, currentLevel - 1);
-    for(let i=0; i<Math.min(dogCount, dogCandidates.length); i++) {
-        dogs.push({x: dogCandidates[i].x, y: dogCandidates[i].y});
-    }
-
-    // コイン配置
-    coinPositions = [];
-    let cp = bfsResult.parent[goal.y][goal.x];
-    let step = 0;
-    while(cp && (cp.x !== player.x || cp.y !== player.y)) {
-        if(++step % 4 === 0) { 
-            map[cp.y][cp.x] = 3; 
-            coinPositions.push({x: cp.x, y: cp.y, order: step}); 
-        }
-        cp = bfsResult.parent[cp.y][cp.x];
-    }
-}
-
-function divide(x, y, w, h) {
-    if (w < 2 || h < 2) return;
-    let horizontal = (w < h) ? true : (w > h ? false : Math.random() < 0.5);
-
-    if (horizontal) {
-        // 水平に壁を作る
-        let py = y + 1 + Math.floor(Math.random() * (h - 2) / 2) * 2;
-        for (let i = x; i < x + w; i++) map[py][i] = 1;
-        // 穴を開ける
-        let holeX = x + Math.floor(Math.random() * (w + 1) / 2) * 2;
-        map[py][holeX] = 0;
-        divide(x, y, w, py - y);
-        divide(x, py + 1, w, h - (py - y) - 1);
-    } else {
-        // 垂直に壁を作る
-        let px = x + 1 + Math.floor(Math.random() * (w - 2) / 2) * 2;
-        for (let i = y; i < y + h; i++) map[i][px] = 1;
-        // 穴を開ける
-        let holeY = y + Math.floor(Math.random() * (h + 1) / 2) * 2;
-        map[holeY][px] = 0;
-        divide(x, y, px - x, h);
-        divide(px + 1, y, w - (px - x) - 1, h);
-    }
-}
-
-function bfs(sx, sy) {
-    let dists = Array.from({length:ROWS},()=>Array(COLS).fill(-1));
-    let parent = Array.from({length:ROWS},()=>Array(COLS).fill(null));
-    let q = [{x:sx, y:sy, d:0}]; dists[sy][sx] = 0;
-    let maxDist = -1, maxNode = null;
-    while(q.length > 0) {
-        let c = q.shift();
-        if(c.d > maxDist) { maxDist = c.d; maxNode = c; }
-        [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx,dy]) => {
-            let nx = c.x+dx, ny = c.y+dy;
-            if(ny>=0 && ny<ROWS && nx>=0 && nx<COLS && map[ny][nx]!==1 && dists[ny][nx]===-1) {
-                dists[ny][nx] = c.d + 1; parent[ny][nx] = {x:c.x, y:c.y}; q.push({x:nx, y:ny, d:c.d+1});
+function generateSimpleMaze() {
+    ROWS = COLS = 6 + (currentLevel * 2); 
+    let found = false;
+    while (!found) {
+        map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+        let startX = 1 + Math.floor(Math.random() * (COLS - 2));
+        let startY = 1 + Math.floor(Math.random() * (ROWS - 2));
+        player = { x: startX, y: startY };
+        let x = startX, y = startY; map[y][x] = 0;
+        let fillAmount = ROWS * COLS * (0.55 - (currentLevel * 0.01)); 
+        for(let i=0; i < fillAmount; i++) {
+            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            let [dx, dy] = dirs[Math.floor(Math.random()*4)];
+            if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) {
+                x += dx; y += dy; map[y][x] = 0;
             }
-        });
+        }
+        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
+        let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        let q = [{x: startX, y: startY, d: 0}]; dists[startY][startX] = 0;
+        let allWalkable = [];
+        while(q.length > 0) {
+            let curr = q.shift();
+            allWalkable.push(curr);
+            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                let nx = curr.x + dx, ny = curr.y + dy;
+                if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
+                    dists[ny][nx] = curr.d + 1;
+                    parent[ny][nx] = {x: curr.x, y: curr.y};
+                    q.push({x: nx, y: ny, d: curr.d + 1});
+                }
+            }
+        }
+        let minThreshold = ROWS * 1.2 + (currentLevel); 
+        let candidates = allWalkable.filter(p => dists[p.y][p.x] >= minThreshold);
+        if(candidates.length > 0) {
+            let goal = candidates[Math.floor(Math.random()*candidates.length)];
+            map[goal.y][goal.x] = 2; 
+            let shortestPathNodes = new Set();
+            let pNode = goal;
+            while(pNode) { shortestPathNodes.add(`${pNode.x},${pNode.y}`); pNode = parent[pNode.y][pNode.x]; }
+            dogs = [];
+            let dogCount = Math.max(0, currentLevel - 1); 
+            let dogCandidates = allWalkable.filter(p => {
+                // 最短ルート上ではない
+                const notOnPath = !shortestPathNodes.has(`${p.x},${p.y}`);
+                // プレイヤーの初期位置ではない
+                const notOnStart = !(p.x === player.x && p.y === player.y);
+                // プレイヤーの隣接マス（上下左右ナナメ）ではない
+                const distToStart = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
+                const notAdjacent = distToStart > 1; 
+
+                return notOnPath && notOnStart && notAdjacent;
+            });
+            
+            for(let i=0; i < dogCount; i++) {
+                if(dogCandidates.length === 0) break;
+                let idx = Math.floor(Math.random() * dogCandidates.length);
+                dogs.push(dogCandidates[idx]);
+                dogCandidates.splice(idx, 1);
+            }
+            coinPositions = [];
+            let currC = parent[goal.y][goal.x];
+            let tempPath = [];
+            while(currC && (currC.x !== player.x || currC.y !== player.y)) { tempPath.push({x: currC.x, y: currC.y}); currC = parent[currC.y][currC.x]; }
+            tempPath.reverse(); 
+            tempPath.forEach((p, index) => {
+                if((index + 1) % 4 === 0) { map[p.y][p.x] = 3; coinPositions.push({x: p.x, y: p.y, order: index}); }
+            });
+            found = true;
+        }
     }
-    return { dists, parent, maxNode };
 }
 
-// 描画・操作ロジック
 function movePlayer(dx, dy) {
     if(!gameStarted) return;
     const nx = player.x + dx, ny = player.y + dy;
-    if (map[ny][nx] === 1) { playOscillator(150, 'square', 0.1); return; }
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
+        playOscillator(150, 'square', 0.1);
+    } else {
+        player.x = nx; player.y = ny;
+        totalSteps++;
+        updateUI();
+
+        // 犬に捕まった時の処理
+if (dogs.some(d => d.x === player.x && d.y === player.y)) {
+    playCustomSound(gameOverSound);
     
-    player.x = nx; player.y = ny; totalSteps++;
-    if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-        playCustomSound(gameOverSound);
-        setTimeout(() => { alert("イッヌに捕まった！"); currentLevel = 1; showStartMenu(); }, 100);
-        return;
+    // メッセージのリスト
+    const messages = [
+        "\n\n~~ GAME OVER ~~\n\n一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
+        "\n\n~~ GAME OVER ~~\n\nガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
+        "\n\n~~ GAME OVER ~~\n\nあなたの骨が砕ける音だけが迷宮に響き渡りました。",
+        "\n\n~~ GAME OVER ~~\n\nイッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。"
+    ];
+    
+    // ランダムに1つ選ぶ
+    const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+
+    setTimeout(() => { 
+        alert(randomMsg); 
+        currentLevel = 1; 
+        showStartMenu(); 
+    }, 100);
+    return;
+}
+        if (map[ny][nx] === 2) {
+            playGoalSound();
+            isBlind = false; 
+            document.getElementById('mode-text').innerText = "オープン";
+            draw(); 
+            if(currentLevel >= 10) {
+                setTimeout(() => { alert("✨✨ おめでとう！ ✨✨\n全10ステージクリア！"); currentLevel = 1; showStartMenu(); }, 600);
+            } else {
+                currentLevel++; 
+                setTimeout(() => { showStartMenu(); }, 600);
+            }
+            return;
+        } else if (map[ny][nx] === 3) {
+            const hitCoin = coinPositions.find(c => c.x === nx && c.y === ny);
+            if (hitCoin) {
+                totalCoins++;
+                updateUI();
+                playOscillator(Math.min(800 + (currentPitchIndex * 40), 2000), 'sine', 0.15);
+                currentPitchIndex++;
+                coinPositions = coinPositions.filter(c => {
+                    if (c.order <= hitCoin.order) { map[c.y][c.x] = 0; return false; }
+                    return true;
+                });
+            }
+        }
+        if (dogs.some(d => Math.abs(player.x - d.x) + Math.abs(player.y - d.y) === 1)) playCustomSound(dogWarnSound);
     }
-    if (map[ny][nx] === 2) {
-        playGoalSound(); isBlind = false; draw();
-        setTimeout(() => { currentLevel++; showStartMenu(); }, 600);
-        return;
-    }
-    if (map[ny][nx] === 3) {
-        totalCoins++; updateUI();
-        playOscillator(800 + (currentPitchIndex * 40), 'sine', 0.15); currentPitchIndex++;
-        map[ny][nx] = 0;
-    }
-    if (dogs.some(d => Math.abs(player.x - d.x) + Math.abs(player.y - d.y) === 1)) playCustomSound(dogWarnSound);
-    updateUI(); draw();
+    draw();
+}
+
+function showStartMenu() {
+    gameStarted = false;
+    levelDisplay.innerText = `Level ${currentLevel}`;
+    startBtn.innerText = currentLevel === 1 ? "ゲームを開始する" : `Level ${currentLevel} を開始`;
+    
+    // Level 1の時だけ説明を表示
+    const desc = document.getElementById('game-desc');
+    if (desc) desc.style.display = (currentLevel === 1) ? 'block' : 'none';
+    
+    startContainer.style.display = 'flex';
 }
 
 function draw() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
-    const ox = (canvas.width - size * COLS) / 2, oy = (canvas.height - size * ROWS) / 2;
+    const offsetX = (canvas.width - size * COLS) / 2;
+    const offsetY = (canvas.height - size * ROWS) / 2;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     if (!isBlind) {
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         for(let y=0; y<ROWS; y++) {
             for(let x=0; x<COLS; x++) {
-                let px = ox + x*size, py = oy + y*size;
-                if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
-                else if (map[y][x] === 2) { 
-                    ctx.fillStyle = "#f00"; ctx.fillRect(px, py, size, size); // ゴールを赤く
+                let px = offsetX + x*size, py = offsetY + y*size;
+                if (map[y][x] === 1) {
+                    ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size);
+                } else if (map[y][x] === 2) { 
+                    let cellSize = size / 4;
+                    for(let i=0; i<4; i++) {
+                        for(let j=0; j<4; j++) {
+                            ctx.fillStyle = (i + j) % 2 === 0 ? "#fff" : "#000";
+                            ctx.fillRect(px + i*cellSize, py + j*cellSize, cellSize, cellSize);
+                        }
+                    }
                 } else if (map[y][x] === 3) {
                     ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px + size/2, py + size/2, size/6, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = "#000"; ctx.font = `bold ${size/5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                    ctx.fillText("$", px + size/2, py + size/2);
                 }
             }
         }
-        dogs.forEach(d => ctx.drawImage(dogImg, ox + d.x*size, oy + d.y*size, size, size));
-        ctx.drawImage(playerImg, ox + player.x * size, oy + player.y * size, size, size);
-    } else { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+        dogs.forEach(d => {
+            if (dogImg.complete && dogImg.naturalWidth !== 0) {
+                let p = size * 0.05;
+                ctx.drawImage(dogImg, offsetX + d.x*size + p, offsetY + d.y*size + p, size - p*2, size - p*2);
+            }
+        });
+        if (playerImg.complete && playerImg.naturalWidth !== 0) {
+            let p = size * 0.1;
+            ctx.drawImage(playerImg, offsetX + player.x * size + p, offsetY + player.y * size + p, size - p*2, size - p*2);
+        }
+    } else {
+        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 }
 
-function showStartMenu() {
-    gameStarted = false;
-    document.getElementById('level-display').innerText = `Level ${currentLevel}`;
-    startContainer.style.display = 'flex';
-}
-
-startBtn.onclick = () => {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    unlockAudio(); startContainer.style.display = 'none'; gameStarted = true; isBlind = true;
-    generateRecursiveMaze(); currentPitchIndex = 0; updateUI(); draw();
-};
-document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; devModeCount++; updateUI(); draw(); };
-
-// スワイプ処理（元コード継承）
-let tsX, tsY;
-window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
+let tsX = null, tsY = null;
+window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; }, { passive: false });
 window.addEventListener('touchend', e => {
+    if (tsX === null || tsY === null) return;
     const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
     if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
         if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1);
     }
-});
+    tsX = null; tsY = null;
+}, { passive: false });
+
+function initGame() {
+    generateSimpleMaze();
+    currentPitchIndex = 0;
+    updateUI();
+    draw();
+}
+window.onresize = draw;
+playerImg.onload = draw;
 </script>
 </body>
 </html>
