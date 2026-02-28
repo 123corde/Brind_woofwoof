@@ -60,7 +60,7 @@
             <div id="shop-coins" style="color: #d4af37; font-weight: bold; margin-bottom: 8px;">所持コイン: 0枚</div>
             <button id="btn-flashlight" class="shop-item" onclick="buyItem('flashlight')">🔦 懐中電灯 (90c)</button>
             <button id="btn-shotgun" class="shop-item" onclick="buyItem('shotgun')">🔫 ショットガン (30c) [2発]</button>
-            <button id="btn-amulet" class="shop-item" onclick="buyItem('amulet')">✨ 金運お守り (3c) [永続3倍]</button>
+            <button id="btn-amulet" class="shop-item" onclick="buyItem('amulet')">✨ 金運お守り (3c) [永続3.1倍]</button>
         </div>
 
         <button id="start-btn">探索を開始する</button>
@@ -273,20 +273,27 @@ function showStartMenu() {
 }
 
 function draw() {
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    // キャンバスのサイズ設定（リサイズ対応）
     const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
     const offsetX = (canvas.width - size * COLS) / 2;
     const offsetY = (canvas.height - size * ROWS) / 2;
-    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 1. 背景を真っ暗に塗る
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
-            // 基本の視認性判定
-            let isVisible = !isBlind;
-            
-            // 🔦 懐中電灯ロジック
+            let px = offsetX + x * size;
+            let py = offsetY + y * size;
+
+            // --- 視認性の判定 ---
+            let isVisible = !isBlind; // オープンモードなら常に真
+
+            // 🔦 懐中電灯：スワイプ方向に2マス
             if (isBlind && hasFlashlight) {
-                let dx = x - player.x, dy = y - player.y;
+                let dx = x - player.x;
+                let dy = y - player.y;
                 let dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist <= 2.2) {
                     let dot = dx * lastDir.x + dy * lastDir.y;
@@ -294,42 +301,46 @@ function draw() {
                 }
             }
 
-            // ★修正ポイント：ゴール(2)は近く(2マス以内)にいれば常にぼんやり見えるように設定
-            if (isBlind && map[y][x] === 2) {
-                let distToGoal = Math.abs(x - player.x) + Math.abs(y - player.y);
-                if (distToGoal <= 2) isVisible = true; 
+            // ★重要：ゴール(2)は暗闇でも常に表示する（isVisibleに関係なく描画）
+            if (map[y][x] === 2) {
+                ctx.fillStyle = "#fff";
+                ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; // 発光エフェクト
+                ctx.fillRect(px + 2, py + 2, size - 4, size - 4);
+                ctx.shadowBlur = 0; 
+                continue; // ゴールを描画したら次のマスへ
             }
 
+            // --- 視界内の要素を描画 ---
             if (isVisible) {
-                let px = offsetX + x*size, py = offsetY + y*size;
-                
                 if (map[y][x] === 1) { 
-                    ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); 
-                } else if (map[y][x] === 2) { 
-                    // ゴール：白く光るタイル
-                    ctx.fillStyle = "#fff"; 
-                    ctx.shadowBlur = 15; ctx.shadowColor = "#fff"; // 光沢演出
-                    ctx.fillRect(px + 2, py + 2, size - 4, size - 4); 
-                    ctx.shadowBlur = 0; // 他の描画に影響しないようリセット
+                    // 壁
+                    ctx.fillStyle = "#333"; 
+                    ctx.fillRect(px, py, size, size); 
                 } else if (map[y][x] === 3) { 
                     // コイン
-                    ctx.fillStyle = "#ffd700"; ctx.beginPath(); 
-                    ctx.arc(px+size/2, py+size/2, size/6, 0, Math.PI*2); ctx.fill(); 
+                    ctx.fillStyle = "#ffd700";
+                    ctx.beginPath();
+                    ctx.arc(px + size/2, py + size/2, size/8, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (map[y][x] === 0) {
+                    // 通路（うっすらグレーで床を表現）
+                    ctx.fillStyle = "#111";
+                    ctx.fillRect(px, py, size, size);
                 }
 
-                // 犬の描画（視界内にいるときだけ）
+                // 犬の描画
                 dogs.forEach(d => {
                     if(d.x === x && d.y === y) {
-                        ctx.drawImage(dogImg, offsetX + d.x*size, offsetY + d.y*size, size, size);
+                        ctx.drawImage(dogImg, px, py, size, size);
                     }
                 });
             }
         }
     }
-    // プレイヤーは常に一番上に描画
-    ctx.drawImage(playerImg, offsetX + player.x*size, offsetY + player.y*size, size, size);
+    // プレイヤーの描画
+    ctx.drawImage(playerImg, offsetX + player.x * size, offsetY + player.y * size, size, size);
 }
-
+    
 // --- イベント登録 ---
 startBtn.onclick = () => {
     startContainer.style.display = 'none';
