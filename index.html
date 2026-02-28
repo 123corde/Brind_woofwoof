@@ -27,7 +27,7 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️ 購入してはいけない (0コイン)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️ 購入してはいけない1 (0コイン)</button>
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
@@ -56,6 +56,7 @@ let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = []; 
+let coinsCollectedInLevel = 0; // そのレベルで鳴らした音のステップ数
 
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 
@@ -107,7 +108,6 @@ function generateSimpleMaze() {
         }
 
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-        let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
         let q = [{x: startX, y: startY, d: 0, fullPath: []}]; dists[startY][startX] = 0;
         let allWalkable = [];
 
@@ -117,7 +117,6 @@ function generateSimpleMaze() {
                 let nx = curr.x + dx, ny = curr.y + dy;
                 if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
                     dists[ny][nx] = curr.d + 1;
-                    parent[ny][nx] = {x: curr.x, y: curr.y};
                     q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]});
                 }
             }
@@ -129,8 +128,9 @@ function generateSimpleMaze() {
             let targetNode = candidates[Math.floor(Math.random()*candidates.length)];
             map[targetNode.y][targetNode.x] = 2; goalPos = { x: targetNode.x, y: targetNode.y };
             shortestPath = targetNode.fullPath;
+            coinsCollectedInLevel = 0; // 音階ステップリセット
 
-            shortestPath.forEach((p, idx) => {
+            shortestPath.forEach((p) => {
                 if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
             });
 
@@ -168,9 +168,9 @@ function getNextStepToGoal() {
     return null;
 }
 
-function playCoinSound(pathIndex) {
+function playCoinSound(step) {
     if (!audioCtx) return;
-    let idx = pathIndex % WHITE_KEYS.length;
+    let idx = step % WHITE_KEYS.length;
     const baseFreq = WHITE_KEYS[idx];
     if (hasAmulet) {
         [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(baseFreq * r, 'sine', 0.25), i * 25));
@@ -197,11 +197,20 @@ function movePlayer(dx, dy, isAuto = false) {
         } else if (map[ny][nx] === 3) {
             let pIdx = shortestPath.findIndex(p => p.x === nx && p.y === ny);
             if (pIdx !== -1) {
-                playCoinSound(pIdx);
+                // 1. まず音を鳴らす
+                playCoinSound(coinsCollectedInLevel);
+                
+                // 2. 今回のコイン以前の最短経路上のコインをすべて消去
+                // 飛ばした分もカウントを進めることで、次の音を高くする
                 for(let i = 0; i <= pIdx; i++) {
                     let p = shortestPath[i];
-                    if (map[p.y][p.x] === 3) { map[p.y][p.x] = 0; totalCoins += (1 * coinMultiplier); }
+                    if (map[p.y][p.x] === 3) { 
+                        map[p.y][p.x] = 0; 
+                        totalCoins += (1 * coinMultiplier);
+                    }
                 }
+                // 音階ステップを「最後に取った位置 + 1」に更新
+                coinsCollectedInLevel++; 
                 updateUI();
             }
         }
