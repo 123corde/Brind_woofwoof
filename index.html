@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮</title>
+    <title>スイカ割り迷宮 (iOS対応版)</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -47,17 +47,16 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
+// 画像リソース
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 
-// サウンド設定：ループなし
+// オーディオオブジェクト
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
-growlSnd.loop = false;
-growlSnd.volume = 0.5;
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
-biteSnd.loop = false;
 
 let audioCtx = null;
+let soundUnlocked = false; // アンロック済みフラグ
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
@@ -73,6 +72,39 @@ const WHITE_KEYS = [
     523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 
     1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00
 ];
+
+/**
+ * iOSのサウンド制限を解除する
+ */
+async function unlockAudio() {
+    if (soundUnlocked) return;
+    
+    // AudioContextの生成とレジューム
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    await audioCtx.resume();
+
+    // HTML5 Audio(Audioオブジェクト)のアンロック
+    // 音量0で一瞬だけ再生して停止させる
+    const unlockSound = async (audio) => {
+        audio.volume = 0;
+        try {
+            await audio.play();
+            audio.pause();
+            audio.currentTime = 0;
+        } catch (e) {
+            console.error("Audio unlock failed:", e);
+        }
+    };
+
+    await unlockSound(growlSnd);
+    await unlockSound(biteSnd);
+
+    growlSnd.volume = 0.5;
+    biteSnd.volume = 1.0;
+    soundUnlocked = true;
+}
 
 function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
@@ -93,8 +125,8 @@ function updateUI() {
     if(devBtn) devBtn.disabled = hasDevGlasses;
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 }
-
-function calculateInterval() {
+    
+    function calculateInterval() {
     if (totalCoins < 1) return 3500;
     return Math.max(50, 3500 * Math.pow(0.975, Math.pow(totalCoins, 1.15)));
 }
@@ -114,11 +146,9 @@ function generateSimpleMaze() {
             let [dx, dy] = dirs[Math.floor(Math.random()*4)];
             if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) { x += dx; y += dy; map[y][x] = 0; }
         }
-
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let q = [{x: startX, y: startY, d: 0, fullPath: []}]; dists[startY][startX] = 0;
         let allWalkable = [];
-
         while(q.length > 0) {
             let curr = q.shift(); allWalkable.push(curr);
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
@@ -129,7 +159,6 @@ function generateSimpleMaze() {
                 }
             }
         }
-
         let minThreshold = ROWS * 1.2 + currentLevel;
         let candidates = allWalkable.filter(p => dists[p.y][p.x] >= minThreshold);
         if(candidates.length > 0) {
@@ -137,11 +166,7 @@ function generateSimpleMaze() {
             map[targetNode.y][targetNode.x] = 2; goalPos = { x: targetNode.x, y: targetNode.y };
             shortestPath = targetNode.fullPath;
             coinsCollectedInLevel = 0;
-
-            shortestPath.forEach((p) => {
-                if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
-            });
-
+            shortestPath.forEach((p) => { if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3; });
             dogs = [];
             let safety = new Set(shortestPath.map(p => `${p.x},${p.y}`));
             safety.add(`${player.x},${player.y}`);
@@ -176,26 +201,29 @@ function getNextStepToGoal() {
     return null;
 }
 
-function updateDogSounds() {
-    if (!gameStarted) return;
-    const nearDog = dogs.some(d => 
-        Math.abs(d.x - player.x) + Math.abs(d.y - player.y) === 1
-    );
-    if (nearDog) {
-        growlSnd.currentTime = 0; // 毎回最初から再生
-        growlSnd.play().catch(() => {});
-    }
+function stopAutoProcess() { 
+    autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); 
 }
 
-function playCoinSound(step) {
+// サウンド再生ヘルパー (AudioContext用)
+async function playOscillator(f, t, d) {
     if (!audioCtx) return;
-    let idx = step % WHITE_KEYS.length;
-    const baseFreq = WHITE_KEYS[idx];
-    if (hasAmulet) {
-        [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(baseFreq * r, 'sine', 0.25), i * 25));
-    } else {
-        playOscillator(baseFreq, 'sine', 0.15);
-    }
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
+    g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
+    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
+}
+
+// 吠え声・噛みつき (Audioオブジェクト用)
+function playGrowl() {
+    growlSnd.pause(); growlSnd.currentTime = 0;
+    growlSnd.play().catch(e => console.log(e));
+}
+
+function playBite() {
+    biteSnd.pause(); biteSnd.currentTime = 0;
+    biteSnd.play().catch(e => console.log(e));
 }
 
 function movePlayer(dx, dy, isAuto = false) {
@@ -208,19 +236,15 @@ function movePlayer(dx, dy, isAuto = false) {
     } else {
         player.x = nx; player.y = ny;
         
-        // 犬に衝突
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-            biteSnd.currentTime = 0;
-            biteSnd.play().catch(e => console.log(e));
-            gameStarted = false; // 先にゲームを止める
-            setTimeout(() => {
-                alert("イッヌに噛みつかれました！"); 
-                resetGame(); 
-            }, 100); // 0.1秒待ってからアラート（音声を先に通す）
+            gameStarted = false;
+            playBite();
+            setTimeout(() => { alert("イッヌに噛みつかれました！"); resetGame(); }, 100);
             return;
         }
 
-        updateDogSounds();
+        const nearDog = dogs.some(d => Math.abs(d.x - player.x) + Math.abs(d.y - player.y) === 1);
+        if (nearDog) playGrowl();
 
         if (map[ny][nx] === 2) {
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
@@ -231,40 +255,46 @@ function movePlayer(dx, dy, isAuto = false) {
                 playCoinSound(coinsCollectedInLevel);
                 for(let i = 0; i <= pIdx; i++) {
                     let p = shortestPath[i];
-                    if (map[p.y][p.x] === 3) { 
-                        map[p.y][p.x] = 0; 
-                        totalCoins += (1 * coinMultiplier);
-                    }
+                    if (map[p.y][p.x] === 3) { map[p.y][p.x] = 0; totalCoins += (1 * coinMultiplier); }
                 }
-                coinsCollectedInLevel++; 
-                updateUI();
+                coinsCollectedInLevel++; updateUI();
             }
         }
     }
     draw();
 }
 
-function executeAutoStep() {
-    if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
-    let step = getNextStepToGoal();
-    if (step) {
-        movePlayer(step.dx, step.dy, true);
-        autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval());
+async function startGame() {
+    // ボタンクリック時のこのタイミングでアンロックを実行
+    await unlockAudio();
+    
+    document.getElementById('start-container').style.display = 'none';
+    gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw();
+}
+
+// ... (以下 draw, resetGame, 各種イベントリスナーは元のロジックを継承) ...
+
+function resetGame() {
+    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
+    gameStarted = false; isBlind = true; stopAutoProcess();
+    document.getElementById('start-container').style.display = 'flex'; updateUI();
+}
+
+function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
+function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
+function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
+function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
+
+function playCoinSound(step) {
+    let idx = step % WHITE_KEYS.length;
+    const baseFreq = WHITE_KEYS[idx];
+    if (hasAmulet) {
+        [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(baseFreq * r, 'sine', 0.25), i * 25));
     } else {
-        stopAutoProcess();
+        playOscillator(baseFreq, 'sine', 0.15);
     }
 }
-
-function stopAutoProcess() { 
-    autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); 
-}
-
-setInterval(() => {
-    if (!gameStarted || !hasAutoDevice) return;
-    let idle = Date.now() - lastMoveTime;
-    if (autoLoadState === "NONE" && idle > 5000) { autoLoadState = "LOADING"; updateUI(); }
-    if (autoLoadState === "LOADING" && idle > 8000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
-}, 500);
+async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
 
 function draw() {
     const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
@@ -294,33 +324,12 @@ function draw() {
     ctx.drawImage(playerImg, offsetX + player.x*size, offsetY + player.y*size, size, size);
 }
 
-function startGame() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    document.getElementById('start-container').style.display = 'none';
-    gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw();
-}
-
-function resetGame() {
-    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
-    gameStarted = false; isBlind = true; stopAutoProcess();
-    document.getElementById('start-container').style.display = 'flex'; updateUI();
-}
-
-function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
-function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
-function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
-function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
-
-async function playOscillator(f, t, d) {
-    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
-}
-async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
-
 let tsX = null, tsY = null;
-window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
+window.addEventListener('touchstart', e => { 
+    tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; 
+    // 操作中もAudioContextがsuspendedならresumeを試みる
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+});
 window.addEventListener('touchend', e => {
     if (tsX === null || tsY === null) return;
     const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
