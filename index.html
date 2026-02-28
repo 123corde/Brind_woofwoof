@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち (Flashlight Full Edition)</title>
+    <title>イッヌと寝落ち (Flashlight Mask Edition)</title>
     <style>
-        body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
         #ui { 
             position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; 
@@ -13,7 +13,6 @@
         }
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
-        
         #start-container { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(255,255,255,0.95); display: flex; flex-direction: column; 
@@ -25,7 +24,6 @@
             max-width: 400px; border-top: 1px solid #ccc; padding-top: 10px;
         }
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
-        
         .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 300px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { background: #6c757d; color: white; }
@@ -37,22 +35,14 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 28px; font-weight: bold;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (10コイン)</button>
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
-        
         <button id="start-btn" onclick="startGame()">ゲームを開始する</button>
-
         <div id="game-desc">
-            <b>画面を見なくてもOK</b><br>
-            😪<b>目を瞑って、寝落ちする体勢でプレイすることを推奨します</b>😴<br>
-            <br>    
-            ・上下左右にスワイプで1マス移動<br>
-            ・暗闇を手探りで進みゴールを目指せ<br>
-            ・コインはゴールに近いほど高音になるよ<br>
-            ・迷路内で待ち構えているイッヌに気を付けて
+            ・上下左右にスワイプで移動<br>
+            ・懐中電灯は「足元1マス」と「前方2マス」を照らします
         </div>
     </div>
 
@@ -66,9 +56,6 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-// ==========================================
-// 1. 基本設定 & アセット
-// ==========================================
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -78,7 +65,7 @@ let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false, hasFlashlight = false;
-let lastDir = { dx: 0, dy: -1 }; // 懐中電灯の向き
+let lastDir = { dx: 0, dy: -1 }; 
 
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = [], coinsCollectedInLevel = 0;
@@ -86,18 +73,11 @@ let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
-// ==========================================
-// 2. 音声制限解除 (iOS/Safari対応)
-// ==========================================
 function unlockAudio() {
     if (soundReady) return;
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    const silentPlay = (audio) => {
-        audio.play().then(() => {
-            setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1);
-        }).catch(e => console.log("Sound unlock waiting for interaction"));
-    };
+    const silentPlay = (audio) => { audio.play().then(() => { setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1); }).catch(e => {}); };
     silentPlay(growlSnd); silentPlay(biteSnd);
     soundReady = true;
 }
@@ -106,14 +86,11 @@ function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
-    
-    // モードテキストの表示優先度
     let modeLabel = "ブラインド";
     if (!isBlind) modeLabel = "デバッグ（視界確保）";
     else if (hasFlashlight) modeLabel = "懐中電灯モード";
     document.getElementById('mode-text').innerText = modeLabel;
     
-    // Google Mapのステータス表示
     let statusText = "";
     if (autoLoadState === "LOADING") statusText = "📡 Google Map読み込み中...";
     else if (autoLoadState === "MOVING") statusText = `📍 案内中 (${(calculateInterval()/1000).toFixed(2)}s)`;
@@ -124,19 +101,10 @@ function updateUI() {
     document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
-    
-    const desc = document.getElementById('game-desc');
-    if (desc) desc.style.display = (currentLevel === 1) ? 'block' : 'none';
 }
 
-function calculateInterval() {
-    if (totalCoins < 1) return 3000;
-    return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15)));
-}
+function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
 
-// ==========================================
-// 3. 迷路生成（安全アルゴリズム）
-// ==========================================
 function generateSimpleMaze() {
     ROWS = COLS = 6 + (currentLevel * 2);
     let found = false;
@@ -166,7 +134,6 @@ function generateSimpleMaze() {
             map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
             shortestPath = target.fullPath; coinsCollectedInLevel = 0;
             shortestPath.forEach(p => { if(!(p.x===goalPos.x && p.y===goalPos.y)) map[p.y][p.x]=3; });
-            
             dogs = [];
             let safetyZone = new Set();
             shortestPath.concat({x: player.x, y: player.y}).forEach(p => {
@@ -181,9 +148,6 @@ function generateSimpleMaze() {
     }
 }
 
-// ==========================================
-// 4. 自動移動ロジック
-// ==========================================
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
@@ -203,10 +167,8 @@ function getNextStepToGoal() {
 function executeAutoStep() {
     if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
     let step = getNextStepToGoal();
-    if (step) {
-        movePlayer(step.dx, step.dy, true);
-        autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval());
-    } else { stopAutoProcess(); }
+    if (step) { movePlayer(step.dx, step.dy, true); autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval()); } 
+    else { stopAutoProcess(); }
 }
 
 function stopAutoProcess() { autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); }
@@ -218,9 +180,6 @@ setInterval(() => {
     if (autoLoadState === "LOADING" && idle > 8000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
 }, 500);
 
-// ==========================================
-// 5. 音声 & 移動処理
-// ==========================================
 async function playOscillator(f, t, d) {
     if (!audioCtx) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -232,10 +191,7 @@ async function playOscillator(f, t, d) {
 function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
     if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
-    
-    // 方向を保存
     lastDir = { dx, dy };
-
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         if(!isAuto) playOscillator(150, 'square', 0.1);
@@ -243,7 +199,7 @@ function movePlayer(dx, dy, isAuto = false) {
         player.x = nx; player.y = ny;
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
             gameStarted = false; biteSnd.play().catch(e=>{});
-            setTimeout(() => { alert("~~ GAME OVER ~~\nイッヌに捕まりました。"); resetGame(); }, 100);
+            setTimeout(() => { alert("~~ GAME OVER ~~"); resetGame(); }, 100);
             return;
         }
         if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) growlSnd.play().catch(e=>{});
@@ -284,53 +240,56 @@ function draw() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
     
-    // 背景
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 1. 全体を一旦黒で塗りつぶす（ブラインドの基本）
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 1. 懐中電灯またはデバッグモードなら描画
-    if (!isBlind || hasFlashlight) {
-        for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
-            let px = oX+x*size, py = oY+y*size;
-            if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
-            else if (map[y][x] === 2) {
-                let cs=3, rs=4, cw=size/cs, ch=size/rs;
-                for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
-                ctx.strokeStyle="#000"; ctx.strokeRect(px, py, size, size);
-            } else if (map[y][x] === 3) {
-                ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
-            }
-            dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
-        }
-        ctx.drawImage(playerImg, oX+player.x*size, oY+player.y*size, size, size);
+    // 2. 視界を「切り抜く」処理
+    ctx.save();
+    if (!isBlind) {
+        // デバッグモード：全表示
+        ctx.beginPath();
+        ctx.rect(0, 0, canvas.width, canvas.height);
+        ctx.clip();
+    } else if (hasFlashlight) {
+        // 懐中電灯モード：特定範囲だけクリップ
+        const centerX = oX + player.x * size + size / 2;
+        const centerY = oY + player.y * size + size / 2;
+        
+        ctx.beginPath();
+        // 足元：半径1マス分
+        ctx.arc(centerX, centerY, size * 1.0, 0, Math.PI * 2);
+
+        // 前方：長さ2マス分の扇形
+        const angle = Math.atan2(lastDir.dy, lastDir.dx);
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, size * 2.5, angle - 0.5, angle + 0.5); 
+        ctx.closePath();
+        
+        ctx.clip(); // 描画領域を限定
+    } else {
+        // 通常ブラインド：クリップなし（何も描画されない）
+        ctx.restore();
+        return;
     }
 
-    // 2. 視界制限レイヤー
-    if (isBlind) {
-        if (hasFlashlight) {
-            ctx.save();
-            const centerX = oX + player.x * size + size / 2;
-            const centerY = oY + player.y * size + size / 2;
-            
-            ctx.beginPath();
-            ctx.rect(0, 0, canvas.width, canvas.height); // 全体
+    // 3. クリップされた領域にだけ迷路を描画
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // プレイヤー周囲の円形
-            ctx.arc(centerX, centerY, size * 0.8, 0, Math.PI * 2, true);
-
-            // 進行方向への扇形
-            const angle = Math.atan2(lastDir.dy, lastDir.dx);
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, size * 5, angle - 0.4, angle + 0.4, true); 
-            ctx.closePath();
-
-            ctx.fillStyle = "black";
-            ctx.fill();
-            ctx.restore();
-        } else {
-            ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
+        let px = oX+x*size, py = oY+y*size;
+        if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
+        else if (map[y][x] === 2) {
+            let cs=3, rs=4, cw=size/cs, ch=size/rs;
+            for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
+        } else if (map[y][x] === 3) {
+            ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
         }
+        dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
     }
+    ctx.drawImage(playerImg, oX+player.x*size, oY+player.y*size, size, size);
+    ctx.restore();
 }
 
 let tsX = null, tsY = null;
