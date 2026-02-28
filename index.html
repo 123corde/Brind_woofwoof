@@ -29,7 +29,7 @@
         <div id="coin-status">所持コイン: 0枚</div>
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購👁️入👁️し👁️て👁️は👁️い👁️け👁️な👁️い👁️ (0コイン)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
         
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
@@ -50,7 +50,6 @@
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 
-// サウンドファイルの更新
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 growlSnd.loop = true;
 growlSnd.volume = 0.4;
@@ -85,9 +84,9 @@ function updateUI() {
     document.getElementById('auto-status').innerText = statusText;
 
     const amuletBtn = document.getElementById('amulet-btn');
-    if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 30);
+    if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
     const autoBtn = document.getElementById('auto-device-btn');
-    if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 15);
+    if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
     const devBtn = document.getElementById('dev-glass-btn');
     if(devBtn) devBtn.disabled = hasDevGlasses;
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
@@ -307,8 +306,8 @@ function resetGame() {
 
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
 function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
-function buyAmulet() { if (totalCoins >= 30 && !hasAmulet) { totalCoins -= 30; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
-function buyAutoDevice() { if (totalCoins >= 15 && !hasAutoDevice) { totalCoins -= 15; hasAutoDevice = true; updateUI(); } }
+function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
+function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
 
 async function playOscillator(f, t, d) {
     const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
