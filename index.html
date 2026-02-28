@@ -60,7 +60,7 @@ let map = [], dogs = [];
 
 // 自動移動用
 let lastMoveTime = Date.now();
-let autoMoveInterval = null;
+let autoMoveTimeout = null;
 let isAutoMoving = false;
 
 function updateUI() {
@@ -68,7 +68,11 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ";
-    document.getElementById('auto-status').innerText = isAutoMoving ? "⚠️ 自動移動中..." : "";
+    
+    // スピード倍率を表示
+    let speedLabel = isAutoMoving ? `⚠️ 自動爆走中 (Speed: x${(1 + totalCoins * 0.2).toFixed(1)})` : "";
+    document.getElementById('auto-status').innerText = speedLabel;
+
     const btn = document.getElementById('amulet-btn');
     if(btn) btn.disabled = (hasAmulet || totalCoins < 3);
 }
@@ -141,16 +145,13 @@ function generateSimpleMaze() {
     }
 }
 
-// 最短経路を探索する関数 (BFS)
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}];
     let visited = new Set();
     visited.add(`${player.x},${player.y}`);
-
     while(q.length > 0) {
         let curr = q.shift();
-        if(map[curr.y][curr.x] === 2) return curr.path[0]; // 最初の1歩を返す
-
+        if(map[curr.y][curr.x] === 2) return curr.path[0];
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
             let nx = curr.x + dx, ny = curr.y + dy;
             if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1 && !visited.has(`${nx},${ny}`)) {
@@ -164,13 +165,10 @@ function getNextStepToGoal() {
 
 function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
-    
-    // 手動操作なら自動移動タイマーをリセット
     if (!isAuto) {
         lastMoveTime = Date.now();
         stopAutoMove();
     }
-
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         if(!isAuto) playOscillator(150, 'square', 0.1);
@@ -178,15 +176,10 @@ function movePlayer(dx, dy, isAuto = false) {
         player.x = nx; player.y = ny;
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
             alert("イッヌに噛まれました！");
-            resetGame();
-            return;
+            resetGame(); return;
         }
         if (map[ny][nx] === 2) {
-            playGoalSound(); 
-            currentLevel++; 
-            gameStarted = false; 
-            isBlind = true;
-            stopAutoMove();
+            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoMove();
             document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
         } else if (map[ny][nx] === 3) {
             totalCoins += (1 * coinMultiplier); 
@@ -202,30 +195,36 @@ function resetGame() {
     document.getElementById('start-container').style.display = 'flex'; updateUI();
 }
 
+// 加速対応した自動移動
+function executeAutoStep() {
+    if (!isAutoMoving || !gameStarted) return;
+    let step = getNextStepToGoal();
+    if (step) {
+        movePlayer(step.dx, step.dy, true);
+        // コイン枚数に基づいて次のステップまでの時間を計算
+        let interval = 1000 / (1 + totalCoins * 0.2); 
+        autoMoveTimeout = setTimeout(executeAutoStep, interval);
+    } else {
+        stopAutoMove();
+    }
+}
+
 function startAutoMove() {
     if (isAutoMoving || !gameStarted) return;
     isAutoMoving = true;
     updateUI();
-    autoMoveInterval = setInterval(() => {
-        let step = getNextStepToGoal();
-        if (step) {
-            movePlayer(step.dx, step.dy, true);
-        } else {
-            stopAutoMove();
-        }
-    }, 1000);
+    executeAutoStep();
 }
 
 function stopAutoMove() {
     isAutoMoving = false;
-    if (autoMoveInterval) {
-        clearInterval(autoMoveInterval);
-        autoMoveInterval = null;
+    if (autoMoveTimeout) {
+        clearTimeout(autoMoveTimeout);
+        autoMoveTimeout = null;
     }
     updateUI();
 }
 
-// 放置チェック用ループ
 setInterval(() => {
     if (gameStarted && !isAutoMoving && Date.now() - lastMoveTime > 5000) {
         startAutoMove();
@@ -239,27 +238,16 @@ function draw() {
     const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
     const offsetX = (canvas.width - size * COLS) / 2;
     const offsetY = (canvas.height - size * ROWS) / 2;
-
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (isBlind) {
-        ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-        return; 
-    }
-
+    if (isBlind) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
             let px = offsetX + x*size, py = offsetY + y*size;
-            if (map[y][x] === 1) { 
-                ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); 
-            } else if (map[y][x] === 2) { 
-                const cols = 3; const rows = 4;
-                const cellW = size / cols; const cellH = size / rows;
-                for (let r = 0; r < rows; r++) {
-                    for (let c = 0; c < cols; c++) {
-                        ctx.fillStyle = (r + c) % 2 === 0 ? "#fff" : "#000";
-                        ctx.fillRect(px + c * cellW, py + r * cellH, cellW, cellH);
-                    }
+            if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
+            else if (map[y][x] === 2) { 
+                const cs = 3, rs = 4, cw = size / cs, ch = size / rs;
+                for (let r = 0; r < rs; r++) for (let c = 0; c < cs; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? "#fff" : "#000"; ctx.fillRect(px + c * cw, py + r * ch, cw, ch);
                 }
                 ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(px, py, size, size);
             } else if (map[y][x] === 3) { 
@@ -276,16 +264,11 @@ function draw() {
 function startGame() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     document.getElementById('start-container').style.display = 'none';
-    gameStarted = true;
-    lastMoveTime = Date.now();
+    gameStarted = true; lastMoveTime = Date.now();
     generateSimpleMaze(); updateUI(); draw();
 }
 
-document.getElementById('toggleMode').onclick = () => { 
-    isBlind = !isBlind; 
-    lastMoveTime = Date.now(); // DevMode切り替えも放置リセット
-    updateUI(); draw(); 
-};
+document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; lastMoveTime = Date.now(); updateUI(); draw(); };
 
 async function playOscillator(f, t, d) {
     if (!audioCtx) return;
