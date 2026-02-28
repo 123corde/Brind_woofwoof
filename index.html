@@ -290,4 +290,57 @@ function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -
 function playCoinSound(step) {
     let idx = step % WHITE_KEYS.length;
     const baseFreq = WHITE_KEYS[idx];
-    if (hasAmulet)
+    if (hasAmulet) {
+        [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(baseFreq * r, 'sine', 0.25), i * 25));
+    } else {
+        playOscillator(baseFreq, 'sine', 0.15);
+    }
+}
+async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
+
+function draw() {
+    const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
+    const offsetX = (canvas.width - size * COLS) / 2, offsetY = (canvas.height - size * ROWS) / 2;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (isBlind) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
+    for(let y=0; y<ROWS; y++) {
+        for(let x=0; x<COLS; x++) {
+            let px = offsetX + x*size, py = offsetY + y*size;
+            if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
+            else if (map[y][x] === 2) { 
+                const cs = 3, rs = 4, cw = size / cs, ch = size / rs;
+                for (let r = 0; r < rs; r++) for (let c = 0; c < cs; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? "#fff" : "#000"; ctx.fillRect(px + c * cw, py + r * ch, cw, ch);
+                }
+                ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(px, py, size, size);
+            } else if (map[y][x] === 3) { 
+                ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = "#5d4037"; ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillText("$", px+size/2, py+size/2);
+            }
+            dogs.forEach(d => { if(d.x === x && d.y === y) ctx.drawImage(dogImg, px, py, size, size); });
+        }
+    }
+    ctx.drawImage(playerImg, offsetX + player.x*size, offsetY + player.y*size, size, size);
+}
+
+let tsX = null, tsY = null;
+window.addEventListener('touchstart', e => { 
+    tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; 
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+});
+window.addEventListener('touchend', e => {
+    if (tsX === null || tsY === null) return;
+    const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
+    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+        if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1);
+    }
+    tsX = null; tsY = null;
+});
+window.onresize = draw;
+updateUI();
+</script>
+</body>
+</html>
