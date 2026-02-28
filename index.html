@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 - 音楽的修正版</title>
+    <title>スイカ割り迷宮 - 正解ルート音階版</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -19,6 +19,7 @@
         .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; min-width: 320px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { background: #6c757d; color: white; }
+        #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; text-shadow: 0 0 2px white; }
     </style>
 </head>
 <body>
@@ -26,13 +27,14 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👓 開発者用メガネ (0コイン: 切り替え機能解放)</button>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン: 報酬10倍 & 綺麗な和音)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👓 開発者用メガネ (0コイン)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン: 白鍵和音)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン: 自動案内)</button>
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
 
     <div id="ui">
+        <div id="auto-status"></div>
         <div id="mode-text">ブラインド</div>
         <div id="total-coins">コイン: 0</div>
     </div>
@@ -60,13 +62,18 @@ let hasDevGlasses = false;
 let ROWS, COLS;
 let player = { x: 0, y: 0 };
 let goalPos = { x: 0, y: 0 };
-let map = [], dogs = [];
+let map = [], dogs = [], distToGoalMap = [];
 
-// ペンタトニックスケールの周波数リスト (C4からC7まで)
-const PENTA_SCALE = [
-    261.63, 293.66, 329.63, 392.00, 440.00, // C4 D4 E4 G4 A4
-    523.25, 587.33, 659.25, 783.99, 880.00, // C5 D5 E5 G5 A5
-    1046.50, 1174.66, 1318.51, 1567.98, 1760.00, // C6 D6 E6 G6 A6
+let lastMoveTime = Date.now();
+let autoMoveTimeout = null;
+let isAutoMoving = false;
+let autoLoadState = "NONE";
+
+// C Major Scale (白鍵のみ、シャープなし) - 3オクターブ分
+const C_MAJOR_SCALE = [
+    261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, // C4-B4
+    523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, // C5-B5
+    1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, // C6-B6
     2093.00 // C7
 ];
 
@@ -76,52 +83,19 @@ function updateUI() {
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ（視界確保）";
     
+    let statusText = "";
+    if (autoLoadState === "LOADING") statusText = "📡 Google Mapが経路読み込み中...";
+    else if (autoLoadState === "MOVING") statusText = "📍 ルート案内中...";
+    document.getElementById('auto-status').innerText = statusText;
+
     const amuletBtn = document.getElementById('amulet-btn');
     if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
     const autoBtn = document.getElementById('auto-device-btn');
     if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
     const devBtn = document.getElementById('dev-glass-btn');
     if(devBtn) devBtn.disabled = hasDevGlasses;
-
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 }
-
-function playDistanceSound() {
-    if (!audioCtx) return;
-    
-    const dist = Math.sqrt(Math.pow(player.x - goalPos.x, 2) + Math.pow(player.y - goalPos.y, 2));
-    const maxDist = Math.sqrt(Math.pow(COLS, 2) + Math.pow(ROWS, 2));
-    
-    // 距離に基づいてリストのインデックスを決定 (近いほどインデックス大)
-    let idx = Math.floor((1 - dist / maxDist) * (PENTA_SCALE.length - 1));
-    idx = Math.max(0, Math.min(idx, PENTA_SCALE.length - 1));
-    
-    const baseFreq = PENTA_SCALE[idx];
-    
-    if (hasAmulet) {
-        // お守りあり：キラキラした和音 (根音 + 3音上 + 5音上など)
-        const chordOffsets = [0, 2, 4]; // スケール内のインデックスをずらす
-        chordOffsets.forEach((offset, i) => {
-            let noteIdx = Math.min(idx + offset, PENTA_SCALE.length - 1);
-            setTimeout(() => playOscillator(PENTA_SCALE[noteIdx], 'sine', 0.3), i * 30);
-        });
-    } else {
-        // お守りなし：単音
-        playOscillator(baseFreq, 'sine', 0.2);
-    }
-}
-
-// --- 基本機能のコード (共通) ---
-
-function toggleBlind() {
-    isBlind = !isBlind;
-    updateUI();
-    draw();
-}
-
-function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
-function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
-function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
 
 function generateSimpleMaze() {
     ROWS = COLS = 6 + (currentLevel * 2);
@@ -138,93 +112,161 @@ function generateSimpleMaze() {
             let [dx, dy] = dirs[Math.floor(Math.random()*4)];
             if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) { x += dx; y += dy; map[y][x] = 0; }
         }
+        
+        // ゴールまでの最短歩数を全マス計算 (BFS)
+        let q = [];
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-        let q = [{x: startX, y: startY, d: 0}]; dists[startY][startX] = 0;
+        let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        
+        q.push({x: startX, y: startY});
+        dists[startY][startX] = 0;
         let allWalkable = [];
+
         while(q.length > 0) {
-            let curr = q.shift(); allWalkable.push(curr);
+            let curr = q.shift();
+            allWalkable.push(curr);
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = curr.x + dx, ny = curr.y + dy;
                 if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
-                    dists[ny][nx] = curr.d + 1; q.push({x: nx, y: ny, d: curr.d + 1});
+                    dists[ny][nx] = dists[curr.y][curr.x] + 1;
+                    parent[ny][nx] = {x: curr.x, y: curr.y};
+                    q.push({x: nx, y: ny});
                 }
             }
         }
+
         let candidates = allWalkable.filter(p => dists[p.y][p.x] >= ROWS * 1.2);
         if(candidates.length > 0) {
             let goal = candidates[Math.floor(Math.random()*candidates.length)];
-            map[goal.y][goal.x] = 2; goalPos = { x: goal.x, y: goal.y };
+            map[goal.y][goal.x] = 2;
+            goalPos = { x: goal.x, y: goal.y };
+            
+            // ゴール側から逆BFSして、全地点から「ゴールまでの最短歩数」をマップ化
+            distToGoalMap = Array.from({ length: ROWS }, () => Array(COLS).fill(999));
+            let gQ = [{x: goal.x, y: goal.y, d: 0}];
+            distToGoalMap[goal.y][goal.x] = 0;
+            while(gQ.length > 0) {
+                let curr = gQ.shift();
+                for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                    let nx = curr.x + dx, ny = curr.y + dy;
+                    if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && distToGoalMap[ny][nx] === 999) {
+                        distToGoalMap[ny][nx] = curr.d + 1;
+                        gQ.push({x: nx, y: ny, d: curr.d + 1});
+                    }
+                }
+            }
+
+            // コイン配置
+            allWalkable.forEach(p => {
+                if(Math.random() < 0.15 && map[p.y][p.x] === 0 && !(p.x === player.x && p.y === player.y)) {
+                    map[p.y][p.x] = 3;
+                }
+            });
             found = true;
-            // 簡易的に道中にコインを配置
-            allWalkable.forEach(p => { if(Math.random() < 0.1 && map[p.y][p.x] === 0) map[p.y][p.x] = 3; });
         }
     }
 }
 
-function movePlayer(dx, dy) {
+function playRouteSound() {
+    if (!audioCtx) return;
+    const stepsToGoal = distToGoalMap[player.y][player.x];
+    const maxSteps = ROWS * COLS; // 余裕を持った最大値
+    
+    // ゴールに近づく(stepsが小さい)ほど、音階のインデックスを上げる
+    // 指数的に変化させることでゴール直前の高揚感を出す
+    let idx = Math.floor(C_MAJOR_SCALE.length - (stepsToGoal * 0.8));
+    idx = Math.max(0, Math.min(idx, C_MAJOR_SCALE.length - 1));
+    
+    const baseFreq = C_MAJOR_SCALE[idx];
+
+    if (hasAmulet) {
+        // お守りあり：C Majorの和音 (ド・ミ・ソのような綺麗な響き)
+        [0, 2, 4].forEach((offset, i) => {
+            let nIdx = Math.min(idx + offset, C_MAJOR_SCALE.length - 1);
+            setTimeout(() => playOscillator(C_MAJOR_SCALE[nIdx], 'sine', 0.25), i * 30);
+        });
+    } else {
+        // お守りなし：白鍵単音
+        playOscillator(baseFreq, 'sine', 0.2);
+    }
+}
+
+function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
+    if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
     const nx = player.x + dx, ny = player.y + dy;
     if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1) {
         player.x = nx; player.y = ny;
         if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true;
+            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
         } else if (map[ny][nx] === 3) {
-            totalCoins += (1 * coinMultiplier); 
-            playDistanceSound(); // ここで距離連動音を鳴らす
+            totalCoins += (1 * coinMultiplier);
+            playRouteSound(); // 正解ルートに基づく音を鳴らす
             map[ny][nx] = 0; updateUI();
         }
-    } else {
-        playOscillator(150, 'square', 0.1); // 壁衝突音
-    }
+    } else { if(!isAuto) playOscillator(150, 'square', 0.1); }
     draw();
 }
 
+// --- 以下、既存のシステム維持 ---
+function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
+function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
+function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
+function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
+function getNextStepToGoal() {
+    for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+        let nx = player.x + dx, ny = player.y + dy;
+        if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && distToGoalMap[ny][nx] < distToGoalMap[player.y][player.x]) return {dx, dy};
+    }
+    return null;
+}
+function executeAutoStep() {
+    if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
+    let s = getNextStepToGoal();
+    if (s) { movePlayer(s.dx, s.dy, true); autoMoveTimeout = setTimeout(executeAutoStep, 300); }
+    else stopAutoProcess();
+}
+function stopAutoProcess() { autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); }
+setInterval(() => {
+    if (!gameStarted || !hasAutoDevice) return;
+    let idle = Date.now() - lastMoveTime;
+    if (autoLoadState === "NONE" && idle > 5000) { autoLoadState = "LOADING"; updateUI(); }
+    if (autoLoadState === "LOADING" && idle > 8000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
+}, 500);
+
 function draw() {
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
-    const offsetX = (canvas.width - size * COLS) / 2;
-    const offsetY = (canvas.height - size * ROWS) / 2;
+    const offsetX = (canvas.width - size * COLS) / 2; const offsetY = (canvas.height - size * ROWS) / 2;
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (isBlind) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
             let px = offsetX + x*size, py = offsetY + y*size;
             if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
-            else if (map[y][x] === 2) { ctx.fillStyle = "#ff0000"; ctx.fillRect(px, py, size, size); }
+            else if (map[y][x] === 2) { ctx.fillStyle = "#f00"; ctx.fillRect(px, py, size, size); }
             else if (map[y][x] === 3) { ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); }
         }
     }
     ctx.drawImage(playerImg, offsetX + player.x*size, offsetY + player.y*size, size, size);
 }
 
-function startGame() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    document.getElementById('start-container').style.display = 'none';
-    gameStarted = true; generateSimpleMaze(); updateUI(); draw();
-}
-
+function startGame() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); document.getElementById('start-container').style.display = 'none'; gameStarted = true; generateSimpleMaze(); updateUI(); draw(); }
 async function playOscillator(f, t, d) {
     const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
     o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    g.gain.setValueAtTime(0.06, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + d);
+    g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
+    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
-
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
-
 let tsX = null, tsY = null;
 window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
 window.addEventListener('touchend', e => {
     if (tsX === null || tsY === null) return;
     const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
-    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
-        if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1);
-    }
+    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) { if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1); }
     tsX = null; tsY = null;
 });
 window.onresize = draw;
