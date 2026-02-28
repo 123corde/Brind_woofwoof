@@ -8,7 +8,10 @@
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
         #ui { position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; font-weight: bold; }
-        #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; }
+        
+        /* 最初は非表示。メガネ購入で表示される */
+        #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
+        
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
 
         #start-container { 
@@ -16,9 +19,10 @@
             background: rgba(255,255,255,0.9); display: flex; flex-direction: column; 
             justify-content: center; align-items: center; z-index: 100; 
         }
-        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; }
-        .shop-btn { padding: 10px; margin: 10px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; min-width: 320px; }
+        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; }
+        .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; min-width: 320px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .dev-btn { background: #6c757d; color: white; }
         #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; text-shadow: 0 0 2px white; }
     </style>
 </head>
@@ -27,8 +31,11 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
-        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
+        
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👓 開発者用メガネ (0コイン: 切り替え機能解放)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン: 報酬10倍)</button>
+        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン: 自動案内)</button>
+        
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
 
@@ -39,7 +46,7 @@
     </div>
 
     <div id="controls">
-        <button id="toggleMode">Dev Mode</button>
+        <button id="toggleMode" onclick="toggleBlind()">Dev Mode</button>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -56,6 +63,8 @@ let totalCoins = 0;
 let coinMultiplier = 1; 
 let hasAmulet = false;
 let hasAutoDevice = false; 
+let hasDevGlasses = false;
+
 let ROWS, COLS;
 let player = { x: 0, y: 0 };
 let map = [], dogs = [];
@@ -69,7 +78,7 @@ function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
-    document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ";
+    document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ（視界確保）";
     
     let statusText = "";
     if (autoLoadState === "LOADING") {
@@ -85,6 +94,12 @@ function updateUI() {
     
     const autoBtn = document.getElementById('auto-device-btn');
     if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
+
+    const devBtn = document.getElementById('dev-glass-btn');
+    if(devBtn) devBtn.disabled = hasDevGlasses;
+
+    // メガネを持っている場合のみボタンを表示
+    document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 }
 
 function calculateInterval() {
@@ -93,11 +108,25 @@ function calculateInterval() {
     return Math.max(50, interval); 
 }
 
+// ボタンで切り替えるための関数
+function toggleBlind() {
+    isBlind = !isBlind;
+    lastMoveTime = Date.now();
+    stopAutoProcess();
+    updateUI();
+    draw();
+}
+
+function buyDevGlasses() {
+    hasDevGlasses = true;
+    updateUI();
+}
+
 function buyAmulet() {
     if (totalCoins >= 3 && !hasAmulet) {
         totalCoins -= 3;
         hasAmulet = true;
-        coinMultiplier = 10; // 効果値を10倍に変更
+        coinMultiplier = 10;
         updateUI();
     }
 }
@@ -206,7 +235,9 @@ function movePlayer(dx, dy, isAuto = false) {
             resetGame(); return;
         }
         if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
+            playGoalSound(); currentLevel++; gameStarted = false; 
+            // 次回開始時の状態は維持（メガネがあればボタンも維持）
+            stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
         } else if (map[ny][nx] === 3) {
             totalCoins += (1 * coinMultiplier); 
@@ -217,7 +248,7 @@ function movePlayer(dx, dy, isAuto = false) {
 }
 
 function resetGame() {
-    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; coinMultiplier = 1;
+    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
     gameStarted = false; isBlind = true; stopAutoProcess();
     document.getElementById('start-container').style.display = 'flex'; updateUI();
 }
@@ -266,7 +297,9 @@ function draw() {
     const offsetX = (canvas.width - size * COLS) / 2;
     const offsetY = (canvas.height - size * ROWS) / 2;
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
     if (isBlind) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
+    
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
             let px = offsetX + x*size, py = offsetY + y*size;
@@ -294,8 +327,6 @@ function startGame() {
     gameStarted = true; lastMoveTime = Date.now();
     generateSimpleMaze(); updateUI(); draw();
 }
-
-document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); };
 
 async function playOscillator(f, t, d) {
     if (!audioCtx) return;
