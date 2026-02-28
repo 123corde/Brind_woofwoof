@@ -19,7 +19,7 @@
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; }
         .shop-btn { padding: 10px; margin: 10px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; min-width: 320px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
-        #auto-status { color: #4285F4; font-size: 12px; height: 1.2em; font-weight: bold; }
+        #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; text-shadow: 0 0 2px white; }
     </style>
 </head>
 <body>
@@ -55,14 +55,16 @@ let currentLevel = 1;
 let totalCoins = 0;
 let coinMultiplier = 1; 
 let hasAmulet = false;
-let hasAutoDevice = false; // Google Map所有フラグ
+let hasAutoDevice = false; 
 let ROWS, COLS;
 let player = { x: 0, y: 0 };
 let map = [], dogs = [];
 
+// 自動移動・読み込み演出用
 let lastMoveTime = Date.now();
 let autoMoveTimeout = null;
 let isAutoMoving = false;
+let autoLoadState = "NONE"; // NONE, LOADING, MOVING
 
 function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
@@ -70,7 +72,12 @@ function updateUI() {
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ";
     
-    let statusText = isAutoMoving ? `🔵 Google Mapがルート案内中... (Speed x${(1 + totalCoins * 0.2).toFixed(1)})` : "";
+    let statusText = "";
+    if (autoLoadState === "LOADING") {
+        statusText = "📡 Google Mapが経路読み込み中...";
+    } else if (autoLoadState === "MOVING") {
+        statusText = `🔵 ルート案内中 (Speed x${(1 + totalCoins * 0.2).toFixed(1)})`;
+    }
     document.getElementById('auto-status').innerText = statusText;
 
     const amuletBtn = document.getElementById('amulet-btn');
@@ -181,7 +188,7 @@ function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
     if (!isAuto) {
         lastMoveTime = Date.now();
-        stopAutoMove();
+        stopAutoProcess();
     }
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
@@ -193,7 +200,7 @@ function movePlayer(dx, dy, isAuto = false) {
             resetGame(); return;
         }
         if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoMove();
+            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
         } else if (map[ny][nx] === 3) {
             totalCoins += (1 * coinMultiplier); 
@@ -205,30 +212,24 @@ function movePlayer(dx, dy, isAuto = false) {
 
 function resetGame() {
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; coinMultiplier = 1;
-    gameStarted = false; isBlind = true; stopAutoMove();
+    gameStarted = false; isBlind = true; stopAutoProcess();
     document.getElementById('start-container').style.display = 'flex'; updateUI();
 }
 
 function executeAutoStep() {
-    if (!isAutoMoving || !gameStarted || !hasAutoDevice) return;
+    if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
     let step = getNextStepToGoal();
     if (step) {
         movePlayer(step.dx, step.dy, true);
         let interval = 1000 / (1 + totalCoins * 0.2); 
         autoMoveTimeout = setTimeout(executeAutoStep, interval);
     } else {
-        stopAutoMove();
+        stopAutoProcess();
     }
 }
 
-function startAutoMove() {
-    if (isAutoMoving || !gameStarted || !hasAutoDevice) return;
-    isAutoMoving = true;
-    updateUI();
-    executeAutoStep();
-}
-
-function stopAutoMove() {
+function stopAutoProcess() {
+    autoLoadState = "NONE";
     isAutoMoving = false;
     if (autoMoveTimeout) {
         clearTimeout(autoMoveTimeout);
@@ -237,9 +238,24 @@ function stopAutoMove() {
     updateUI();
 }
 
+// メインの放置監視ループ
 setInterval(() => {
-    if (gameStarted && hasAutoDevice && !isAutoMoving && Date.now() - lastMoveTime > 5000) {
-        startAutoMove();
+    if (!gameStarted || !hasAutoDevice) return;
+
+    let idleTime = Date.now() - lastMoveTime;
+
+    // 5秒経過で読み込み開始
+    if (autoLoadState === "NONE" && idleTime > 5000) {
+        autoLoadState = "LOADING";
+        updateUI();
+    }
+
+    // さらに3秒（計8秒）経過で案内開始
+    if (autoLoadState === "LOADING" && idleTime > 8000) {
+        autoLoadState = "MOVING";
+        isAutoMoving = true;
+        updateUI();
+        executeAutoStep();
     }
 }, 500);
 
@@ -280,7 +296,7 @@ function startGame() {
     generateSimpleMaze(); updateUI(); draw();
 }
 
-document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; lastMoveTime = Date.now(); updateUI(); draw(); };
+document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); };
 
 async function playOscillator(f, t, d) {
     if (!audioCtx) return;
