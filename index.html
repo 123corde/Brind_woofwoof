@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 (寝落ち推奨版)</title>
+    <title>スイカ割り迷宮 - 寝落ち Edition</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
-        #ui { position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; font-weight: bold; }
+        #ui { 
+            position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; 
+            font-weight: bold; background: rgba(0,0,0,0.7); color: #fff; padding: 10px; border-radius: 6px;
+        }
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
         
-        /* スタートメニューのデザイン */
         #start-container { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(255,255,255,0.95); display: flex; flex-direction: column; 
@@ -19,12 +21,12 @@
             padding: 20px; box-sizing: border-box;
         }
         #game-desc {
-            margin-top: 20px; font-size: 14px; line-height: 1.6; color: #555;
-            max-width: 400px; border-top: 1px solid #ccc; padding-top: 15px;
+            margin-top: 15px; font-size: 13px; line-height: 1.5; color: #555;
+            max-width: 400px; border-top: 1px solid #ccc; padding-top: 10px;
         }
-        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 15px 0; }
+        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
         
-        .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 320px; }
+        .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 300px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { background: #6c757d; color: white; }
         #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; text-shadow: 0 0 2px white; }
@@ -56,20 +58,22 @@
     <div id="ui">
         <div id="auto-status"></div>
         <div id="mode-text">ブラインド</div>
-        <div id="total-coins">コイン: 0</div>
+        <div id="total-coins">所持コイン: 0</div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">Dev Mode</button></div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
-// --- 基本設定 & アセット ---
+// ==========================================
+// 1. 基本設定 & アセット
+// ==========================================
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
 
-let audioCtx = null, soundUnlocked = false;
+let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
@@ -80,33 +84,49 @@ let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
-// --- 初期化 & UI ---
-async function unlockAudio() {
-    if (soundUnlocked) return;
+// ==========================================
+// 2. 音声制限解除 (iOS/Safari対応)
+// ==========================================
+function unlockAudio() {
+    if (soundReady) return;
+    
+    // AudioContextの作成
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    await audioCtx.resume();
-    const unlockSound = async (audio) => {
-        audio.volume = 0; try { await audio.play(); audio.pause(); audio.currentTime = 0; } catch (e) {}
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    // 既存Audioオブジェクトを一瞬だけ鳴らして停止させる
+    const silentPlay = (audio) => {
+        audio.play().then(() => {
+            setTimeout(() => {
+                audio.pause();
+                audio.currentTime = 0;
+            }, 1);
+        }).catch(e => console.log("Sound unlock waiting for interaction"));
     };
-    await unlockSound(growlSnd); await unlockSound(biteSnd);
-    growlSnd.volume = 0.5; biteSnd.volume = 1.0; soundUnlocked = true;
+
+    silentPlay(growlSnd);
+    silentPlay(biteSnd);
+    soundReady = true;
 }
 
 function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
-    document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
+    document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ（視界確保）";
     
     let statusText = "";
-    if (autoLoadState === "LOADING") statusText = "📡 Google Mapが経路読み込み中...";
-    else if (autoLoadState === "MOVING") statusText = `📍 ルート案内中 (${(calculateInterval()/1000).toFixed(2)}s間隔)`;
+    if (autoLoadState === "LOADING") statusText = "📡 Google Map読み込み中...";
+    else if (autoLoadState === "MOVING") statusText = `📍 案内中 (${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
 
-    const amuletBtn = document.getElementById('amulet-btn'); if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
-    const autoBtn = document.getElementById('auto-device-btn'); if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
-    const devBtn = document.getElementById('dev-glass-btn'); if(devBtn) devBtn.disabled = hasDevGlasses;
+    document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
+    document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
+    document.getElementById('dev-glass-btn').disabled = hasDevGlasses;
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
+    
+    const desc = document.getElementById('game-desc');
+    if (desc) desc.style.display = (currentLevel === 1) ? 'block' : 'none';
 }
 
 function calculateInterval() {
@@ -114,7 +134,9 @@ function calculateInterval() {
     return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15)));
 }
 
-// --- 迷路生成（安全アルゴリズム維持） ---
+// ==========================================
+// 3. 迷路生成（安全アルゴリズム）
+// ==========================================
 function generateSimpleMaze() {
     ROWS = COLS = 6 + (currentLevel * 2);
     let found = false;
@@ -145,7 +167,6 @@ function generateSimpleMaze() {
             shortestPath = target.fullPath; coinsCollectedInLevel = 0;
             shortestPath.forEach(p => { if(!(p.x===goalPos.x && p.y===goalPos.y)) map[p.y][p.x]=3; });
             
-            // 安全配置
             dogs = [];
             let safetyZone = new Set();
             shortestPath.concat({x: player.x, y: player.y}).forEach(p => {
@@ -160,7 +181,9 @@ function generateSimpleMaze() {
     }
 }
 
-// --- 自動移動ロジック ---
+// ==========================================
+// 4. 自動移動ロジック
+// ==========================================
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
@@ -195,9 +218,11 @@ setInterval(() => {
     if (autoLoadState === "LOADING" && idle > 8000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
 }, 500);
 
-// --- 音声 & 移動 ---
+// ==========================================
+// 5. 音声 & 移動処理
+// ==========================================
 async function playOscillator(f, t, d) {
-    if (!audioCtx) return; if (audioCtx.state === 'suspended') await audioCtx.resume();
+    if (!audioCtx) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
     g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
@@ -208,28 +233,27 @@ function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
     if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
     const nx = player.x + dx, ny = player.y + dy;
+    
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         if(!isAuto) playOscillator(150, 'square', 0.1);
     } else {
         player.x = nx; player.y = ny;
         
-        // --- 犬に捕まった時の処理（ランダムメッセージ実装） ---
+        // 犬接触判定
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
             gameStarted = false; biteSnd.play().catch(e=>{});
-            
             const messages = [
                 "\n\n~~ GAME OVER ~~\n\n一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
                 "\n\n~~ GAME OVER ~~\n\nガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
                 "\n\n~~ GAME OVER ~~\n\nあなたの骨が砕ける音だけが迷宮に響き渡りました。",
                 "\n\n~~ GAME OVER ~~\n\nイッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。"
             ];
-            const randomMsg = messages[Math.floor(Math.random() * messages.length)];
-
-            setTimeout(() => { alert(randomMsg); resetGame(); }, 100);
+            setTimeout(() => { alert(messages[Math.floor(Math.random()*messages.length)]); resetGame(); }, 100);
             return;
         }
 
         if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) growlSnd.play().catch(e=>{});
+        
         if (map[ny][nx] === 2) {
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
@@ -247,9 +271,18 @@ function movePlayer(dx, dy, isAuto = false) {
     draw();
 }
 
-// --- システム関数 ---
-async function startGame() { await unlockAudio(); document.getElementById('start-container').style.display = 'none'; gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw(); }
-function resetGame() { currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1; gameStarted = false; isBlind = true; stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); }
+async function startGame() { 
+    unlockAudio(); 
+    document.getElementById('start-container').style.display = 'none'; 
+    gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw(); 
+}
+
+function resetGame() { 
+    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1; 
+    gameStarted = false; isBlind = true; stopAutoProcess(); 
+    document.getElementById('start-container').style.display = 'flex'; updateUI(); 
+}
+
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
 function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
 function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
@@ -285,7 +318,7 @@ function draw() {
 }
 
 let tsX = null, tsY = null;
-window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); });
+window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
 window.addEventListener('touchend', e => {
     if (tsX === null || tsY === null) return;
     const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
