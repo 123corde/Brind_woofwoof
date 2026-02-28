@@ -8,12 +8,8 @@
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
         #ui { position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; font-weight: bold; }
-        
-        /* 最初は非表示。メガネ購入で表示される */
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
-        
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
-
         #start-container { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(255,255,255,0.9); display: flex; flex-direction: column; 
@@ -31,11 +27,9 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👓 開発者用メガネ (0コイン: 切り替え機能解放)</button>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン: 報酬10倍)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン: 報酬10倍 & 豪華SE)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン: 自動案内)</button>
-        
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
 
@@ -91,14 +85,11 @@ function updateUI() {
 
     const amuletBtn = document.getElementById('amulet-btn');
     if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
-    
     const autoBtn = document.getElementById('auto-device-btn');
     if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
-
     const devBtn = document.getElementById('dev-glass-btn');
     if(devBtn) devBtn.disabled = hasDevGlasses;
 
-    // メガネを持っている場合のみボタンを表示
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 }
 
@@ -108,7 +99,6 @@ function calculateInterval() {
     return Math.max(50, interval); 
 }
 
-// ボタンで切り替えるための関数
 function toggleBlind() {
     isBlind = !isBlind;
     lastMoveTime = Date.now();
@@ -203,7 +193,6 @@ function getNextStepToGoal() {
     let visited = new Set();
     visited.add(`${player.x},${player.y}`);
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
-
     while(q.length > 0) {
         let curr = q.shift();
         if(map[curr.y][curr.x] === 2) return curr.path[0];
@@ -235,13 +224,16 @@ function movePlayer(dx, dy, isAuto = false) {
             resetGame(); return;
         }
         if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; gameStarted = false; 
-            // 次回開始時の状態は維持（メガネがあればボタンも維持）
+            playGoalSound(); 
+            currentLevel++; 
+            gameStarted = false; 
+            isBlind = true; // クリア時にブラインドに戻す
             stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
         } else if (map[ny][nx] === 3) {
             totalCoins += (1 * coinMultiplier); 
-            playOscillator(800, 'sine', 0.1); map[ny][nx] = 0; updateUI();
+            if(hasAmulet) playCharingSound(); else playOscillator(800, 'sine', 0.1);
+            map[ny][nx] = 0; updateUI();
         }
     }
     draw();
@@ -297,9 +289,7 @@ function draw() {
     const offsetX = (canvas.width - size * COLS) / 2;
     const offsetY = (canvas.height - size * ROWS) / 2;
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
     if (isBlind) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
-    
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
             let px = offsetX + x*size, py = offsetY + y*size;
@@ -338,6 +328,13 @@ async function playOscillator(f, t, d) {
     o.start(); o.stop(audioCtx.currentTime + d);
 }
 
+// チャリーンという綺麗な音（高音の和音）
+async function playCharingSound() {
+    [987, 1318, 1567].forEach((f, i) => {
+        setTimeout(() => playOscillator(f, 'sine', 0.5), i * 30);
+    });
+}
+
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
 
 let tsX = null, tsY = null;
@@ -350,7 +347,6 @@ window.addEventListener('touchend', e => {
     }
     tsX = null; tsY = null;
 });
-
 window.onresize = draw;
 updateUI();
 </script>
