@@ -27,8 +27,8 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">✨ 金運お守り (3コイン: 報酬3倍)</button>
-        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 文明の利器：Google Map (5コイン: 最短経路を自動追従)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
+        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
 
@@ -60,11 +60,10 @@ let ROWS, COLS;
 let player = { x: 0, y: 0 };
 let map = [], dogs = [];
 
-// 自動移動・読み込み演出用
 let lastMoveTime = Date.now();
 let autoMoveTimeout = null;
 let isAutoMoving = false;
-let autoLoadState = "NONE"; // NONE, LOADING, MOVING
+let autoLoadState = "NONE";
 
 function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
@@ -76,7 +75,8 @@ function updateUI() {
     if (autoLoadState === "LOADING") {
         statusText = "📡 Google Mapが経路読み込み中...";
     } else if (autoLoadState === "MOVING") {
-        statusText = `🔵 ルート案内中 (Speed x${(1 + totalCoins * 0.2).toFixed(1)})`;
+        const currentInterval = calculateInterval();
+        statusText = `📍 ルート案内中 (${(currentInterval/1000).toFixed(2)}s間隔)`;
     }
     document.getElementById('auto-status').innerText = statusText;
 
@@ -87,11 +87,17 @@ function updateUI() {
     if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
 }
 
+function calculateInterval() {
+    if (totalCoins < 1) return 3500;
+    let interval = 3500 * Math.pow(0.975, Math.pow(totalCoins, 1.15));
+    return Math.max(50, interval); 
+}
+
 function buyAmulet() {
     if (totalCoins >= 3 && !hasAmulet) {
         totalCoins -= 3;
         hasAmulet = true;
-        coinMultiplier = 3;
+        coinMultiplier = 10; // 効果値を10倍に変更
         updateUI();
     }
 }
@@ -221,8 +227,7 @@ function executeAutoStep() {
     let step = getNextStepToGoal();
     if (step) {
         movePlayer(step.dx, step.dy, true);
-        let interval = 1000 / (1 + totalCoins * 0.2); 
-        autoMoveTimeout = setTimeout(executeAutoStep, interval);
+        autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval());
     } else {
         stopAutoProcess();
     }
@@ -238,19 +243,13 @@ function stopAutoProcess() {
     updateUI();
 }
 
-// メインの放置監視ループ
 setInterval(() => {
     if (!gameStarted || !hasAutoDevice) return;
-
     let idleTime = Date.now() - lastMoveTime;
-
-    // 5秒経過で読み込み開始
     if (autoLoadState === "NONE" && idleTime > 5000) {
         autoLoadState = "LOADING";
         updateUI();
     }
-
-    // さらに3秒（計8秒）経過で案内開始
     if (autoLoadState === "LOADING" && idleTime > 8000) {
         autoLoadState = "MOVING";
         isAutoMoving = true;
