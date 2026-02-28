@@ -55,7 +55,7 @@
             ・迷路内で待ち構えているイッヌに気を付けて<br>
             <br>
             <br>
-            ver.3.31
+            ver.3.32
         </div>
     </div>
 
@@ -190,21 +190,31 @@ function generateSimpleMaze() {
 
     while (!found) {
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-        let startX = 1 + Math.floor(Math.random() * (COLS - 2));
-        let startY = 1 + Math.floor(Math.random() * (ROWS - 2));
-        player = { x: startX, y: startY };
-        let x = startX, y = startY; map[y][x] = 0;
         
-        // 迷路の削り（少し複雑にするためにfillAmountを調整）
+        // 1. スタート地点を「奇数マス」に固定（迷路生成が安定します）
+        let startX = 1 + Math.floor(Math.random() * ((COLS - 2) / 2)) * 2;
+        let startY = 1 + Math.floor(Math.random() * ((ROWS - 2) / 2)) * 2;
+        
+        player = { x: startX, y: startY };
+        map[startY][startX] = 0; // 足元を道にする
+
+        // 2. スタート地点の上下左右のうち少なくとも1箇所を強制的に道にする（詰み防止）
+        let initialDirs = [[0,1],[0,-1],[1,0],[-1,0]];
+        let d = initialDirs[Math.floor(Math.random()*4)];
+        map[startY + d[1]][startX + d[0]] = 0;
+
+        let x = startX, y = startY;
+        
+        // 3. 削り処理
         let fillAmount = ROWS * COLS * 0.5; 
         for(let i=0; i < fillAmount; i++) {
-            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-            let [dx, dy] = dirs[Math.floor(Math.random()*4)];
+            let [dx, dy] = initialDirs[Math.floor(Math.random()*4)];
+            // 外壁（0とROWS-1）を壊さないように範囲制限
             if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) {
-                x += dx; y += dy; map[y][x] = 0;
+                x += dx; y += dy;
+                map[y][x] = 0;
             }
         }
-
         // --- 距離計算 (BFS) ---
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
