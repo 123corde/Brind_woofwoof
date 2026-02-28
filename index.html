@@ -27,9 +27,9 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👓 開発者用メガネ (0コイン: 切り替え機能解放)</button>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン: 報酬10倍 & 豪華SE)</button>
-        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン: 自動案内)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️ 購入してはいけない (0コイン)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
+        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
 
@@ -61,6 +61,7 @@ let hasDevGlasses = false;
 
 let ROWS, COLS;
 let player = { x: 0, y: 0 };
+let goalPos = { x: 0, y: 0 }; // ゴール座標を保持
 let map = [], dogs = [];
 
 let lastMoveTime = Date.now();
@@ -162,6 +163,7 @@ function generateSimpleMaze() {
         if(candidates.length > 0) {
             let goal = candidates[Math.floor(Math.random()*candidates.length)];
             map[goal.y][goal.x] = 2;
+            goalPos = { x: goal.x, y: goal.y }; // ゴール位置を保存
             let safetyZone = new Set();
             let tempPath = [];
             let pNode = goal;
@@ -208,6 +210,28 @@ function getNextStepToGoal() {
     return null;
 }
 
+// 距離に基づいた動的なピッチを計算する関数
+function playDistanceSound() {
+    if (!audioCtx) return;
+    
+    // 直線距離を計算
+    const dist = Math.sqrt(Math.pow(player.x - goalPos.x, 2) + Math.pow(player.y - goalPos.y, 2));
+    const maxDist = Math.sqrt(Math.pow(COLS, 2) + Math.pow(ROWS, 2));
+    
+    // 距離が近いほど周波数が高くなるようにマッピング (400Hz 〜 2000Hz)
+    const baseFreq = 400 + (1 - dist / maxDist) * 1600;
+    
+    if (hasAmulet) {
+        // お守りあり：距離に応じたキラキラ和音
+        [1, 1.25, 1.5].forEach((ratio, i) => {
+            setTimeout(() => playOscillator(baseFreq * ratio, 'sine', 0.25), i * 25);
+        });
+    } else {
+        // お守りなし：単音
+        playOscillator(baseFreq, 'sine', 0.15);
+    }
+}
+
 function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
     if (!isAuto) {
@@ -227,13 +251,17 @@ function movePlayer(dx, dy, isAuto = false) {
             playGoalSound(); 
             currentLevel++; 
             gameStarted = false; 
-            isBlind = true; // クリア時にブラインドに戻す
+            isBlind = true; 
             stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
         } else if (map[ny][nx] === 3) {
             totalCoins += (1 * coinMultiplier); 
-            if(hasAmulet) playCharingSound(); else playOscillator(800, 'sine', 0.1);
+            // コインを拾った時の音（距離に応じて変化）
+            playDistanceSound();
             map[ny][nx] = 0; updateUI();
+        } else {
+            // 何もない床を歩いた時も、お守りがあれば微かに音を鳴らす（オプション: スイカ割り感アップ）
+            // playDistanceSound(); // 必要ならここを有効化
         }
     }
     draw();
@@ -322,17 +350,10 @@ async function playOscillator(f, t, d) {
     if (!audioCtx) return;
     const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
     o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    g.gain.setValueAtTime(0.05, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
+    g.gain.setValueAtTime(0.06, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
     o.connect(g); g.connect(audioCtx.destination);
     o.start(); o.stop(audioCtx.currentTime + d);
-}
-
-// チャリーンという綺麗な音（高音の和音）
-async function playCharingSound() {
-    [987, 1318, 1567].forEach((f, i) => {
-        setTimeout(() => playOscillator(f, 'sine', 0.5), i * 30);
-    });
 }
 
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
