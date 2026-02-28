@@ -27,9 +27,10 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️ 購入してはいけない1 (0コイン)</button>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
-        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3 30コイン)</button>
+        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5 15コイン)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️👁️👁️ 購入してはいけない 👁️👁️👁️ (0 1000コイン)</button>
+        
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
 
@@ -56,7 +57,7 @@ let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = []; 
-let coinsCollectedInLevel = 0; // そのレベルで鳴らした音のステップ数
+let coinsCollectedInLevel = 0;
 
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 
@@ -128,7 +129,7 @@ function generateSimpleMaze() {
             let targetNode = candidates[Math.floor(Math.random()*candidates.length)];
             map[targetNode.y][targetNode.x] = 2; goalPos = { x: targetNode.x, y: targetNode.y };
             shortestPath = targetNode.fullPath;
-            coinsCollectedInLevel = 0; // 音階ステップリセット
+            coinsCollectedInLevel = 0;
 
             shortestPath.forEach((p) => {
                 if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
@@ -197,11 +198,7 @@ function movePlayer(dx, dy, isAuto = false) {
         } else if (map[ny][nx] === 3) {
             let pIdx = shortestPath.findIndex(p => p.x === nx && p.y === ny);
             if (pIdx !== -1) {
-                // 1. まず音を鳴らす
                 playCoinSound(coinsCollectedInLevel);
-                
-                // 2. 今回のコイン以前の最短経路上のコインをすべて消去
-                // 飛ばした分もカウントを進めることで、次の音を高くする
                 for(let i = 0; i <= pIdx; i++) {
                     let p = shortestPath[i];
                     if (map[p.y][p.x] === 3) { 
@@ -209,7 +206,6 @@ function movePlayer(dx, dy, isAuto = false) {
                         totalCoins += (1 * coinMultiplier);
                     }
                 }
-                // 音階ステップを「最後に取った位置 + 1」に更新
                 coinsCollectedInLevel++; 
                 updateUI();
             }
