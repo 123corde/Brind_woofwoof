@@ -238,16 +238,36 @@ function generateSimpleMaze() {
             while(pNode) { shortestPathNodes.add(`${pNode.x},${pNode.y}`); pNode = parent[pNode.y][pNode.x]; }
             dogs = [];
             let dogCount = Math.max(0, currentLevel - 1); 
-            let dogCandidates = allWalkable.filter(p => {
-                // 最短ルート上ではない
+let dogCandidates = allWalkable.filter(p => {
+                // 1. 基本条件（最短ルート上、スタート地点、プレイヤー隣接はNG）
                 const notOnPath = !shortestPathNodes.has(`${p.x},${p.y}`);
-                // プレイヤーの初期位置ではない
                 const notOnStart = !(p.x === player.x && p.y === player.y);
-                // プレイヤーの隣接マス（上下左右ナナメ）ではない
                 const distToStart = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
-                const notAdjacent = distToStart > 1; 
-
-                return notOnPath && notOnStart && notAdjacent;
+                const notAdjacent = distToStart > 1;
+                // 2. 自分の周囲の床(0)をカウント（通路であることを確認）
+                let myNeighbors = 0;
+                [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(d => {
+                    let nx = p.x + d[0], ny = p.y + d[1];
+                    if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0) myNeighbors++;
+                });
+                // 3. 【一本道の出口セーフティ】
+                // 自分が「分岐点（道が3本以上）」の隣接マスかどうかをチェック
+                let isAdjacentToJunction = false;
+                [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(d => {
+                    let nx = p.x + d[0], ny = p.y + d[1];
+                    if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0) {
+                        // 隣のマス(nx, ny)が「分岐点」か調べる
+                        let junctionCheck = 0;
+                        [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(jd => {
+                            let jnx = nx + jd[0], jny = ny + jd[1];
+                            if (jny >= 0 && jny < ROWS && jnx >= 0 && jnx < COLS && map[jny][jnx] === 0) junctionCheck++;
+                        });
+                        // 隣が3方向以上の分岐点なら、自分は「出口の隣接マス」なのでNG
+                        if (junctionCheck >= 3) isAdjacentToJunction = true;
+                    }
+                });
+                // 通路(myNeighbors===2)であり、かつ分岐点に隣接していない場所のみ許可
+                return notOnPath && notOnStart && notAdjacent && (myNeighbors === 2) && !isAdjacentToJunction;
             });
             
             for(let i=0; i < dogCount; i++) {
