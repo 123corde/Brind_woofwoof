@@ -3,14 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 - お守り統合版</title>
+    <title>スイカ割り迷宮 - DevMode復活版</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
+        
         #ui { 
             position: absolute; bottom: 15px; left: 15px; z-index: 10; 
             background: rgba(0,0,0,0.7); color: #fff; padding: 10px; border-radius: 5px; pointer-events: none;
         }
+        #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; }
+        button.ctrl-btn { 
+            padding: 10px 15px; font-size: 12px; background: #444; color: white; 
+            border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; 
+        }
+
         #start-container { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(255,255,255,0.9); display: flex; flex-direction: column; 
@@ -38,6 +45,10 @@
         <div id="amulet-ui" style="color: #ffd700; font-size: 0.9em;"></div>
     </div>
 
+    <div id="controls">
+        <button id="toggleMode" class="ctrl-btn" onclick="toggleDevMode()">Dev Mode</button>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -52,9 +63,9 @@ let audioCtx = null;
 // --- ゲーム状態変数 ---
 let currentLevel = 1;
 let totalCoins = 0;
-let coinMultiplier = 1; // ★倍率変数
+let coinMultiplier = 1;
 let hasAmulet = false;
-let isBlind = true;
+let isBlind = true; // デフォルトはブラインドモード（暗闇）
 let gameStarted = false;
 let map = [], player = {x:0, y:0}, dogs = [], ROWS, COLS;
 
@@ -67,12 +78,18 @@ function updateUI() {
     document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
 }
 
-// --- アイテム購入 ---
+// --- デベロッパーモード切り替え ---
+function toggleDevMode() {
+    isBlind = !isBlind;
+    draw();
+}
+
+// --- お守り購入 ---
 function buyAmulet() {
     if (totalCoins >= 3 && !hasAmulet) {
         totalCoins -= 3;
         hasAmulet = true;
-        coinMultiplier = 3; // ★変数で3倍を適用
+        coinMultiplier = 3;
         updateUI();
     }
 }
@@ -87,11 +104,10 @@ function startGame() {
     draw();
 }
 
-// --- 迷路生成 (前回の高度なロジックを維持) ---
+// --- 迷路生成 ---
 function generateSimpleMaze() {
     ROWS = COLS = 6 + (currentLevel * 2);
     let found = false;
-
     while (!found) {
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
         let startX = 1 + Math.floor(Math.random() * (COLS - 2));
@@ -128,14 +144,12 @@ function generateSimpleMaze() {
 
         if(candidates.length > 0) {
             let goal = candidates[Math.floor(Math.random()*candidates.length)];
-            map[goal.y][goal.x] = 2; // ゴール
+            map[goal.y][goal.x] = 2;
 
-            let shortestPathNodes = new Set();
             let safetyZone = new Set();
             let tempPath = [];
             let pNode = goal;
             while(pNode) {
-                shortestPathNodes.add(`${pNode.x},${pNode.y}`);
                 safetyZone.add(`${pNode.x},${pNode.y}`);
                 safetyZone.add(`${pNode.x+1},${pNode.y}`); safetyZone.add(`${pNode.x-1},${pNode.y}`);
                 safetyZone.add(`${pNode.x},${pNode.y+1}`); safetyZone.add(`${pNode.x},${pNode.y-1}`);
@@ -155,7 +169,7 @@ function generateSimpleMaze() {
 
             let coinInterval = 1 + Math.floor((currentLevel - 1) * 0.5);
             tempPath.forEach((p, index) => {
-                if(index % coinInterval === 0 && map[p.y][p.x] === 0) map[p.y][p.x] = 3; // コイン
+                if(index % coinInterval === 0 && map[p.y][p.x] === 0) map[p.y][p.x] = 3;
             });
             found = true;
         }
@@ -173,22 +187,22 @@ function movePlayer(dx, dy) {
             alert("イッヌに噛まれました！");
             currentLevel = 1; totalCoins = 0; hasAmulet = false; coinMultiplier = 1;
             document.getElementById('start-container').style.display = 'flex';
-            gameStarted = false; updateUI(); return;
+            gameStarted = false; isBlind = true; updateUI(); return;
         }
 
-        if(map[ny][nx] === 2) { // ゴール
+        if(map[ny][nx] === 2) { 
             currentLevel++;
             gameStarted = false;
             document.getElementById('start-container').style.display = 'flex';
             updateUI();
-        } else if(map[ny][nx] === 3) { // コイン
-            totalCoins += (1 * coinMultiplier); // ★倍率適用
+        } else if(map[ny][nx] === 3) { 
+            totalCoins += (1 * coinMultiplier);
             map[ny][nx] = 0;
             playOscillator(800, 'sine', 0.1);
             updateUI();
         }
     } else {
-        playOscillator(150, 'square', 0.1); // 壁衝突音
+        playOscillator(150, 'square', 0.1);
     }
     draw();
 }
@@ -203,14 +217,17 @@ function draw() {
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
             let px = ox + x*size, py = oy + y*size;
+            
             // ゴールは常に表示
             if(map[y][x] === 2) { 
                 ctx.fillStyle = "#fff"; ctx.shadowBlur = 10; ctx.shadowColor = "#fff";
                 ctx.fillRect(px+2, py+2, size-4, size-4); ctx.shadowBlur = 0;
             } 
+            // Dev Mode時、または足元1マスの場合は表示
             else if(!isBlind || (Math.abs(x-player.x) <= 1 && Math.abs(y-player.y) <= 1)) {
                 if(map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
                 else if(map[y][x] === 3) { ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/6, 0, Math.PI*2); ctx.fill(); }
+                
                 dogs.forEach(d => { if(d.x === x && d.y === y) ctx.drawImage(dogImg, px, py, size, size); });
             }
         }
@@ -229,10 +246,11 @@ async function playOscillator(f, t, d) {
     o.start(); o.stop(audioCtx.currentTime + d);
 }
 
-// --- イベント ---
+// --- リサイズ ---
 function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; if(gameStarted) draw(); }
 window.addEventListener('resize', resizeCanvas);
 
+// --- スワイプ入力 ---
 let tsX = null, tsY = null;
 window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
 window.addEventListener('touchend', e => {
