@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち (Flashlight Mask Edition)</title>
+    <title>イッヌと寝落ち (Tight Flashlight Edition)</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -42,7 +42,7 @@
         <button id="start-btn" onclick="startGame()">ゲームを開始する</button>
         <div id="game-desc">
             ・上下左右にスワイプで移動<br>
-            ・懐中電灯は「足元1マス」と「前方2マス」を照らします
+            ・懐中電灯は超至近距離（0.7マス）のみを照らします
         </div>
     </div>
 
@@ -86,9 +86,7 @@ function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
-    let modeLabel = "ブラインド";
-    if (!isBlind) modeLabel = "デバッグ（視界確保）";
-    else if (hasFlashlight) modeLabel = "懐中電灯モード";
+    let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ（視界確保）";
     document.getElementById('mode-text').innerText = modeLabel;
     
     let statusText = "";
@@ -134,6 +132,7 @@ function generateSimpleMaze() {
             map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
             shortestPath = target.fullPath; coinsCollectedInLevel = 0;
             shortestPath.forEach(p => { if(!(p.x===goalPos.x && p.y===goalPos.y)) map[p.y][p.x]=3; });
+            
             dogs = [];
             let safetyZone = new Set();
             shortestPath.concat({x: player.x, y: player.y}).forEach(p => {
@@ -240,43 +239,21 @@ function draw() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
     
-    // 1. 全体を一旦黒で塗りつぶす（ブラインドの基本）
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 2. 視界を「切り抜く」処理
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.save();
-    if (!isBlind) {
-        // デバッグモード：全表示
+    if (!isBlind) { ctx.beginPath(); ctx.rect(0, 0, canvas.width, canvas.height); ctx.clip(); } 
+    else if (hasFlashlight) {
+        const cX = oX + player.x * size + size / 2, cY = oY + player.y * size + size / 2;
         ctx.beginPath();
-        ctx.rect(0, 0, canvas.width, canvas.height);
-        ctx.clip();
-    } else if (hasFlashlight) {
-        // 懐中電灯モード：特定範囲だけクリップ
-        const centerX = oX + player.x * size + size / 2;
-        const centerY = oY + player.y * size + size / 2;
-        
-        ctx.beginPath();
-        // 足元：半径1マス分
-        ctx.arc(centerX, centerY, size * 1.0, 0, Math.PI * 2);
-
-        // 前方：長さ2マス分の扇形
+        ctx.arc(cX, cY, size * 0.5, 0, Math.PI * 2); // 半径0.5マス
         const angle = Math.atan2(lastDir.dy, lastDir.dx);
-        ctx.moveTo(centerX, centerY);
-        ctx.arc(centerX, centerY, size * 2.5, angle - 0.5, angle + 0.5); 
+        ctx.moveTo(cX, cY);
+        ctx.arc(cX, cY, size * 0.7, angle - 0.5, angle + 0.5); // 距離0.7マス
         ctx.closePath();
-        
-        ctx.clip(); // 描画領域を限定
-    } else {
-        // 通常ブラインド：クリップなし（何も描画されない）
-        ctx.restore();
-        return;
-    }
+        ctx.clip();
+    } else { ctx.restore(); return; }
 
-    // 3. クリップされた領域にだけ迷路を描画
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
         let px = oX+x*size, py = oY+y*size;
         if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
@@ -284,7 +261,9 @@ function draw() {
             let cs=3, rs=4, cw=size/cs, ch=size/rs;
             for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
         } else if (map[y][x] === 3) {
+            // コインのドルマーク描画を復元
             ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
         }
         dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
     }
