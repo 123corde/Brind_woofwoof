@@ -3,69 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 - Item Shop Edition</title>
+    <title>スイカ割り迷宮 - Item Shop Full Edition</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
         
         #ui { 
             position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; 
-            font-weight: bold; background: rgba(51, 51, 51, 0.8); 
-            color: #fff; padding: 10px; border-radius: 6px; min-width: 160px;
+            font-weight: bold; background: rgba(51, 51, 51, 0.85); 
+            color: #fff; padding: 10px; border-radius: 6px; border: 1px solid #555;
+            min-width: 160px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; }
         button { 
-            padding: 10px 15px; font-size: 12px; background: #444; color: white; 
+            padding: 12px 20px; font-size: 14px; background: #444; color: white; 
             border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
-
-        /* スタート＆ショップ画面 */
+        
         #start-container { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(255,255,255,0.9); 
+            background: rgba(255,255,255,0.92); 
             display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; 
         }
-        #level-display { font-size: 28px; margin-bottom: 10px; color: #218838; font-weight: bold; }
-        #coin-display { font-size: 18px; margin-bottom: 20px; color: #d4af37; }
-
-        .shop-box { 
-            background: #f8f9fa; border: 2px solid #ddd; padding: 15px; border-radius: 10px; 
-            margin-bottom: 20px; text-align: center; width: 280px;
+        #level-display { font-size: 28px; color: #218838; font-weight: bold; margin-bottom: 5px; }
+        
+        /* ショップUI */
+        #shop-container {
+            background: #eee; padding: 15px; border-radius: 12px; border: 1px solid #ccc;
+            margin: 15px 0; width: 280px; text-align: center;
         }
-        .item-btn { 
-            width: 100%; margin: 5px 0; padding: 10px; border: none; border-radius: 5px; 
-            color: white; font-weight: bold; cursor: pointer;
+        .shop-item {
+            width: 100%; margin: 4px 0; padding: 10px; border: none; border-radius: 6px;
+            color: white; font-weight: bold; cursor: pointer; font-size: 13px;
         }
-        .buy-flashlight { background: #6f42c1; }
-        .buy-shotgun { background: #dc3545; }
-        .buy-amulet { background: #ffc107; color: #333; }
-        .item-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .shop-item:disabled { background: #bbb !important; cursor: not-allowed; }
+        #btn-flashlight { background: #6f42c1; }
+        #btn-shotgun { background: #dc3545; }
+        #btn-amulet { background: #ffc107; color: #333; }
 
         #start-btn { 
-            padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; 
-            background-color: #28a745; border: none; border-radius: 8px; cursor: pointer;
+            padding: 18px 40px; font-size: 20px; font-weight: bold; color: white; 
+            background-color: #28a745; border: none; border-radius: 8px; 
+            box-shadow: 0 4px #1e7e34; cursor: pointer;
         }
+        #start-btn:active { box-shadow: 0 1px #1e7e34; transform: translate(0, 3px); }
+        
+        #game-desc { margin-top: 15px; font-size: 12px; color: #666; text-align: center; line-height: 1.4; }
     </style>
 </head>
 <body>
     <div id="start-container">
         <div id="level-display">Level 1</div>
-        <div id="coin-display">所持コイン: 0枚</div>
-
-        <div class="shop-box">
-            <div style="font-size: 14px; margin-bottom: 10px; color: #666;">--- アイテムショップ ---</div>
-            <button class="item-btn buy-flashlight" onclick="buyItem('flashlight')">🔦 懐中電灯 (90c)</button>
-            <button class="item-btn buy-shotgun" onclick="buyItem('shotgun')">🔫 ショットガン (30c)</button>
-            <button class="item-btn buy-amulet" onclick="buyItem('amulet')">✨ 金運お守り (3c)</button>
+        
+        <div id="shop-container">
+            <div id="shop-coins" style="color: #d4af37; font-weight: bold; margin-bottom: 8px;">所持コイン: 0枚</div>
+            <button id="btn-flashlight" class="shop-item" onclick="buyItem('flashlight')">🔦 懐中電灯 (90c)</button>
+            <button id="btn-shotgun" class="shop-item" onclick="buyItem('shotgun')">🔫 ショットガン (30c) [2発]</button>
+            <button id="btn-amulet" class="shop-item" onclick="buyItem('amulet')">✨ 金運お守り (3c) [永続3倍]</button>
         </div>
 
         <button id="start-btn">探索を開始する</button>
+
+        <div id="game-desc">
+            スワイプで移動。音を頼りに進め。<br>
+            アイテムを駆使して最深部を目指せ。
+        </div>
     </div>
 
     <div id="ui">
         <div id="mode-text">ブラインド</div>
-        <div id="total-coins">コイン: 0</div>
-        <div id="item-status" style="font-size: 0.8em; color: #ffeb3b; margin-top: 5px;"></div>
+        <div id="display-coins">コイン: 0枚</div>
+        <div id="item-info" style="font-size: 0.8em; color: #ffeb3b; margin-top: 5px;"></div>
     </div>
 
     <div id="controls">
@@ -75,34 +84,46 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-// --- 基本設定 ---
+// ==========================================
+// 0. 画像・音声・グローバル変数
+// ==========================================
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 
 let audioCtx = null;
-let isBlind = true;
+let isBlind = true; 
 let gameStarted = false;
-let currentLevel = 1;
+let currentLevel = 1; 
 let ROWS, COLS;
-let totalCoins = 0;
-let player = { x: 0, y: 0, dir: {x: 0, y: 1} };
-let map = [], dogs = [], coinPositions = [];
 
-// --- アイテム状態 ---
+// ★累計データ & アイテム変数★
+let totalCoins = 0;
 let hasFlashlight = false;
 let shotgunAmmo = 0;
 let hasAmulet = false;
+let lastDir = { x: 0, y: 1 }; // 最後に動いた向き（懐中電灯用）
+
+const startContainer = document.getElementById('start-container');
+const startBtn = document.getElementById('start-btn');
 
 function updateUI() {
-    document.getElementById('coin-display').innerText = `所持コイン: ${totalCoins}枚`;
-    document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
-    let status = "";
-    if(hasFlashlight) status += "🔦ON ";
-    if(shotgunAmmo > 0) status += `🔫x${shotgunAmmo} `;
-    if(hasAmulet) status += "✨x3 ";
-    document.getElementById('item-status').innerText = status;
+    document.getElementById('display-coins').innerText = `コイン: ${totalCoins}枚`;
+    document.getElementById('shop-coins').innerText = `所持コイン: ${totalCoins}枚`;
+    
+    // アイテム状態表示
+    let info = "";
+    if(hasFlashlight) info += "🔦ON ";
+    if(shotgunAmmo > 0) info += `🔫x${shotgunAmmo} `;
+    if(hasAmulet) info += "✨x3 ";
+    document.getElementById('item-info').innerText = info;
+
+    // ボタン無効化
+    document.getElementById('btn-flashlight').disabled = (totalCoins < 90 || hasFlashlight);
+    document.getElementById('btn-shotgun').disabled = (totalCoins < 30);
+    document.getElementById('btn-amulet').disabled = (totalCoins < 3 || hasAmulet);
 }
 
+// アイテム購入処理
 function buyItem(type) {
     if(type === 'flashlight' && totalCoins >= 90 && !hasFlashlight) {
         totalCoins -= 90; hasFlashlight = true;
@@ -114,7 +135,31 @@ function buyItem(type) {
     updateUI();
 }
 
-// --- 迷路生成 ---
+// ==========================================
+// 1. サウンド（簡易版）
+// ==========================================
+async function playOscillator(f, t, d, v = 0.05) {
+    if (!audioCtx) return;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
+    g.gain.setValueAtTime(v, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + d);
+}
+
+function playGoalSound() {
+    [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150));
+}
+
+// ==========================================
+// 2. 迷路生成ロジック
+// ==========================================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let map = [], player = { x: 0, y: 0 }, dogs = [], coinPositions = [];
+
 function generateSimpleMaze() {
     ROWS = COLS = 6 + (currentLevel * 2); 
     let found = false;
@@ -148,10 +193,12 @@ function generateSimpleMaze() {
         if(candidates.length > 0) {
             let goal = candidates[Math.floor(Math.random()*candidates.length)];
             map[goal.y][goal.x] = 2;
+            let shortestPathNodes = new Set();
             let safetyZone = new Set();
             let tempPath = [];
             let pNode = goal;
             while(pNode) {
+                shortestPathNodes.add(`${pNode.x},${pNode.y}`);
                 safetyZone.add(`${pNode.x},${pNode.y}`);
                 safetyZone.add(`${pNode.x+1},${pNode.y}`); safetyZone.add(`${pNode.x-1},${pNode.y}`);
                 safetyZone.add(`${pNode.x},${pNode.y+1}`); safetyZone.add(`${pNode.x},${pNode.y-1}`);
@@ -177,26 +224,30 @@ function generateSimpleMaze() {
     }
 }
 
+// ==========================================
+// 3. 移動・アクション
+// ==========================================
 function movePlayer(dx, dy) {
     if(!gameStarted) return;
-    player.dir = {x: dx, y: dy}; // 向きを保存
+    lastDir = { x: dx, y: dy }; // 向きを保存
     const nx = player.x + dx, ny = player.y + dy;
+    
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         playOscillator(150, 'square', 0.1);
     } else {
         player.x = nx; player.y = ny;
         
-        // 犬との遭遇
-        let dogIdx = dogs.findIndex(d => d.x === player.x && d.y === player.y);
-        if (dogIdx !== -1) {
+        // 犬との衝突判定
+        let dogHit = dogs.findIndex(d => d.x === player.x && d.y === player.y);
+        if (dogHit !== -1) {
             if (shotgunAmmo > 0) {
                 shotgunAmmo--;
-                dogs.splice(dogIdx, 1); // 犬を消去
+                dogs.splice(dogHit, 1); // 犬を消去
                 playOscillator(100, 'sawtooth', 0.4, 0.2); // 発砲音
-                alert("🔫 ショットガンで追い払った！ (残り" + shotgunAmmo + "回)");
+                alert(`🔫 ショットガンで追い払った！ (残り${shotgunAmmo}回)`);
             } else {
-                alert("イッヌに噛まれました！ Level 1に戻ります。");
-                currentLevel = 1; hasFlashlight = false; shotgunAmmo = 0; // アイテム没収
+                alert("イッヌに噛まれました... Level 1に戻ります。");
+                currentLevel = 1; hasFlashlight = false; shotgunAmmo = 0; // アイテムロスト
                 showStartMenu(); return;
             }
         }
@@ -205,38 +256,40 @@ function movePlayer(dx, dy) {
             playGoalSound();
             currentLevel++; showStartMenu(); return;
         } else if (map[ny][nx] === 3) {
-            let hitCoin = coinPositions.find(c => c.x === nx && c.y === ny);
-            if (hitCoin) {
-                totalCoins += (hasAmulet ? 3 : 1);
-                playOscillator(800, 'sine', 0.1);
-                map[ny][nx] = 0;
-            }
+            totalCoins += (hasAmulet ? 3 : 1);
+            playOscillator(800, 'sine', 0.1);
+            map[ny][nx] = 0;
         }
     }
     updateUI();
     draw();
 }
 
+function showStartMenu() {
+    gameStarted = false;
+    document.getElementById('level-display').innerText = `Level ${currentLevel}`;
+    startContainer.style.display = 'flex';
+    updateUI();
+}
+
 function draw() {
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
     const offsetX = (canvas.width - size * COLS) / 2;
     const offsetY = (canvas.height - size * ROWS) / 2;
-
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
             let isVisible = !isBlind;
-            // 懐中電灯のロジック: スワイプ方向2マス円錐状
+            
+            // 🔦 懐中電灯ロジック
             if (isBlind && hasFlashlight) {
-                let dx = x - player.x; let dy = y - player.y;
+                let dx = x - player.x, dy = y - player.y;
                 let dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist <= 2.2) {
-                    let dot = dx * player.dir.x + dy * player.dir.y;
-                    if (dot > 0 || dist < 0.8) isVisible = true;
+                    let dot = dx * lastDir.x + dy * lastDir.y;
+                    if (dot > 0 || dist < 0.6) isVisible = true;
                 }
             }
 
@@ -245,9 +298,8 @@ function draw() {
                 if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
                 else if (map[y][x] === 2) { ctx.fillStyle = "#fff"; ctx.fillRect(px, py, size, size); }
                 else if (map[y][x] === 3) { 
-                    ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); 
+                    ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/6, 0, Math.PI*2); ctx.fill(); 
                 }
-                
                 dogs.forEach(d => {
                     if(d.x === x && d.y === y) ctx.drawImage(dogImg, offsetX + d.x*size, offsetY + d.y*size, size, size);
                 });
@@ -257,33 +309,14 @@ function draw() {
     ctx.drawImage(playerImg, offsetX + player.x*size, offsetY + player.y*size, size, size);
 }
 
-// --- 以下共通処理 ---
-function showStartMenu() {
-    gameStarted = false;
-    document.getElementById('level-display').innerText = `Level ${currentLevel}`;
-    document.getElementById('start-container').style.display = 'flex';
-    updateUI();
-}
-
-document.getElementById('start-btn').onclick = () => {
-    document.getElementById('start-container').style.display = 'none';
+// --- イベント登録 ---
+startBtn.onclick = () => {
+    startContainer.style.display = 'none';
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    gameStarted = true; generateSimpleMaze(); draw();
+    gameStarted = true; isBlind = true; generateSimpleMaze(); updateUI(); draw();
 };
 
 document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; draw(); };
-
-async function playOscillator(f, t, d, v = 0.05) {
-    if (!audioCtx) return;
-    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    g.gain.setValueAtTime(v, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + d);
-}
-
-async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
 
 let tsX = null, tsY = null;
 window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
