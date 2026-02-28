@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 (Google Map修正版)</title>
+    <title>スイカ割り迷宮 (安全ルート確保版)</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -30,7 +30,6 @@
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
-        
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
 
@@ -40,52 +39,34 @@
         <div id="total-coins">コイン: 0</div>
     </div>
 
-    <div id="controls">
-        <button id="toggleMode" onclick="toggleBlind()">Dev Mode</button>
-    </div>
-
+    <div id="controls"><button id="toggleMode" onclick="toggleBlind()">Dev Mode</button></div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
-// --- 画像 ---
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
-
-// --- サウンド ---
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
 
-let audioCtx = null;
-let soundUnlocked = false;
+let audioCtx = null, soundUnlocked = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
-
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
-let shortestPath = []; 
-let coinsCollectedInLevel = 0;
-
-// --- 自動移動用の変数 ---
+let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 
-const WHITE_KEYS = [
-    261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 
-    523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 
-    1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00
-];
+const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
-// iOSサウンド解除
 async function unlockAudio() {
     if (soundUnlocked) return;
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     await audioCtx.resume();
     const unlockSound = async (audio) => {
-        audio.volume = 0;
-        try { await audio.play(); audio.pause(); audio.currentTime = 0; } catch (e) {}
+        audio.volume = 0; try { await audio.play(); audio.pause(); audio.currentTime = 0; } catch (e) {}
     };
     await unlockSound(growlSnd); await unlockSound(biteSnd);
-    growlSnd.volume = 0.5; biteSnd.volume = 1.0;
-    soundUnlocked = true;
+    growlSnd.volume = 0.5; biteSnd.volume = 1.0; soundUnlocked = true;
 }
 
 function updateUI() {
@@ -93,165 +74,133 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ（視界確保）";
-    
     let statusText = "";
     if (autoLoadState === "LOADING") statusText = "📡 Google Mapが経路読み込み中...";
     else if (autoLoadState === "MOVING") statusText = `📍 ルート案内中 (${(calculateInterval()/1000).toFixed(2)}s間隔)`;
     document.getElementById('auto-status').innerText = statusText;
-
-    const amuletBtn = document.getElementById('amulet-btn');
-    if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
-    const autoBtn = document.getElementById('auto-device-btn');
-    if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
-    const devBtn = document.getElementById('dev-glass-btn');
-    if(devBtn) devBtn.disabled = hasDevGlasses;
+    const amuletBtn = document.getElementById('amulet-btn'); if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
+    const autoBtn = document.getElementById('auto-device-btn'); if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
+    const devBtn = document.getElementById('dev-glass-btn'); if(devBtn) devBtn.disabled = hasDevGlasses;
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 }
 
 function calculateInterval() {
-    if (totalCoins < 1) return 3500;
-    return Math.max(50, 3500 * Math.pow(0.975, Math.pow(totalCoins, 1.15)));
+    if (totalCoins < 1) return 3000;
+    return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15)));
 }
 
-// 迷路生成
 function generateSimpleMaze() {
     ROWS = COLS = 6 + (currentLevel * 2);
     let found = false;
     while (!found) {
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-        let startX = 1 + Math.floor(Math.random() * (COLS - 2));
-        let startY = 1 + Math.floor(Math.random() * (ROWS - 2));
-        player = { x: startX, y: startY };
-        let x = startX, y = startY; map[y][x] = 0;
-        let fillAmount = ROWS * COLS * (0.55 - (currentLevel * 0.01));
-        for(let i=0; i < fillAmount; i++) {
-            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-            let [dx, dy] = dirs[Math.floor(Math.random()*4)];
+        let sX = 1 + Math.floor(Math.random()*(COLS-2)), sY = 1 + Math.floor(Math.random()*(ROWS-2));
+        player = { x: sX, y: sY }; let x = sX, y = sY; map[y][x] = 0;
+        let fill = ROWS * COLS * (0.55 - (currentLevel * 0.01));
+        for(let i=0; i < fill; i++) {
+            let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random()*4)];
             if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) { x += dx; y += dy; map[y][x] = 0; }
         }
-        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-        let q = [{x: startX, y: startY, d: 0, fullPath: []}]; dists[startY][startX] = 0;
+        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; dists[sY][sX] = 0;
         let allWalkable = [];
         while(q.length > 0) {
             let curr = q.shift(); allWalkable.push(curr);
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                let nx = curr.x + dx, ny = curr.y + dy;
-                if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
-                    dists[ny][nx] = curr.d + 1;
-                    q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]});
+                let nx = curr.x+dx, ny = curr.y+dy;
+                if(ny>=0 && ny<ROWS && nx>=0 && nx<COLS && map[ny][nx]===0 && dists[ny][nx]===-1) {
+                    dists[ny][nx] = curr.d+1; q.push({x: nx, y: ny, d: curr.d+1, fullPath: [...curr.fullPath, {x: nx, y: ny}]});
                 }
             }
         }
-        let minThreshold = ROWS * 1.2 + currentLevel;
-        let candidates = allWalkable.filter(p => dists[p.y][p.x] >= minThreshold);
-        if(candidates.length > 0) {
-            let targetNode = candidates[Math.floor(Math.random()*candidates.length)];
-            map[targetNode.y][targetNode.x] = 2; goalPos = { x: targetNode.x, y: targetNode.y };
-            shortestPath = targetNode.fullPath;
+        let cand = allWalkable.filter(p => dists[p.y][p.x] >= ROWS * 1.2 + currentLevel);
+        if(cand.length > 0) {
+            let target = cand[Math.floor(Math.random()*cand.length)];
+            map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
+            shortestPath = target.fullPath;
             coinsCollectedInLevel = 0;
-            shortestPath.forEach((p) => { if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3; });
+            shortestPath.forEach(p => { if(!(p.x===goalPos.x && p.y===goalPos.y)) map[p.y][p.x]=3; });
+            
+            // --- 犬の安全配置ロジック ---
             dogs = [];
-            let safety = new Set(shortestPath.map(p => `${p.x},${p.y}`));
-            safety.add(`${player.x},${player.y}`);
-            let dogCandidates = allWalkable.filter(p => !safety.has(`${p.x},${p.y}`));
-            let dogCount = Math.max(0, currentLevel - 1);
-            for(let i=0; i<dogCount && dogCandidates.length>0; i++) {
-                let idx = Math.floor(Math.random() * dogCandidates.length);
-                dogs.push(dogCandidates[idx]); dogCandidates.splice(idx, 1);
+            let safetyZone = new Set();
+            // 最短経路とその周囲1マスを「安全地帯」に指定
+            shortestPath.concat({x: player.x, y: player.y}).forEach(p => {
+                for(let dy=-1; dy<=1; dy++) {
+                    for(let dx=-1; dx<=1; dx++) {
+                        safetyZone.add(`${p.x+dx},${p.y+dy}`);
+                    }
+                }
+            });
+            
+            let dCand = allWalkable.filter(p => !safetyZone.has(`${p.x},${p.y}`));
+            let dogLimit = Math.max(0, currentLevel - 1);
+            for(let i=0; i<dogLimit && dCand.length>0; i++) {
+                let idx = Math.floor(Math.random()*dCand.length);
+                dogs.push(dCand[idx]);
+                dCand.splice(idx,1);
             }
             found = true;
         }
     }
 }
 
-// 最短経路の計算
 function getNextStepToGoal() {
-    let q = [{x: player.x, y: player.y, path: []}];
-    let visited = new Set();
-    visited.add(`${player.x},${player.y}`);
+    let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
     while(q.length > 0) {
         let curr = q.shift();
         if(map[curr.y][curr.x] === 2) return curr.path[0];
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-            let nx = curr.x + dx, ny = curr.y + dy;
-            let key = `${nx},${ny}`;
-            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1 && !visited.has(key) && !dogSet.has(key)) {
-                visited.add(key);
-                q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
+            let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
+            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) {
+                visited.add(key); q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
             }
         }
     }
     return null;
 }
 
-// --- 【自動移動ロジックここから】 ---
 function executeAutoStep() {
     if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
     let step = getNextStepToGoal();
     if (step) {
         movePlayer(step.dx, step.dy, true);
         autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval());
-    } else {
-        stopAutoProcess();
-    }
+    } else { stopAutoProcess(); }
 }
 
 function stopAutoProcess() { 
-    autoLoadState = "NONE"; 
-    if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } 
-    updateUI(); 
+    autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); 
 }
 
-// 放置時間の監視ループ（500ミリ秒ごとにチェック）
 setInterval(() => {
     if (!gameStarted || !hasAutoDevice) return;
     let idle = Date.now() - lastMoveTime;
-    
-    // 5秒動かなければ「読み込み中」
-    if (autoLoadState === "NONE" && idle > 5000) { 
-        autoLoadState = "LOADING"; 
-        updateUI(); 
-    }
-    // 8秒動かなければ「自動移動」を開始
-    if (autoLoadState === "LOADING" && idle > 8000) { 
-        autoLoadState = "MOVING"; 
-        updateUI(); 
-        executeAutoStep(); 
-    }
+    if (autoLoadState === "NONE" && idle > 5000) { autoLoadState = "LOADING"; updateUI(); }
+    if (autoLoadState === "LOADING" && idle > 8000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
 }, 500);
-// --- 【自動移動ロジックここまで】 ---
 
-// 音声再生
 async function playOscillator(f, t, d) {
-    if (!audioCtx) return;
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    if (!audioCtx) return; if (audioCtx.state === 'suspended') await audioCtx.resume();
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
     g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
 
-function playGrowl() { growlSnd.pause(); growlSnd.currentTime = 0; growlSnd.play().catch(e => {}); }
-function playBite() { biteSnd.pause(); biteSnd.currentTime = 0; biteSnd.play().catch(e => {}); }
-
-// 移動処理
 function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
     if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
     const nx = player.x + dx, ny = player.y + dy;
-
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
         if(!isAuto) playOscillator(150, 'square', 0.1);
     } else {
         player.x = nx; player.y = ny;
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-            gameStarted = false; playBite();
-            setTimeout(() => { alert("イッヌに噛みつかれました！"); resetGame(); }, 100);
-            return;
+            gameStarted = false; biteSnd.play().catch(e=>{});
+            setTimeout(() => { alert("イッヌに噛みつかれました！"); resetGame(); }, 100); return;
         }
-        const nearDog = dogs.some(d => Math.abs(d.x - player.x) + Math.abs(d.y - player.y) === 1);
-        if (nearDog) playGrowl();
+        if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) growlSnd.play().catch(e=>{});
         if (map[ny][nx] === 2) {
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
@@ -260,8 +209,7 @@ function movePlayer(dx, dy, isAuto = false) {
             if (pIdx !== -1) {
                 playCoinSound(coinsCollectedInLevel);
                 for(let i = 0; i <= pIdx; i++) {
-                    let p = shortestPath[i];
-                    if (map[p.y][p.x] === 3) { map[p.y][p.x] = 0; totalCoins += (1 * coinMultiplier); }
+                    let p = shortestPath[i]; if (map[p.y][p.x] === 3) { map[p.y][p.x] = 0; totalCoins += (1 * coinMultiplier); }
                 }
                 coinsCollectedInLevel++; updateUI();
             }
@@ -270,60 +218,40 @@ function movePlayer(dx, dy, isAuto = false) {
     draw();
 }
 
-async function startGame() {
-    await unlockAudio();
-    document.getElementById('start-container').style.display = 'none';
-    gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw();
-}
-
-function resetGame() {
-    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
-    gameStarted = false; isBlind = true; stopAutoProcess();
-    document.getElementById('start-container').style.display = 'flex'; updateUI();
-}
-
+async function startGame() { await unlockAudio(); document.getElementById('start-container').style.display = 'none'; gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw(); }
+function resetGame() { currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1; gameStarted = false; isBlind = true; stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); }
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
 function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
 function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
 function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
 
 function playCoinSound(step) {
-    let idx = step % WHITE_KEYS.length;
-    const baseFreq = WHITE_KEYS[idx];
-    if (hasAmulet) {
-        [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(baseFreq * r, 'sine', 0.25), i * 25));
-    } else {
-        playOscillator(baseFreq, 'sine', 0.15);
-    }
+    let f = WHITE_KEYS[step % WHITE_KEYS.length];
+    if (hasAmulet) [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25));
+    else playOscillator(f, 'sine', 0.15);
 }
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
 
 function draw() {
-    const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
+    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    const size = Math.min(canvas.width / COLS, canvas.height / ROWS);
-    const offsetX = (canvas.width - size * COLS) / 2, offsetY = (canvas.height - size * ROWS) / 2;
+    const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (isBlind) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height); return; }
-    for(let y=0; y<ROWS; y++) {
-        for(let x=0; x<COLS; x++) {
-            let px = offsetX + x*size, py = offsetY + y*size;
-            if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
-            else if (map[y][x] === 2) { 
-                const cs = 3, rs = 4, cw = size / cs, ch = size / rs;
-                for (let r = 0; r < rs; r++) for (let c = 0; c < cs; c++) {
-                    ctx.fillStyle = (r + c) % 2 === 0 ? "#fff" : "#000"; ctx.fillRect(px + c * cw, py + r * ch, cw, ch);
-                }
-                ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(px, py, size, size);
-            } else if (map[y][x] === 3) { 
-                ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); 
-                ctx.fillStyle = "#5d4037"; ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-                ctx.fillText("$", px+size/2, py+size/2);
-            }
-            dogs.forEach(d => { if(d.x === x && d.y === y) ctx.drawImage(dogImg, px, py, size, size); });
+    for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
+        let px = oX+x*size, py = oY+y*size;
+        if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
+        else if (map[y][x] === 2) {
+            let cs=3, rs=4, cw=size/cs, ch=size/rs;
+            for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
+            ctx.strokeStyle="#000"; ctx.strokeRect(px, py, size, size);
+        } else if (map[y][x] === 3) {
+            ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
         }
+        dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
     }
-    ctx.drawImage(playerImg, offsetX + player.x*size, offsetY + player.y*size, size, size);
+    ctx.drawImage(playerImg, oX+player.x*size, oY+player.y*size, size, size);
 }
 
 let tsX = null, tsY = null;
@@ -339,8 +267,7 @@ window.addEventListener('touchend', e => {
     }
     tsX = null; tsY = null;
 });
-window.onresize = draw;
-updateUI();
+window.onresize = draw; updateUI();
 </script>
 </body>
 </html>
