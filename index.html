@@ -27,9 +27,9 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3 30コイン)</button>
-        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5 15コイン)</button>
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️👁️👁️ 購入してはいけない 👁️👁️👁️ (0 1000コイン)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (30コイン)</button>
+        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (15コイン)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️👁️👁️ 購入してはいけない 👁️👁️👁️ (1000コイン)</button>
         
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
@@ -49,6 +49,11 @@
 <script>
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
+
+// サウンドファイルの追加
+const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/唸り声.mp3');
+growlSnd.loop = true;
+const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/噛みつく音.mp3');
 
 let audioCtx = null;
 let isBlind = true, gameStarted = false;
@@ -79,11 +84,11 @@ function updateUI() {
     document.getElementById('auto-status').innerText = statusText;
 
     const amuletBtn = document.getElementById('amulet-btn');
-    if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
+    if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 30);
     const autoBtn = document.getElementById('auto-device-btn');
-    if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
+    if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 15);
     const devBtn = document.getElementById('dev-glass-btn');
-    if(devBtn) devBtn.disabled = hasDevGlasses;
+    if(devBtn) devBtn.disabled = (hasDevGlasses || totalCoins < 1000);
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 }
 
@@ -169,6 +174,19 @@ function getNextStepToGoal() {
     return null;
 }
 
+// 唸り声の制御関数
+function updateDogSounds() {
+    if (!gameStarted) { growlSnd.pause(); return; }
+    const nearDog = dogs.some(d => 
+        Math.abs(d.x - player.x) + Math.abs(d.y - player.y) === 1
+    );
+    if (nearDog) {
+        if (growlSnd.paused) growlSnd.play().catch(() => {});
+    } else {
+        growlSnd.pause();
+    }
+}
+
 function playCoinSound(step) {
     if (!audioCtx) return;
     let idx = step % WHITE_KEYS.length;
@@ -189,10 +207,21 @@ function movePlayer(dx, dy, isAuto = false) {
         if(!isAuto) playOscillator(150, 'square', 0.1);
     } else {
         player.x = nx; player.y = ny;
+        
+        // イッヌに衝突
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-            alert("案内中にイッヌに遭遇しました！"); resetGame(); return;
+            growlSnd.pause();
+            biteSnd.play().catch(() => {});
+            alert("イッヌに噛みつかれました！"); 
+            resetGame(); 
+            return;
         }
+
+        // 唸り声の更新
+        updateDogSounds();
+
         if (map[ny][nx] === 2) {
+            growlSnd.pause();
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
         } else if (map[ny][nx] === 3) {
@@ -268,18 +297,20 @@ function startGame() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     document.getElementById('start-container').style.display = 'none';
     gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw();
+    updateDogSounds(); // 開始時にチェック
 }
 
 function resetGame() {
+    growlSnd.pause();
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
     gameStarted = false; isBlind = true; stopAutoProcess();
     document.getElementById('start-container').style.display = 'flex'; updateUI();
 }
 
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
-function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
-function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
-function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
+function buyDevGlasses() { if (totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); } }
+function buyAmulet() { if (totalCoins >= 30 && !hasAmulet) { totalCoins -= 30; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
+function buyAutoDevice() { if (totalCoins >= 15 && !hasAutoDevice) { totalCoins -= 15; hasAutoDevice = true; updateUI(); } }
 
 async function playOscillator(f, t, d) {
     const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
