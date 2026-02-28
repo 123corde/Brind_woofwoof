@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち (Full Edition)</title>
+    <title>スイカ割り迷宮 - 手探り強化Edition</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -21,12 +21,12 @@
             padding: 20px; box-sizing: border-box;
         }
         #game-desc {
-            margin-top: 15px; font-size: 13px; line-height: 1.5; color: #555;
+            margin-top: 10px; font-size: 13px; line-height: 1.5; color: #555;
             max-width: 400px; border-top: 1px solid #ccc; padding-top: 10px;
         }
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
         
-        .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 300px; }
+        .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 280px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { background: #6c757d; color: white; }
         #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; text-shadow: 0 0 2px white; }
@@ -46,12 +46,12 @@
 
         <div id="game-desc">
             <b>画面を見なくてもOK</b><br>
-            😪<b>目を瞑って、寝落ちする体勢でプレイすることを推奨します</b>😴<br>
+            😪<b>寝落ちする体勢でのプレイを推奨します</b>😴<br>
             <br>    
-            ・上下左右にスワイプで1マス移動<br>
-            ・暗闇を手探りで進みゴールを目指せ<br>
+            ・上下左右にスワイプで移動<br>
             ・コインはゴールに近いほど高音になるよ<br>
-            ・迷路内で待ち構えているイッヌに気を付けて
+            ・<b>Levelが進むとコインの間隔が広くなります</b><br>
+            ・迷宮に潜むイッヌに気を付けて
         </div>
     </div>
 
@@ -66,7 +66,7 @@
 
 <script>
 // ==========================================
-// 1. 基本設定 & アセット
+// 基本設定 & サウンド
 // ==========================================
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -78,64 +78,24 @@ let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 
-let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
+let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 };
 let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
-// ==========================================
-// 2. 音声制限解除 (iOS/Safari対応)
-// ==========================================
 function unlockAudio() {
     if (soundReady) return;
-    
-    // AudioContextの作成
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-
-    // 既存Audioオブジェクトを一瞬だけ鳴らして停止させる
-    const silentPlay = (audio) => {
-        audio.play().then(() => {
-            setTimeout(() => {
-                audio.pause();
-                audio.currentTime = 0;
-            }, 1);
-        }).catch(e => console.log("Sound unlock waiting for interaction"));
-    };
-
-    silentPlay(growlSnd);
-    silentPlay(biteSnd);
+    [growlSnd, biteSnd].forEach(s => {
+        s.play().then(() => { setTimeout(() => { s.pause(); s.currentTime = 0; }, 1); }).catch(e => {});
+    });
     soundReady = true;
 }
 
-function updateUI() {
-    document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
-    document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
-    document.getElementById('level-display').innerText = `Level ${currentLevel}`;
-    document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ（視界確保）";
-    
-    let statusText = "";
-    if (autoLoadState === "LOADING") statusText = "📡 Google Map読み込み中...";
-    else if (autoLoadState === "MOVING") statusText = `📍 案内中 (${(calculateInterval()/1000).toFixed(2)}s)`;
-    document.getElementById('auto-status').innerText = statusText;
-
-    document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
-    document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
-    document.getElementById('dev-glass-btn').disabled = hasDevGlasses;
-    document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
-    
-    const desc = document.getElementById('game-desc');
-    if (desc) desc.style.display = (currentLevel === 1) ? 'block' : 'none';
-}
-
-function calculateInterval() {
-    if (totalCoins < 1) return 3000;
-    return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15)));
-}
-
 // ==========================================
-// 3. 迷路生成（安全アルゴリズム）
+// 迷路生成 & コイン配置ロジック
 // ==========================================
 function generateSimpleMaze() {
     ROWS = COLS = 6 + (currentLevel * 2);
@@ -149,6 +109,8 @@ function generateSimpleMaze() {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random()*4)];
             if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) { x += dx; y += dy; map[y][x] = 0; }
         }
+        
+        // パス探索
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; dists[sY][sX] = 0;
         let allWalkable = [];
         while(q.length > 0) {
@@ -160,21 +122,44 @@ function generateSimpleMaze() {
                 }
             }
         }
+
         let cand = allWalkable.filter(p => dists[p.y][p.x] >= ROWS * 1.2 + currentLevel);
         if(cand.length > 0) {
             let target = cand[Math.floor(Math.random()*cand.length)];
-            map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
-            shortestPath = target.fullPath; coinsCollectedInLevel = 0;
-            shortestPath.forEach(p => { if(!(p.x===goalPos.x && p.y===goalPos.y)) map[p.y][p.x]=3; });
-            
+            map[target.y][target.x] = 2; // Goal
+            shortestPath = target.fullPath;
+            coinsCollectedInLevel = 0;
+
+            // --- コイン配置間隔の設定 ---
+            let interval = 0; // デフォルト0（全マス）
+            if (currentLevel >= 2 && currentLevel <= 3) interval = 1;
+            else if (currentLevel >= 4 && currentLevel <= 5) interval = 2;
+            else if (currentLevel >= 6 && currentLevel <= 7) interval = 3;
+            else if (currentLevel === 8) interval = 4;
+            else if (currentLevel === 9) interval = 5;
+            else if (currentLevel >= 10) interval = -1; // コインなし
+
+            // 最短経路にコインを置く
+            if (interval !== -1) {
+                shortestPath.forEach((p, idx) => {
+                    // ゴールではなく、かつ指定間隔(interval+1)ごとの場合に配置
+                    if (!(p.x === target.x && p.y === target.y) && (idx % (interval + 1) === 0)) {
+                        map[p.y][p.x] = 3;
+                    }
+                });
+            }
+
+            // 犬の配置（安全圏外）
             dogs = [];
             let safetyZone = new Set();
             shortestPath.concat({x: player.x, y: player.y}).forEach(p => {
                 for(let dy=-1; dy<=1; dy++) for(let dx=-1; dx<=1; dx++) safetyZone.add(`${p.x+dx},${p.y+dy}`);
             });
             let dCand = allWalkable.filter(p => !safetyZone.has(`${p.x},${p.y}`));
-            for(let i=0; i<Math.max(0, currentLevel-1) && dCand.length>0; i++) {
-                let idx = Math.floor(Math.random()*dCand.length); dogs.push(dCand[idx]); dCand.splice(idx,1);
+            let dogNum = (currentLevel >= 10) ? Math.floor(currentLevel * 0.8) : Math.max(0, currentLevel - 1);
+            for(let i=0; i < dogNum && dCand.length > 0; i++) {
+                let idx = Math.floor(Math.random()*dCand.length);
+                dogs.push(dCand[idx]); dCand.splice(idx,1);
             }
             found = true;
         }
@@ -182,8 +167,63 @@ function generateSimpleMaze() {
 }
 
 // ==========================================
-// 4. 自動移動ロジック
+// ゲーム進行 & 移動
 // ==========================================
+function movePlayer(dx, dy, isAuto = false) {
+    if(!gameStarted) return;
+    if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
+    const nx = player.x + dx, ny = player.y + dy;
+    
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
+        if(!isAuto) playOscillator(150, 'square', 0.1);
+    } else {
+        player.x = nx; player.y = ny;
+        
+        if (dogs.some(d => d.x === player.x && d.y === player.y)) {
+            gameStarted = false; biteSnd.play().catch(e=>{});
+            const messages = [
+                "\n\n~~ GAME OVER ~~\n\nイッヌの執念があなたを Level1 まで引き戻しました。",
+                "\n\n~~ GAME OVER ~~\n\nガブッ！\nイッヌがあなたを骨付き肉と勘違いしました。",
+                "\n\n~~ GAME OVER ~~\n\nあなたの骨が砕ける音だけが迷宮に響きました。",
+                "\n\n~~ GAME OVER ~~\n\nイッヌの愛情(物理)を受け、あなたは意識を失いました。"
+            ];
+            setTimeout(() => { alert(messages[Math.floor(Math.random()*messages.length)]); resetGame(); }, 100);
+            return;
+        }
+
+        if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) growlSnd.play().catch(e=>{});
+        
+        if (map[ny][nx] === 2) {
+            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
+            document.getElementById('start-container').style.display = 'flex'; updateUI();
+        } else if (map[ny][nx] === 3) {
+            // コイン獲得
+            playCoinSound(coinsCollectedInLevel);
+            map[ny][nx] = 0; 
+            totalCoins += (1 * coinMultiplier);
+            coinsCollectedInLevel++; updateUI();
+        }
+    }
+    draw();
+}
+
+// --- 以下、既存のショップ・自動移動・描画ロジック ---
+
+function updateUI() {
+    document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
+    document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
+    document.getElementById('level-display').innerText = `Level ${currentLevel}`;
+    document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "オープン";
+    document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
+    document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
+    document.getElementById('dev-glass-btn').disabled = hasDevGlasses;
+    document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
+    const desc = document.getElementById('game-desc');
+    if (desc) desc.style.display = (currentLevel === 1) ? 'block' : 'none';
+}
+
+function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
+
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
@@ -203,10 +243,8 @@ function getNextStepToGoal() {
 function executeAutoStep() {
     if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
     let step = getNextStepToGoal();
-    if (step) {
-        movePlayer(step.dx, step.dy, true);
-        autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval());
-    } else { stopAutoProcess(); }
+    if (step) { movePlayer(step.dx, step.dy, true); autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval()); } 
+    else { stopAutoProcess(); }
 }
 
 function stopAutoProcess() { autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); }
@@ -218,9 +256,6 @@ setInterval(() => {
     if (autoLoadState === "LOADING" && idle > 8000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
 }, 500);
 
-// ==========================================
-// 5. 音声 & 移動処理
-// ==========================================
 async function playOscillator(f, t, d) {
     if (!audioCtx) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -229,71 +264,19 @@ async function playOscillator(f, t, d) {
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
 
-function movePlayer(dx, dy, isAuto = false) {
-    if(!gameStarted) return;
-    if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
-    const nx = player.x + dx, ny = player.y + dy;
-    
-    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
-        if(!isAuto) playOscillator(150, 'square', 0.1);
-    } else {
-        player.x = nx; player.y = ny;
-        
-        // 犬接触判定
-        if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-            gameStarted = false; biteSnd.play().catch(e=>{});
-            const messages = [
-                "\n\n~~ GAME OVER ~~\n\n一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
-                "\n\n~~ GAME OVER ~~\n\nガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
-                "\n\n~~ GAME OVER ~~\n\nあなたの骨が砕ける音だけが迷宮に響き渡りました。",
-                "\n\n~~ GAME OVER ~~\n\nイッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。"
-            ];
-            setTimeout(() => { alert(messages[Math.floor(Math.random()*messages.length)]); resetGame(); }, 100);
-            return;
-        }
-
-        if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) growlSnd.play().catch(e=>{});
-        
-        if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
-            document.getElementById('start-container').style.display = 'flex'; updateUI();
-        } else if (map[ny][nx] === 3) {
-            let pIdx = shortestPath.findIndex(p => p.x === nx && p.y === ny);
-            if (pIdx !== -1) {
-                playCoinSound(coinsCollectedInLevel);
-                for(let i = 0; i <= pIdx; i++) {
-                    let p = shortestPath[i]; if (map[p.y][p.x] === 3) { map[p.y][p.x] = 0; totalCoins += (1 * coinMultiplier); }
-                }
-                coinsCollectedInLevel++; updateUI();
-            }
-        }
-    }
-    draw();
-}
-
-async function startGame() { 
-    unlockAudio(); 
-    document.getElementById('start-container').style.display = 'none'; 
-    gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw(); 
-}
-
-function resetGame() { 
-    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1; 
-    gameStarted = false; isBlind = true; stopAutoProcess(); 
-    document.getElementById('start-container').style.display = 'flex'; updateUI(); 
-}
-
-function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
-function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
-function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
-function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
-
 function playCoinSound(step) {
     let f = WHITE_KEYS[step % WHITE_KEYS.length];
     if (hasAmulet) [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25));
     else playOscillator(f, 'sine', 0.15);
 }
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
+
+async function startGame() { unlockAudio(); document.getElementById('start-container').style.display = 'none'; gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw(); }
+function resetGame() { currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1; gameStarted = false; isBlind = true; stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); }
+function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
+function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
+function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
+function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
 
 function draw() {
     const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
