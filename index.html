@@ -50,10 +50,12 @@
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 
+// サウンド設定：ループなし
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
-growlSnd.loop = true;
-growlSnd.volume = 0.4;
+growlSnd.loop = false;
+growlSnd.volume = 0.5;
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
+biteSnd.loop = false;
 
 let audioCtx = null;
 let isBlind = true, gameStarted = false;
@@ -175,14 +177,13 @@ function getNextStepToGoal() {
 }
 
 function updateDogSounds() {
-    if (!gameStarted) { growlSnd.pause(); return; }
+    if (!gameStarted) return;
     const nearDog = dogs.some(d => 
         Math.abs(d.x - player.x) + Math.abs(d.y - player.y) === 1
     );
     if (nearDog) {
-        if (growlSnd.paused) growlSnd.play().catch(() => {});
-    } else {
-        growlSnd.pause();
+        growlSnd.currentTime = 0; // 毎回最初から再生
+        growlSnd.play().catch(() => {});
     }
 }
 
@@ -207,18 +208,21 @@ function movePlayer(dx, dy, isAuto = false) {
     } else {
         player.x = nx; player.y = ny;
         
+        // 犬に衝突
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-            growlSnd.pause();
-            biteSnd.play().catch(() => {});
-            alert("イッヌに噛みつかれました！"); 
-            resetGame(); 
+            biteSnd.currentTime = 0;
+            biteSnd.play().catch(e => console.log(e));
+            gameStarted = false; // 先にゲームを止める
+            setTimeout(() => {
+                alert("イッヌに噛みつかれました！"); 
+                resetGame(); 
+            }, 100); // 0.1秒待ってからアラート（音声を先に通す）
             return;
         }
 
         updateDogSounds();
 
         if (map[ny][nx] === 2) {
-            growlSnd.pause();
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
         } else if (map[ny][nx] === 3) {
@@ -294,11 +298,9 @@ function startGame() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     document.getElementById('start-container').style.display = 'none';
     gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw();
-    updateDogSounds();
 }
 
 function resetGame() {
-    growlSnd.pause();
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
     gameStarted = false; isBlind = true; stopAutoProcess();
     document.getElementById('start-container').style.display = 'flex'; updateUI();
