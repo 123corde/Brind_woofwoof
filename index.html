@@ -176,6 +176,7 @@ function draw() {
             if (map[y][x] === 1) { 
                 ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); 
             } else if (map[y][x] === 2) { 
+                // ★ゴール：3x4チェック模様 + 黒い外枠
                 const cols = 3; const rows = 4;
                 const cellW = size / cols; const cellH = size / rows;
                 for (let r = 0; r < rows; r++) {
@@ -184,9 +185,15 @@ function draw() {
                         ctx.fillRect(px + c * cellW, py + r * cellH, cellW, cellH);
                     }
                 }
+                // 黒い枠線を描画
+                ctx.strokeStyle = "#000";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px, py, size, size);
             } else if (map[y][x] === 3) { 
+                // ★コイン：円は黄金、ドルマークは濃い茶色 (#5d4037)
                 ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); 
-                ctx.fillStyle = "#000"; ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillStyle = "#5d4037"; // 濃い茶色
+                ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
                 ctx.fillText("$", px+size/2, py+size/2);
             }
             dogs.forEach(d => { if(d.x === x && d.y === y) ctx.drawImage(dogImg, px, py, size, size); });
