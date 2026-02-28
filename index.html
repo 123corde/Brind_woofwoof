@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 - Full Edition</title>
+    <title>Brind_woofwoof (Full Edition)</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -59,7 +59,8 @@
             ・上下左右にスワイプで1マス移動<br>
             ・暗闇を手探りで進みゴールを目指せ<br>
             ・コインはゴールに近いほど高音になるよ<br>
-            ・迷路内で待ち構えているイッヌに気を付けて
+            ・迷路内で待ち構えているイッヌに気を付けて<br>
+                ver.re3
         </div>
     </div>
 
@@ -238,37 +239,54 @@ function generateSimpleMaze() {
             while(pNode) { shortestPathNodes.add(`${pNode.x},${pNode.y}`); pNode = parent[pNode.y][pNode.x]; }
             dogs = [];
             let dogCount = Math.max(0, currentLevel - 1); 
+
 let dogCandidates = allWalkable.filter(p => {
-                // 1. 基本条件（最短ルート上、スタート地点、プレイヤー隣接はNG）
+                // 1. 基本条件
                 const notOnPath = !shortestPathNodes.has(`${p.x},${p.y}`);
                 const notOnStart = !(p.x === player.x && p.y === player.y);
                 const distToStart = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
                 const notAdjacent = distToStart > 1;
-                // 2. 自分の周囲の床(0)をカウント（通路であることを確認）
+
+                // 2. 自分の周囲の床を数える (0 = 床)
                 let myNeighbors = 0;
-                [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(d => {
+                let adjacents = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                adjacents.forEach(d => {
                     let nx = p.x + d[0], ny = p.y + d[1];
                     if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0) myNeighbors++;
                 });
-                // 3. 【一本道の出口セーフティ】
-                // 自分が「分岐点（道が3本以上）」の隣接マスかどうかをチェック
-                let isAdjacentToJunction = false;
-                [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(d => {
+
+                // 3. 「自分」が分岐点のすぐ隣（上下左右）にいるかチェック
+                let isNextToJunction = false;
+                adjacents.forEach(d => {
                     let nx = p.x + d[0], ny = p.y + d[1];
                     if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0) {
-                        // 隣のマス(nx, ny)が「分岐点」か調べる
-                        let junctionCheck = 0;
-                        [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(jd => {
-                            let jnx = nx + jd[0], jny = ny + jd[1];
-                            if (jny >= 0 && jny < ROWS && jnx >= 0 && jnx < COLS && map[jny][jnx] === 0) junctionCheck++;
+                        // 隣のマス(nx, ny)が「分岐点(道が3つ以上)」なら、自分(p)はNG
+                        let nPathCount = 0;
+                        [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(nd => {
+                            let nnx = nx + nd[0], nny = ny + nd[1];
+                            if (nny >= 0 && nny < ROWS && nnx >= 0 && nnx < COLS && map[nny][nnx] === 0) nPathCount++;
                         });
-                        // 隣が3方向以上の分岐点なら、自分は「出口の隣接マス」なのでNG
-                        if (junctionCheck >= 3) isAdjacentToJunction = true;
+                        if (nPathCount >= 3) isNextToJunction = true;
                     }
                 });
-                // 通路(myNeighbors===2)であり、かつ分岐点に隣接していない場所のみ許可
-                return notOnPath && notOnStart && notAdjacent && (myNeighbors === 2) && !isAdjacentToJunction;
+
+                // 通路(2マス接続)であり、かつ分岐点の隣(isNextToJunction)でもない場所
+                return notOnPath && notOnStart && notAdjacent && (myNeighbors === 2) && !isNextToJunction;
             });
+
+            // 犬が出やすくなるように調整
+            for(let i=0; i < dogCount; i++) {
+                if(dogCandidates.length === 0) break;
+                let idx = Math.floor(Math.random() * dogCandidates.length);
+                dogs.push(dogCandidates[idx]);
+                dogCandidates.splice(idx, 1);
+            }
+
+
+
+
+
+            
             
             for(let i=0; i < dogCount; i++) {
                 if(dogCandidates.length === 0) break;
