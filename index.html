@@ -19,6 +19,7 @@
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; }
         .shop-btn { padding: 10px; margin: 10px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
+        #auto-status { color: #dc3545; font-size: 12px; height: 1.2em; }
     </style>
 </head>
 <body>
@@ -31,6 +32,7 @@
     </div>
 
     <div id="ui">
+        <div id="auto-status"></div>
         <div id="mode-text">ブラインド</div>
         <div id="total-coins">コイン: 0</div>
     </div>
@@ -56,11 +58,17 @@ let ROWS, COLS;
 let player = { x: 0, y: 0 };
 let map = [], dogs = [];
 
+// 自動移動用
+let lastMoveTime = Date.now();
+let autoMoveInterval = null;
+let isAutoMoving = false;
+
 function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ";
+    document.getElementById('auto-status').innerText = isAutoMoving ? "⚠️ 自動移動中..." : "";
     const btn = document.getElementById('amulet-btn');
     if(btn) btn.disabled = (hasAmulet || totalCoins < 3);
 }
@@ -133,25 +141,52 @@ function generateSimpleMaze() {
     }
 }
 
-function movePlayer(dx, dy) {
+// 最短経路を探索する関数 (BFS)
+function getNextStepToGoal() {
+    let q = [{x: player.x, y: player.y, path: []}];
+    let visited = new Set();
+    visited.add(`${player.x},${player.y}`);
+
+    while(q.length > 0) {
+        let curr = q.shift();
+        if(map[curr.y][curr.x] === 2) return curr.path[0]; // 最初の1歩を返す
+
+        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            let nx = curr.x + dx, ny = curr.y + dy;
+            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1 && !visited.has(`${nx},${ny}`)) {
+                visited.add(`${nx},${ny}`);
+                q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
+            }
+        }
+    }
+    return null;
+}
+
+function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
+    
+    // 手動操作なら自動移動タイマーをリセット
+    if (!isAuto) {
+        lastMoveTime = Date.now();
+        stopAutoMove();
+    }
+
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
-        playOscillator(150, 'square', 0.1);
+        if(!isAuto) playOscillator(150, 'square', 0.1);
     } else {
         player.x = nx; player.y = ny;
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
             alert("イッヌに噛まれました！");
-            currentLevel = 1; totalCoins = 0; hasAmulet = false; coinMultiplier = 1;
-            gameStarted = false; 
-            isBlind = true; // リセット
-            document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
+            resetGame();
+            return;
         }
         if (map[ny][nx] === 2) {
             playGoalSound(); 
             currentLevel++; 
             gameStarted = false; 
-            isBlind = true; // 次のレベルは必ずブラインドから
+            isBlind = true;
+            stopAutoMove();
             document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
         } else if (map[ny][nx] === 3) {
             totalCoins += (1 * coinMultiplier); 
@@ -160,6 +195,42 @@ function movePlayer(dx, dy) {
     }
     draw();
 }
+
+function resetGame() {
+    currentLevel = 1; totalCoins = 0; hasAmulet = false; coinMultiplier = 1;
+    gameStarted = false; isBlind = true; stopAutoMove();
+    document.getElementById('start-container').style.display = 'flex'; updateUI();
+}
+
+function startAutoMove() {
+    if (isAutoMoving || !gameStarted) return;
+    isAutoMoving = true;
+    updateUI();
+    autoMoveInterval = setInterval(() => {
+        let step = getNextStepToGoal();
+        if (step) {
+            movePlayer(step.dx, step.dy, true);
+        } else {
+            stopAutoMove();
+        }
+    }, 1000);
+}
+
+function stopAutoMove() {
+    isAutoMoving = false;
+    if (autoMoveInterval) {
+        clearInterval(autoMoveInterval);
+        autoMoveInterval = null;
+    }
+    updateUI();
+}
+
+// 放置チェック用ループ
+setInterval(() => {
+    if (gameStarted && !isAutoMoving && Date.now() - lastMoveTime > 5000) {
+        startAutoMove();
+    }
+}, 500);
 
 function draw() {
     const canvas = document.getElementById('gameCanvas');
@@ -205,10 +276,16 @@ function draw() {
 function startGame() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     document.getElementById('start-container').style.display = 'none';
-    gameStarted = true; generateSimpleMaze(); updateUI(); draw();
+    gameStarted = true;
+    lastMoveTime = Date.now();
+    generateSimpleMaze(); updateUI(); draw();
 }
 
-document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; updateUI(); draw(); };
+document.getElementById('toggleMode').onclick = () => { 
+    isBlind = !isBlind; 
+    lastMoveTime = Date.now(); // DevMode切り替えも放置リセット
+    updateUI(); draw(); 
+};
 
 async function playOscillator(f, t, d) {
     if (!audioCtx) return;
