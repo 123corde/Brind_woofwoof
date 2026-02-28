@@ -76,9 +76,12 @@ function updateUI() {
     else if (autoLoadState === "MOVING") statusText = `📍 ルート案内中 (${(calculateInterval()/1000).toFixed(2)}s間隔)`;
     document.getElementById('auto-status').innerText = statusText;
 
-    document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
-    document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
-    document.getElementById('dev-glass-btn').disabled = hasDevGlasses;
+    const amuletBtn = document.getElementById('amulet-btn');
+    if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
+    const autoBtn = document.getElementById('auto-device-btn');
+    if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
+    const devBtn = document.getElementById('dev-glass-btn');
+    if(devBtn) devBtn.disabled = hasDevGlasses;
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 }
 
@@ -105,7 +108,7 @@ function generateSimpleMaze() {
 
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-        let q = [{x: startX, y: startY, d: 0, path: []}]; dists[startY][startX] = 0;
+        let q = [{x: startX, y: startY, d: 0, fullPath: []}]; dists[startY][startX] = 0;
         let allWalkable = [];
 
         while(q.length > 0) {
@@ -115,7 +118,7 @@ function generateSimpleMaze() {
                 if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
                     dists[ny][nx] = curr.d + 1;
                     parent[ny][nx] = {x: curr.x, y: curr.y};
-                    q.push({x: nx, y: ny, d: curr.d + 1, path: [...curr.path, {x: nx, y: ny}]});
+                    q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]});
                 }
             }
         }
@@ -123,16 +126,14 @@ function generateSimpleMaze() {
         let minThreshold = ROWS * 1.2 + currentLevel;
         let candidates = allWalkable.filter(p => dists[p.y][p.x] >= minThreshold);
         if(candidates.length > 0) {
-            let goalNode = candidates[Math.floor(Math.random()*candidates.length)];
-            map[goalNode.y][goalNode.x] = 2; goalPos = { x: goalNode.x, y: goalNode.y };
-            shortestPath = goalNode.path;
+            let targetNode = candidates[Math.floor(Math.random()*candidates.length)];
+            map[targetNode.y][targetNode.x] = 2; goalPos = { x: targetNode.x, y: targetNode.y };
+            shortestPath = targetNode.fullPath;
 
-            // コイン配置：最短経路のみ
             shortestPath.forEach((p, idx) => {
                 if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
             });
 
-            // イッヌ配置：最短経路上以外
             dogs = [];
             let safety = new Set(shortestPath.map(p => `${p.x},${p.y}`));
             safety.add(`${player.x},${player.y}`);
@@ -145,6 +146,26 @@ function generateSimpleMaze() {
             found = true;
         }
     }
+}
+
+function getNextStepToGoal() {
+    let q = [{x: player.x, y: player.y, path: []}];
+    let visited = new Set();
+    visited.add(`${player.x},${player.y}`);
+    const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
+    while(q.length > 0) {
+        let curr = q.shift();
+        if(map[curr.y][curr.x] === 2) return curr.path[0];
+        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            let nx = curr.x + dx, ny = curr.y + dy;
+            let key = `${nx},${ny}`;
+            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1 && !visited.has(key) && !dogSet.has(key)) {
+                visited.add(key);
+                q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
+            }
+        }
+    }
+    return null;
 }
 
 function playCoinSound(pathIndex) {
@@ -177,7 +198,6 @@ function movePlayer(dx, dy, isAuto = false) {
             let pIdx = shortestPath.findIndex(p => p.x === nx && p.y === ny);
             if (pIdx !== -1) {
                 playCoinSound(pIdx);
-                // 今回のコイン以前の最短経路上のコインをすべて消去
                 for(let i = 0; i <= pIdx; i++) {
                     let p = shortestPath[i];
                     if (map[p.y][p.x] === 3) { map[p.y][p.x] = 0; totalCoins += (1 * coinMultiplier); }
@@ -189,28 +209,19 @@ function movePlayer(dx, dy, isAuto = false) {
     draw();
 }
 
-function resetGame() {
-    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
-    gameStarted = false; isBlind = true; stopAutoProcess();
-    document.getElementById('start-container').style.display = 'flex'; updateUI();
+function executeAutoStep() {
+    if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
+    let step = getNextStepToGoal();
+    if (step) {
+        movePlayer(step.dx, step.dy, true);
+        autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval());
+    } else {
+        stopAutoProcess();
+    }
 }
 
 function stopAutoProcess() { 
     autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); 
-}
-
-function executeAutoStep() {
-    if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
-    let pIdx = shortestPath.findIndex(p => p.x === player.x && p.y === player.y);
-    let next = (pIdx === -1) ? shortestPath[0] : shortestPath[pIdx + 1];
-    if (!next) {
-        for(let [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-            if(player.x+dx===goalPos.x && player.y+dy===goalPos.y) { movePlayer(dx,dy,true); return; }
-        }
-    } else {
-        movePlayer(next.x - player.x, next.y - player.y, true);
-        autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval());
-    }
 }
 
 setInterval(() => {
@@ -252,6 +263,12 @@ function startGame() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     document.getElementById('start-container').style.display = 'none';
     gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw();
+}
+
+function resetGame() {
+    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
+    gameStarted = false; isBlind = true; stopAutoProcess();
+    document.getElementById('start-container').style.display = 'flex'; updateUI();
 }
 
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
