@@ -60,7 +60,7 @@
             ・暗闇を手探りで進みゴールを目指せ<br>
             ・コインはゴールに近いほど高音になるよ<br>
             ・迷路内で待ち構えているイッヌに気を付けて<br>
-                ver.re3
+                ver.re31
         </div>
     </div>
 
@@ -238,53 +238,53 @@ function generateSimpleMaze() {
             let pNode = goal;
             while(pNode) { shortestPathNodes.add(`${pNode.x},${pNode.y}`); pNode = parent[pNode.y][pNode.x]; }
             dogs = [];
-            let dogCount = Math.max(0, currentLevel - 1); 
+           
 
-let dogCandidates = allWalkable.filter(p => {
+let dogCount = Math.max(0, currentLevel - 1); 
+            let dogCandidates = allWalkable.filter(p => {
                 // 1. 基本条件
                 const notOnPath = !shortestPathNodes.has(`${p.x},${p.y}`);
                 const notOnStart = !(p.x === player.x && p.y === player.y);
                 const distToStart = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
-                const notAdjacent = distToStart > 1;
+                if (!notOnPath || !notOnStart || distToStart <= 1) return false;
 
-                // 2. 自分の周囲の床を数える (0 = 床)
-                let myNeighbors = 0;
-                let adjacents = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-                adjacents.forEach(d => {
-                    let nx = p.x + d[0], ny = p.y + d[1];
-                    if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0) myNeighbors++;
-                });
-
-                // 3. 「自分」が分岐点のすぐ隣（上下左右）にいるかチェック
-                let isNextToJunction = false;
-                adjacents.forEach(d => {
+                // 2. 【重要】分岐点（出口）からの距離判定
+                // 周囲1マス（上下左右）に「分岐点（道が3本以上）」があったら配置禁止
+                let isTooCloseToJunction = false;
+                [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(d => {
                     let nx = p.x + d[0], ny = p.y + d[1];
                     if (ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0) {
-                        // 隣のマス(nx, ny)が「分岐点(道が3つ以上)」なら、自分(p)はNG
-                        let nPathCount = 0;
+                        let nPath = 0;
                         [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(nd => {
-                            let nnx = nx + nd[0], nny = ny + nd[1];
-                            if (nny >= 0 && nny < ROWS && nnx >= 0 && nnx < COLS && map[nny][nnx] === 0) nPathCount++;
+                            if (map[ny+nd[1]] && map[ny+nd[1]][nx+nd[0]] === 0) nPath++;
                         });
-                        if (nPathCount >= 3) isNextToJunction = true;
+                        if (nPath >= 3) isTooCloseToJunction = true; // 隣が分岐点ならダメ
                     }
                 });
+                if (isTooCloseToJunction) return false;
 
-                // 通路(2マス接続)であり、かつ分岐点の隣(isNextToJunction)でもない場所
-                return notOnPath && notOnStart && notAdjacent && (myNeighbors === 2) && !isNextToJunction;
+                // 3. 行き止まり（道が1本）または深い脇道を優先する
+                let neighbors = 0;
+                [[0, 1], [0, -1], [1, 0], [-1, 0]].forEach(d => {
+                    if (map[p.y+d[1]] && map[p.y+d[1]][p.x+d[0]] === 0) neighbors++;
+                });
+
+                // 隣が分岐点ではなく、かつ自身が「行き止まり(1)」か「通路(2)」であれば候補とする
+                return neighbors <= 2; 
             });
 
-            // 犬が出やすくなるように調整
-            for(let i=0; i < dogCount; i++) {
-                if(dogCandidates.length === 0) break;
-                let idx = Math.floor(Math.random() * dogCandidates.length);
-                dogs.push(dogCandidates[idx]);
-                dogCandidates.splice(idx, 1);
+            // 4. 確実に指定数出すためのチェック
+            if (dogCandidates.length < dogCount) {
+                // 候補が足りない場合は迷路を再生成（found = false のままループを回す）
+                found = false; 
+            } else {
+                for(let i=0; i < dogCount; i++) {
+                    let idx = Math.floor(Math.random() * dogCandidates.length);
+                    dogs.push(dogCandidates[idx]);
+                    dogCandidates.splice(idx, 1);
+                }
+                found = true; 
             }
-
-
-
-
 
             
             
