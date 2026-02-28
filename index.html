@@ -55,7 +55,7 @@
             ・迷路内で待ち構えているイッヌに気を付けて<br>
             <br>
             <br>
-            ver.3.32
+            ver.3.33
         </div>
     </div>
 
@@ -184,41 +184,44 @@ let coinPositions = [];
 // ==========================================
 
 function generateSimpleMaze() {
-    // 確実な配置のためサイズを少し広めに確保
     ROWS = COLS = 10 + (currentLevel * 2); 
     let found = false;
 
     while (!found) {
+        // 1. 全てを壁(1)で埋める
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
         
-        // 1. スタート地点を「奇数マス」に固定（迷路生成が安定します）
+        // 2. スタート地点（奇数マス）を決定
         let startX = 1 + Math.floor(Math.random() * ((COLS - 2) / 2)) * 2;
         let startY = 1 + Math.floor(Math.random() * ((ROWS - 2) / 2)) * 2;
-        
         player = { x: startX, y: startY };
-        map[startY][startX] = 0; // 足元を道にする
-
-        // 2. スタート地点の上下左右のうち少なくとも1箇所を強制的に道にする（詰み防止）
-        let initialDirs = [[0,1],[0,-1],[1,0],[-1,0]];
-        let d = initialDirs[Math.floor(Math.random()*4)];
-        map[startY + d[1]][startX + d[0]] = 0;
-
-        let x = startX, y = startY;
         
-        // 3. 削り処理
-        let fillAmount = ROWS * COLS * 0.5; 
-        for(let i=0; i < fillAmount; i++) {
-            let [dx, dy] = initialDirs[Math.floor(Math.random()*4)];
-            // 外壁（0とROWS-1）を壊さないように範囲制限
-            if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) {
-                x += dx; y += dy;
-                map[y][x] = 0;
+        // 3. スタート地点から直接「削り」を開始する
+        let x = startX, y = startY;
+        map[y][x] = 0; // スタート地点を道にする
+
+        let fillAmount = ROWS * COLS * 0.6; // 6割くらいを道にする
+        let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+
+        for(let i = 0; i < fillAmount; i++) {
+            let [dx, dy] = dirs[Math.floor(Math.random() * 4)];
+            // 外壁（インデックス0と末尾）を壊さない範囲で移動
+            if(x + dx > 0 && x + dx < COLS - 1 && y + dy > 0 && y + dy < ROWS - 1) {
+                x += dx;
+                y += dy;
+                map[y][x] = 0; // 移動先を道にする
+            } else {
+                // 壁にぶつかったら、すでにある「道」のどこかから再開（一筆書きの継続）
+                // これにより「離れ小島」が作られるのを防ぐ
+                i--; 
             }
         }
-        // --- 距離計算 (BFS) ---
+        
+        // --- 距離計算 (BFS) 以下のロジックは以前と同じ ---
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-        let q = [{x: startX, y: startY, d: 0}]; dists[startY][startX] = 0;
+        let q = [{x: startX, y: startY, d: 0}]; 
+        dists[startY][startX] = 0;
         let allWalkable = [];
         let maxDist = 0;
         let farthestNode = {x: startX, y: startY};
@@ -230,7 +233,7 @@ function generateSimpleMaze() {
                 maxDist = curr.d;
                 farthestNode = {x: curr.x, y: curr.y};
             }
-            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            for(let [dx, dy] of dirs) {
                 let nx = curr.x + dx, ny = curr.y + dy;
                 if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
                     dists[ny][nx] = curr.d + 1;
@@ -240,17 +243,12 @@ function generateSimpleMaze() {
             }
         }
 
-        // 4. 【改善】ゴールを迷路の最深部（最も遠い場所）に設定
+        // ゴールを最深部に設定
         let goal = farthestNode;
-        map[goal.y][goal.x] = 2; 
+        if (maxDist < 5) continue; // 短すぎる迷路は作り直し
 
-        let shortestPathNodes = new Set();
-        let pNode = goal;
-        while(pNode) { 
-            shortestPathNodes.add(`${pNode.x},${pNode.y}`); 
-            pNode = parent[pNode.y][pNode.x]; 
-        }
-
+        map[goal.y][goal.x] = 2;
+        
         // 5. 犬の配置（厳格ルール：袋小路 or 四方通路）
         dogs = [];
         let dogCount = Math.max(0, currentLevel - 1); 
