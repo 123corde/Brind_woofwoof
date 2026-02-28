@@ -17,9 +17,9 @@
             justify-content: center; align-items: center; z-index: 100; 
         }
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; }
-        .shop-btn { padding: 10px; margin: 10px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .shop-btn { padding: 10px; margin: 10px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; min-width: 320px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
-        #auto-status { color: #dc3545; font-size: 12px; height: 1.2em; }
+        #auto-status { color: #4285F4; font-size: 12px; height: 1.2em; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -27,7 +27,8 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">✨ 金運お守り (3コインで永続3倍)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">✨ 金運お守り (3コイン: 報酬3倍)</button>
+        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 文明の利器：Google Map (5コイン: 最短経路を自動追従)</button>
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
     </div>
 
@@ -54,11 +55,11 @@ let currentLevel = 1;
 let totalCoins = 0;
 let coinMultiplier = 1; 
 let hasAmulet = false;
+let hasAutoDevice = false; // Google Map所有フラグ
 let ROWS, COLS;
 let player = { x: 0, y: 0 };
 let map = [], dogs = [];
 
-// 自動移動用
 let lastMoveTime = Date.now();
 let autoMoveTimeout = null;
 let isAutoMoving = false;
@@ -69,11 +70,14 @@ function updateUI() {
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ";
     
-    let speedLabel = isAutoMoving ? `⚠️ 犬を避けて爆走中 (x${(1 + totalCoins * 0.2).toFixed(1)})` : "";
-    document.getElementById('auto-status').innerText = speedLabel;
+    let statusText = isAutoMoving ? `🔵 Google Mapがルート案内中... (Speed x${(1 + totalCoins * 0.2).toFixed(1)})` : "";
+    document.getElementById('auto-status').innerText = statusText;
 
-    const btn = document.getElementById('amulet-btn');
-    if(btn) btn.disabled = (hasAmulet || totalCoins < 3);
+    const amuletBtn = document.getElementById('amulet-btn');
+    if(amuletBtn) amuletBtn.disabled = (hasAmulet || totalCoins < 3);
+    
+    const autoBtn = document.getElementById('auto-device-btn');
+    if(autoBtn) autoBtn.disabled = (hasAutoDevice || totalCoins < 5);
 }
 
 function buyAmulet() {
@@ -81,6 +85,14 @@ function buyAmulet() {
         totalCoins -= 3;
         hasAmulet = true;
         coinMultiplier = 3;
+        updateUI();
+    }
+}
+
+function buyAutoDevice() {
+    if (totalCoins >= 5 && !hasAutoDevice) {
+        totalCoins -= 5;
+        hasAutoDevice = true;
         updateUI();
     }
 }
@@ -144,35 +156,25 @@ function generateSimpleMaze() {
     }
 }
 
-// 犬を避けるための最短経路探索 (BFS)
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}];
     let visited = new Set();
     visited.add(`${player.x},${player.y}`);
-    
-    // 犬の座標セット（回避用）
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
 
     while(q.length > 0) {
         let curr = q.shift();
         if(map[curr.y][curr.x] === 2) return curr.path[0];
-
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
             let nx = curr.x + dx, ny = curr.y + dy;
             let key = `${nx},${ny}`;
-            
-            // 壁でなく、未訪問で、かつ犬がいないマスのみ進む
-            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && 
-               map[ny][nx] !== 1 && 
-               !visited.has(key) && 
-               !dogSet.has(key)) {
-                
+            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1 && !visited.has(key) && !dogSet.has(key)) {
                 visited.add(key);
                 q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
             }
         }
     }
-    return null; // 安全な道が見つからない場合
+    return null;
 }
 
 function movePlayer(dx, dy, isAuto = false) {
@@ -187,7 +189,7 @@ function movePlayer(dx, dy, isAuto = false) {
     } else {
         player.x = nx; player.y = ny;
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-            alert("イッヌに噛まれました！");
+            alert("案内中にイッヌに遭遇しました！");
             resetGame(); return;
         }
         if (map[ny][nx] === 2) {
@@ -202,26 +204,25 @@ function movePlayer(dx, dy, isAuto = false) {
 }
 
 function resetGame() {
-    currentLevel = 1; totalCoins = 0; hasAmulet = false; coinMultiplier = 1;
+    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; coinMultiplier = 1;
     gameStarted = false; isBlind = true; stopAutoMove();
     document.getElementById('start-container').style.display = 'flex'; updateUI();
 }
 
 function executeAutoStep() {
-    if (!isAutoMoving || !gameStarted) return;
-    let step = getNextStepToGoal(); // 犬を避けるステップを取得
+    if (!isAutoMoving || !gameStarted || !hasAutoDevice) return;
+    let step = getNextStepToGoal();
     if (step) {
         movePlayer(step.dx, step.dy, true);
         let interval = 1000 / (1 + totalCoins * 0.2); 
         autoMoveTimeout = setTimeout(executeAutoStep, interval);
     } else {
-        // 道が塞がっている場合は一旦停止（放置タイマーで再試行される）
         stopAutoMove();
     }
 }
 
 function startAutoMove() {
-    if (isAutoMoving || !gameStarted) return;
+    if (isAutoMoving || !gameStarted || !hasAutoDevice) return;
     isAutoMoving = true;
     updateUI();
     executeAutoStep();
@@ -237,7 +238,7 @@ function stopAutoMove() {
 }
 
 setInterval(() => {
-    if (gameStarted && !isAutoMoving && Date.now() - lastMoveTime > 5000) {
+    if (gameStarted && hasAutoDevice && !isAutoMoving && Date.now() - lastMoveTime > 5000) {
         startAutoMove();
     }
 }, 500);
