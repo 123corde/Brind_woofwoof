@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>スイカ割り迷宮 - 最短経路コイン限定版</title>
+    <title>スイカ割り迷宮</title>
     <style>
         body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -18,7 +18,8 @@
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin-top: 10px; }
         .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; min-width: 320px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
-        #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; }
+        .dev-btn { background: #6c757d; color: white; }
+        #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; text-shadow: 0 0 2px white; }
     </style>
 </head>
 <body>
@@ -26,7 +27,7 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
-        <button id="dev-glass-btn" class="shop-btn" style="background:#6c757d; color:white;" onclick="buyDevGlasses()">👁️ 購入してはいけない (0コイン)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️ 購入してはいけない (0コイン)</button>
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
         <button id="start-btn" onclick="startGame()">探索を開始する</button>
@@ -46,20 +47,22 @@
 
 <script>
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
+const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
+
 let audioCtx = null;
 let isBlind = true, gameStarted = false;
-let currentLevel = 1, totalCoins = 0, coinMultiplier = 1;
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 
-let ROWS, COLS, map = [], player = {x:0,y:0}, goalPos = {x:0,y:0};
+let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = []; 
-let lastMoveTime = Date.now(), autoMoveTimeout = null;
+
+let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 
 const WHITE_KEYS = [
     261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 
     523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 
-    1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 
-    2093.00
+    1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00
 ];
 
 function updateUI() {
@@ -67,10 +70,21 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ（視界確保）";
+    
+    let statusText = "";
+    if (autoLoadState === "LOADING") statusText = "📡 Google Mapが経路読み込み中...";
+    else if (autoLoadState === "MOVING") statusText = `📍 ルート案内中 (${(calculateInterval()/1000).toFixed(2)}s間隔)`;
+    document.getElementById('auto-status').innerText = statusText;
+
     document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
     document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
+}
+
+function calculateInterval() {
+    if (totalCoins < 1) return 3500;
+    return Math.max(50, 3500 * Math.pow(0.975, Math.pow(totalCoins, 1.15)));
 }
 
 function generateSimpleMaze() {
@@ -82,40 +96,52 @@ function generateSimpleMaze() {
         let startY = 1 + Math.floor(Math.random() * (ROWS - 2));
         player = { x: startX, y: startY };
         let x = startX, y = startY; map[y][x] = 0;
-        let fillAmount = ROWS * COLS * 0.55;
+        let fillAmount = ROWS * COLS * (0.55 - (currentLevel * 0.01));
         for(let i=0; i < fillAmount; i++) {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
             let [dx, dy] = dirs[Math.floor(Math.random()*4)];
             if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) { x += dx; y += dy; map[y][x] = 0; }
         }
 
-        // BFSで最短経路（正解ルート）のみ抽出
-        let q = [{x: player.x, y: player.y, path: []}];
-        let visited = Array.from({length: ROWS}, () => Array(COLS).fill(false));
-        visited[player.y][player.x] = true;
-        
-        let goalNode = null;
+        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
+        let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        let q = [{x: startX, y: startY, d: 0, path: []}]; dists[startY][startX] = 0;
+        let allWalkable = [];
+
         while(q.length > 0) {
-            let curr = q.shift();
-            if (curr.path.length > ROWS) goalNode = curr; // 一定以上の長さ
+            let curr = q.shift(); allWalkable.push(curr);
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = curr.x + dx, ny = curr.y + dy;
-                if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]===0 && !visited[ny][nx]) {
-                    visited[ny][nx] = true;
-                    q.push({x: nx, y: ny, path: [...curr.path, {x: nx, y: ny}]});
+                if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
+                    dists[ny][nx] = curr.d + 1;
+                    parent[ny][nx] = {x: curr.x, y: curr.y};
+                    q.push({x: nx, y: ny, d: curr.d + 1, path: [...curr.path, {x: nx, y: ny}]});
                 }
             }
         }
 
-        if(goalNode) {
+        let minThreshold = ROWS * 1.2 + currentLevel;
+        let candidates = allWalkable.filter(p => dists[p.y][p.x] >= minThreshold);
+        if(candidates.length > 0) {
+            let goalNode = candidates[Math.floor(Math.random()*candidates.length)];
+            map[goalNode.y][goalNode.x] = 2; goalPos = { x: goalNode.x, y: goalNode.y };
             shortestPath = goalNode.path;
-            goalPos = shortestPath[shortestPath.length - 1];
-            map[goalPos.y][goalPos.x] = 2; // ゴール
-            
-            // コイン(3)を最短経路上にのみ配置（一定間隔に調整可、現在は全マス）
+
+            // コイン配置：最短経路のみ
             shortestPath.forEach((p, idx) => {
-                if (idx < shortestPath.length - 1) map[p.y][p.x] = 3;
+                if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
             });
+
+            // イッヌ配置：最短経路上以外
+            dogs = [];
+            let safety = new Set(shortestPath.map(p => `${p.x},${p.y}`));
+            safety.add(`${player.x},${player.y}`);
+            let dogCandidates = allWalkable.filter(p => !safety.has(`${p.x},${p.y}`));
+            let dogCount = Math.max(0, currentLevel - 1);
+            for(let i=0; i<dogCount && dogCandidates.length>0; i++) {
+                let idx = Math.floor(Math.random() * dogCandidates.length);
+                dogs.push(dogCandidates[idx]); dogCandidates.splice(idx, 1);
+            }
             found = true;
         }
     }
@@ -126,7 +152,7 @@ function playCoinSound(pathIndex) {
     let idx = pathIndex % WHITE_KEYS.length;
     const baseFreq = WHITE_KEYS[idx];
     if (hasAmulet) {
-        [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(baseFreq * r, 'sine', 0.25), i * 30));
+        [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(baseFreq * r, 'sine', 0.25), i * 25));
     } else {
         playOscillator(baseFreq, 'sine', 0.15);
     }
@@ -137,58 +163,62 @@ function movePlayer(dx, dy, isAuto = false) {
     if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
     const nx = player.x + dx, ny = player.y + dy;
 
-    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1) {
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
+        if(!isAuto) playOscillator(150, 'square', 0.1);
+    } else {
         player.x = nx; player.y = ny;
-        
-        if (map[ny][nx] === 2) { // ゴール
+        if (dogs.some(d => d.x === player.x && d.y === player.y)) {
+            alert("案内中にイッヌに遭遇しました！"); resetGame(); return;
+        }
+        if (map[ny][nx] === 2) {
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
-        } else if (map[ny][nx] === 3) { // コイン
+        } else if (map[ny][nx] === 3) {
             let pIdx = shortestPath.findIndex(p => p.x === nx && p.y === ny);
             if (pIdx !== -1) {
                 playCoinSound(pIdx);
-                // 今回のインデックス以下の経路上のコインをすべて消す
+                // 今回のコイン以前の最短経路上のコインをすべて消去
                 for(let i = 0; i <= pIdx; i++) {
                     let p = shortestPath[i];
-                    if (map[p.y][p.x] === 3) {
-                        map[p.y][p.x] = 0;
-                        totalCoins += (1 * coinMultiplier);
-                    }
+                    if (map[p.y][p.x] === 3) { map[p.y][p.x] = 0; totalCoins += (1 * coinMultiplier); }
                 }
                 updateUI();
             }
         }
-    } else if (!isAuto) {
-        playOscillator(150, 'square', 0.1);
     }
     draw();
 }
 
-// 共通機能
-function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
-function buyAmulet() { if (totalCoins >= 3) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
-function buyAutoDevice() { if (totalCoins >= 5) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
-function toggleBlind() { isBlind = !isBlind; stopAutoProcess(); draw(); updateUI(); }
-function stopAutoProcess() { if (autoMoveTimeout) clearTimeout(autoMoveTimeout); document.getElementById('auto-status').innerText = ""; }
+function resetGame() {
+    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; coinMultiplier = 1;
+    gameStarted = false; isBlind = true; stopAutoProcess();
+    document.getElementById('start-container').style.display = 'flex'; updateUI();
+}
+
+function stopAutoProcess() { 
+    autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); 
+}
 
 function executeAutoStep() {
-    if (!gameStarted || !hasAutoDevice) return;
+    if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
     let pIdx = shortestPath.findIndex(p => p.x === player.x && p.y === player.y);
     let next = (pIdx === -1) ? shortestPath[0] : shortestPath[pIdx + 1];
     if (!next) {
         for(let [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-            if(player.x+dx === goalPos.x && player.y+dy === goalPos.y) { movePlayer(dx, dy, true); return; }
+            if(player.x+dx===goalPos.x && player.y+dy===goalPos.y) { movePlayer(dx,dy,true); return; }
         }
     } else {
         movePlayer(next.x - player.x, next.y - player.y, true);
-        document.getElementById('auto-status').innerText = "📍 自動案内中...";
-        autoMoveTimeout = setTimeout(executeAutoStep, 350);
+        autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval());
     }
 }
 
 setInterval(() => {
-    if (gameStarted && hasAutoDevice && (Date.now() - lastMoveTime > 5000) && !autoMoveTimeout) executeAutoStep();
-}, 1000);
+    if (!gameStarted || !hasAutoDevice) return;
+    let idle = Date.now() - lastMoveTime;
+    if (autoLoadState === "NONE" && idle > 5000) { autoLoadState = "LOADING"; updateUI(); }
+    if (autoLoadState === "LOADING" && idle > 8000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
+}, 500);
 
 function draw() {
     const canvas = document.getElementById('gameCanvas'); const ctx = canvas.getContext('2d');
@@ -201,10 +231,18 @@ function draw() {
         for(let x=0; x<COLS; x++) {
             let px = offsetX + x*size, py = offsetY + y*size;
             if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
-            else if (map[y][x] === 2) { ctx.fillStyle = "#f00"; ctx.fillRect(px, py, size, size); }
-            else if (map[y][x] === 3) { 
+            else if (map[y][x] === 2) { 
+                const cs = 3, rs = 4, cw = size / cs, ch = size / rs;
+                for (let r = 0; r < rs; r++) for (let c = 0; c < cs; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? "#fff" : "#000"; ctx.fillRect(px + c * cw, py + r * ch, cw, ch);
+                }
+                ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(px, py, size, size);
+            } else if (map[y][x] === 3) { 
                 ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = "#5d4037"; ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillText("$", px+size/2, py+size/2);
             }
+            dogs.forEach(d => { if(d.x === x && d.y === y) ctx.drawImage(dogImg, px, py, size, size); });
         }
     }
     ctx.drawImage(playerImg, offsetX + player.x*size, offsetY + player.y*size, size, size);
@@ -216,13 +254,17 @@ function startGame() {
     gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw();
 }
 
+function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
+function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
+function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
+function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
+
 async function playOscillator(f, t, d) {
     const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
     o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
     g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
-
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
 
 let tsX = null, tsY = null;
