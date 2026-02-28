@@ -1,3 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>スイカ割り迷宮</title>
+    <style>
+        body { margin: 0; background: #fff; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
+        canvas { display: block; }
+        #ui { position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; font-weight: bold; }
+        #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; }
+        button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
+
+        #start-container { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255,255,255,0.9); display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; z-index: 100; 
+        }
+        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; }
+        .shop-btn { padding: 10px; margin: 10px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+    <div id="start-container">
+        <div id="level-display" style="font-size: 24px; margin-bottom: 10px;">Level 1</div>
+        <div id="coin-status">所持コイン: 0枚</div>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">✨ 金運お守り (3コインで永続3倍)</button>
+        <button id="start-btn" onclick="startGame()">探索を開始する</button>
+    </div>
+
+    <div id="ui">
+        <div id="mode-text">ブラインド</div>
+        <div id="total-coins">コイン: 0</div>
+    </div>
+
+    <div id="controls">
+        <button id="toggleMode">Dev Mode</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
+const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
+
+let audioCtx = null;
+let isBlind = true;
+let gameStarted = false;
+let currentLevel = 1;
+let totalCoins = 0;
+let coinMultiplier = 1; 
+let hasAmulet = false;
+let ROWS, COLS;
+let player = { x: 0, y: 0 };
+let map = [], dogs = [];
+
+function updateUI() {
+    document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
+    document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
+    document.getElementById('level-display').innerText = `Level ${currentLevel}`;
+    const btn = document.getElementById('amulet-btn');
+    if(btn) btn.disabled = (hasAmulet || totalCoins < 3);
+}
+
+function buyAmulet() {
+    if (totalCoins >= 3 && !hasAmulet) {
+        totalCoins -= 3;
+        hasAmulet = true;
+        coinMultiplier = 3;
+        updateUI();
+    }
+}
+
+function generateSimpleMaze() {
+    ROWS = COLS = 6 + (currentLevel * 2);
+    let found = false;
+    while (!found) {
+        map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+        let startX = 1 + Math.floor(Math.random() * (COLS - 2));
+        let startY = 1 + Math.floor(Math.random() * (ROWS - 2));
+        player = { x: startX, y: startY };
+        let x = startX, y = startY; map[y][x] = 0;
+        let fillAmount = ROWS * COLS * (0.55 - (currentLevel * 0.01));
+        for(let i=0; i < fillAmount; i++) {
+            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            let [dx, dy] = dirs[Math.floor(Math.random()*4)];
+            if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) { x += dx; y += dy; map[y][x] = 0; }
+        }
+        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
+        let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        let q = [{x: startX, y: startY, d: 0}]; dists[startY][startX] = 0;
+        let allWalkable = [];
+        while(q.length > 0) {
+            let curr = q.shift(); allWalkable.push(curr);
+            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                let nx = curr.x + dx, ny = curr.y + dy;
+                if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] === 0 && dists[ny][nx] === -1) {
+                    dists[ny][nx] = curr.d + 1; parent[ny][nx] = {x: curr.x, y: curr.y}; q.push({x: nx, y: ny, d: curr.d + 1});
+                }
+            }
+        }
+        let minThreshold = ROWS * 1.2 + currentLevel;
+        let candidates = allWalkable.filter(p => dists[p.y][p.x] >= minThreshold);
+        if(candidates.length > 0) {
+            let goal = candidates[Math.floor(Math.random()*candidates.length)];
+            map[goal.y][goal.x] = 2;
+            let safetyZone = new Set();
+            let tempPath = [];
+            let pNode = goal;
+            while(pNode) {
+                safetyZone.add(`${pNode.x},${pNode.y}`);
+                safetyZone.add(`${pNode.x+1},${pNode.y}`); safetyZone.add(`${pNode.x-1},${pNode.y}`);
+                safetyZone.add(`${pNode.x},${pNode.y+1}`); safetyZone.add(`${pNode.x},${pNode.y-1}`);
+                if(!(pNode.x === player.x && pNode.y === player.y)) tempPath.push({x: pNode.x, y: pNode.y});
+                pNode = parent[pNode.y][pNode.x];
+            }
+            tempPath.reverse();
+            dogs = [];
+            let dogCount = Math.max(0, currentLevel - 1);
+            let dogCandidates = allWalkable.filter(p => !safetyZone.has(`${p.x},${p.y}`) && !(p.x === player.x && p.y === player.y));
+            for(let i=0; i < dogCount; i++) {
+                if(dogCandidates.length === 0) break;
+                let idx = Math.floor(Math.random() * dogCandidates.length);
+                dogs.push(dogCandidates[idx]); dogCandidates.splice(idx, 1);
+            }
+            let coinInterval = 1 + Math.floor((currentLevel - 1) * 0.5);
+            tempPath.forEach((p, index) => { if(index % coinInterval === 0 && map[p.y][p.x] === 0) map[p.y][p.x] = 3; });
+            found = true;
+        }
+    }
+}
+
+function movePlayer(dx, dy) {
+    if(!gameStarted) return;
+    const nx = player.x + dx, ny = player.y + dy;
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
+        playOscillator(150, 'square', 0.1);
+    } else {
+        player.x = nx; player.y = ny;
+        if (dogs.some(d => d.x === player.x && d.y === player.y)) {
+            alert("イッヌに噛まれました！");
+            currentLevel = 1; totalCoins = 0; hasAmulet = false; coinMultiplier = 1;
+            gameStarted = false; document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
+        }
+        if (map[ny][nx] === 2) {
+            playGoalSound(); currentLevel++; gameStarted = false; 
+            document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
+        } else if (map[ny][nx] === 3) {
+            totalCoins += (1 * coinMultiplier); 
+            playOscillator(800, 'sine', 0.1); map[ny][nx] = 0; updateUI();
+        }
+    }
+    draw();
+}
+
 function draw() {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -8,21 +165,17 @@ function draw() {
 
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // ブラインドモードなら画面を真っ黒にして描画を終了する
     if (isBlind) {
         ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
         return; 
     }
 
-    // デバッグモード（非ブラインド）時の描画
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
             let px = offsetX + x*size, py = offsetY + y*size;
-            
             if (map[y][x] === 1) { 
                 ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); 
             } else if (map[y][x] === 2) { 
-                // ★ゴール：3x4の細かなチェック模様
                 const cols = 3; const rows = 4;
                 const cellW = size / cols; const cellH = size / rows;
                 for (let r = 0; r < rows; r++) {
@@ -32,7 +185,6 @@ function draw() {
                     }
                 }
             } else if (map[y][x] === 3) { 
-                // ★コイン：ドルマークを少し小さく (size/2.5)
                 ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); 
                 ctx.fillStyle = "#000"; ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
                 ctx.fillText("$", px+size/2, py+size/2);
@@ -42,3 +194,40 @@ function draw() {
     }
     ctx.drawImage(playerImg, offsetX + player.x*size, offsetY + player.y*size, size, size);
 }
+
+function startGame() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    document.getElementById('start-container').style.display = 'none';
+    gameStarted = true; generateSimpleMaze(); updateUI(); draw();
+}
+
+document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ"; draw(); };
+
+async function playOscillator(f, t, d) {
+    if (!audioCtx) return;
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
+    g.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + d);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + d);
+}
+
+async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
+
+let tsX = null, tsY = null;
+window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
+window.addEventListener('touchend', e => {
+    if (tsX === null || tsY === null) return;
+    const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
+    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+        if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1);
+    }
+    tsX = null; tsY = null;
+});
+
+window.onresize = draw;
+updateUI();
+</script>
+</body>
+</html>
