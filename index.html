@@ -60,6 +60,7 @@ function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
+    document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ";
     const btn = document.getElementById('amulet-btn');
     if(btn) btn.disabled = (hasAmulet || totalCoins < 3);
 }
@@ -142,10 +143,15 @@ function movePlayer(dx, dy) {
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
             alert("イッヌに噛まれました！");
             currentLevel = 1; totalCoins = 0; hasAmulet = false; coinMultiplier = 1;
-            gameStarted = false; document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
+            gameStarted = false; 
+            isBlind = true; // リセット
+            document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
         }
         if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; gameStarted = false; 
+            playGoalSound(); 
+            currentLevel++; 
+            gameStarted = false; 
+            isBlind = true; // 次のレベルは必ずブラインドから
             document.getElementById('start-container').style.display = 'flex'; updateUI(); return;
         } else if (map[ny][nx] === 3) {
             totalCoins += (1 * coinMultiplier); 
@@ -176,7 +182,6 @@ function draw() {
             if (map[y][x] === 1) { 
                 ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); 
             } else if (map[y][x] === 2) { 
-                // ★ゴール：3x4チェック模様 + 黒い外枠
                 const cols = 3; const rows = 4;
                 const cellW = size / cols; const cellH = size / rows;
                 for (let r = 0; r < rows; r++) {
@@ -185,15 +190,10 @@ function draw() {
                         ctx.fillRect(px + c * cellW, py + r * cellH, cellW, cellH);
                     }
                 }
-                // 黒い枠線を描画
-                ctx.strokeStyle = "#000";
-                ctx.lineWidth = 2;
-                ctx.strokeRect(px, py, size, size);
+                ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.strokeRect(px, py, size, size);
             } else if (map[y][x] === 3) { 
-                // ★コイン：円は黄金、ドルマークは濃い茶色 (#5d4037)
                 ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); 
-                ctx.fillStyle = "#5d4037"; // 濃い茶色
-                ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillStyle = "#5d4037"; ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
                 ctx.fillText("$", px+size/2, py+size/2);
             }
             dogs.forEach(d => { if(d.x === x && d.y === y) ctx.drawImage(dogImg, px, py, size, size); });
@@ -208,7 +208,7 @@ function startGame() {
     gameStarted = true; generateSimpleMaze(); updateUI(); draw();
 }
 
-document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ"; draw(); };
+document.getElementById('toggleMode').onclick = () => { isBlind = !isBlind; updateUI(); draw(); };
 
 async function playOscillator(f, t, d) {
     if (!audioCtx) return;
