@@ -69,8 +69,7 @@ function updateUI() {
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('mode-text').innerText = isBlind ? "ブラインド" : "デバッグ";
     
-    // スピード倍率を表示
-    let speedLabel = isAutoMoving ? `⚠️ 自動爆走中 (Speed: x${(1 + totalCoins * 0.2).toFixed(1)})` : "";
+    let speedLabel = isAutoMoving ? `⚠️ 犬を避けて爆走中 (x${(1 + totalCoins * 0.2).toFixed(1)})` : "";
     document.getElementById('auto-status').innerText = speedLabel;
 
     const btn = document.getElementById('amulet-btn');
@@ -145,22 +144,35 @@ function generateSimpleMaze() {
     }
 }
 
+// 犬を避けるための最短経路探索 (BFS)
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}];
     let visited = new Set();
     visited.add(`${player.x},${player.y}`);
+    
+    // 犬の座標セット（回避用）
+    const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
+
     while(q.length > 0) {
         let curr = q.shift();
         if(map[curr.y][curr.x] === 2) return curr.path[0];
+
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
             let nx = curr.x + dx, ny = curr.y + dy;
-            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1 && !visited.has(`${nx},${ny}`)) {
-                visited.add(`${nx},${ny}`);
+            let key = `${nx},${ny}`;
+            
+            // 壁でなく、未訪問で、かつ犬がいないマスのみ進む
+            if(nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && 
+               map[ny][nx] !== 1 && 
+               !visited.has(key) && 
+               !dogSet.has(key)) {
+                
+                visited.add(key);
                 q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
             }
         }
     }
-    return null;
+    return null; // 安全な道が見つからない場合
 }
 
 function movePlayer(dx, dy, isAuto = false) {
@@ -195,16 +207,15 @@ function resetGame() {
     document.getElementById('start-container').style.display = 'flex'; updateUI();
 }
 
-// 加速対応した自動移動
 function executeAutoStep() {
     if (!isAutoMoving || !gameStarted) return;
-    let step = getNextStepToGoal();
+    let step = getNextStepToGoal(); // 犬を避けるステップを取得
     if (step) {
         movePlayer(step.dx, step.dy, true);
-        // コイン枚数に基づいて次のステップまでの時間を計算
         let interval = 1000 / (1 + totalCoins * 0.2); 
         autoMoveTimeout = setTimeout(executeAutoStep, interval);
     } else {
+        // 道が塞がっている場合は一旦停止（放置タイマーで再試行される）
         stopAutoMove();
     }
 }
