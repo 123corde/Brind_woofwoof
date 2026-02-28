@@ -62,7 +62,7 @@
             ・迷路内で待ち構えているイッヌに気を付けて<br>
             <br>
             <br>
-            ver.4.1
+            ver.4.2
         </div>
     </div>
 
@@ -199,22 +199,18 @@ let currentPitchIndex = 0;
 let coinPositions = []; 
 
 function generateSimpleMaze() {
-    // レベルに応じて迷路のサイズを大きくする
     ROWS = COLS = 6 + (currentLevel * 2); 
     let found = false;
 
     while (!found) {
-        // 1. 迷路の初期化（すべて壁: 1）
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
         
-        // 2. スタート地点の設定
         let startX = 1 + Math.floor(Math.random() * (COLS - 2));
         let startY = 1 + Math.floor(Math.random() * (ROWS - 2));
         player = { x: startX, y: startY };
         let x = startX, y = startY; 
-        map[y][x] = 0; // 通路にする
+        map[y][x] = 0; 
 
-        // 3. ランダムウォークで通路を生成
         let fillAmount = ROWS * COLS * (0.55 - (currentLevel * 0.01)); 
         for(let i=0; i < fillAmount; i++) {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
@@ -224,7 +220,6 @@ function generateSimpleMaze() {
             }
         }
 
-        // 4. BFS（幅優先探索）で最短距離と親ノードを計算
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let parent = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
         let q = [{x: startX, y: startY, d: 0}]; 
@@ -244,34 +239,46 @@ function generateSimpleMaze() {
             }
         }
 
-        // 5. ゴールの選定（一定以上の距離がある場所）
         let minThreshold = ROWS * 1.2 + (currentLevel); 
         let candidates = allWalkable.filter(p => dists[p.y][p.x] >= minThreshold);
         
         if(candidates.length > 0) {
             let goal = candidates[Math.floor(Math.random()*candidates.length)];
-            map[goal.y][goal.x] = 2; // ゴール: 2
+            map[goal.y][goal.x] = 2; 
             
-            // 最短パスのノードを特定
+            // 最短パスと「上下左右」を安全地帯としてマーキング
             let shortestPathNodes = new Set();
+            let safetyZone = new Set();
             let tempPath = [];
             let pNode = goal;
+            
             while(pNode) { 
-                shortestPathNodes.add(`${pNode.x},${pNode.y}`); 
+                shortestPathNodes.add(`${pNode.x},${pNode.y}`);
+                // パス上のマス
+                safetyZone.add(`${pNode.x},${pNode.y}`);
+                // 上下左右も安全地帯に追加
+                safetyZone.add(`${pNode.x+1},${pNode.y}`);
+                safetyZone.add(`${pNode.x-1},${pNode.y}`);
+                safetyZone.add(`${pNode.x},${pNode.y+1}`);
+                safetyZone.add(`${pNode.x},${pNode.y-1}`);
+
                 if(!(pNode.x === player.x && pNode.y === player.y)) tempPath.push({x: pNode.x, y: pNode.y});
                 pNode = parent[pNode.y][pNode.x]; 
             }
-            tempPath.reverse(); // スタート側から並べる
+            tempPath.reverse();
 
-            // 6. イッヌ（敵）の配置
+            // 犬の配置：安全地帯（上下左右含む）を避ける
             dogs = [];
             let dogCount = Math.max(0, currentLevel - 1); 
             let dogCandidates = allWalkable.filter(p => {
-                const notOnPath = !shortestPathNodes.has(`${p.x},${p.y}`);
-                const notOnStart = !(p.x === player.x && p.y === player.y);
-                const distToStart = Math.max(Math.abs(p.x - player.x), Math.abs(p.y - player.y));
-                return notOnPath && notOnStart && distToStart > 1;
+                return !safetyZone.has(`${p.x},${p.y}`) && !(p.x === player.x && p.y === player.y);
             });
+
+            // 候補が足りない場合は最短ルート上だけ避ける設定にフォールバック
+            if(dogCandidates.length < dogCount) {
+                dogCandidates = allWalkable.filter(p => !shortestPathNodes.has(`${p.x},${p.y}`) && !(p.x === player.x && p.y === player.y));
+            }
+
             for(let i=0; i < dogCount; i++) {
                 if(dogCandidates.length === 0) break;
                 let idx = Math.floor(Math.random() * dogCandidates.length);
@@ -279,18 +286,17 @@ function generateSimpleMaze() {
                 dogCandidates.splice(idx, 1);
             }
 
-            // 7. コイン（ヒント）の配置：Lv1=1, Lv5=3, Lv9=5の間隔
+            // コインの配置（間隔調整：Lv1=1, Lv5=3, Lv9=5）
             coinPositions = [];
             let coinInterval = 1 + Math.floor((currentLevel - 1) * 0.5);
-            
             tempPath.forEach((p, index) => {
                 if(index % coinInterval === 0 && map[p.y][p.x] === 0) { 
-                    map[p.y][p.x] = 3; // コイン: 3
+                    map[p.y][p.x] = 3; 
                     coinPositions.push({x: p.x, y: p.y, order: index}); 
                 }
             });
 
-            found = true; // 生成成功
+            found = true; 
         }
     }
 }
