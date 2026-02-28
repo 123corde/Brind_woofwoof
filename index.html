@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち (Tight Flashlight Edition)</title>
+    <title>イッヌと寝落ち (Classic Logic Edition)</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -18,10 +18,6 @@
             background: rgba(255,255,255,0.95); display: flex; flex-direction: column; 
             justify-content: center; align-items: center; z-index: 100; text-align: center;
             padding: 20px; box-sizing: border-box;
-        }
-        #game-desc {
-            margin-top: 15px; font-size: 13px; line-height: 1.5; color: #555;
-            max-width: 400px; border-top: 1px solid #ccc; padding-top: 10px;
         }
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
         .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 300px; }
@@ -40,10 +36,6 @@
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (10コイン)</button>
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
         <button id="start-btn" onclick="startGame()">ゲームを開始する</button>
-        <div id="game-desc">
-            ・上下左右にスワイプで移動<br>
-            ・懐中電灯は超至近距離（0.7マス）のみを照らします
-        </div>
     </div>
 
     <div id="ui">
@@ -72,6 +64,16 @@ let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
+
+// ゲームオーバーメッセージ
+const gameOverMessages = [
+    "イッヌ「クッソワロタｗｗｗｗ」",
+    "イッヌ「お前の場所、丸見えだぞ」",
+    "イッヌ「寝る前に食われてやんの」",
+    "イッヌ「センスねーな！出直してこい！」",
+    "イッヌ「そこ、行き止まりだったか？ｗ」",
+    "イッヌ「おやすみ。いい夢見ろよ（物理）」"
+];
 
 function unlockAudio() {
     if (soundReady) return;
@@ -131,7 +133,15 @@ function generateSimpleMaze() {
             let target = cand[Math.floor(Math.random()*cand.length)];
             map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
             shortestPath = target.fullPath; coinsCollectedInLevel = 0;
-            shortestPath.forEach(p => { if(!(p.x===goalPos.x && p.y===goalPos.y)) map[p.y][p.x]=3; });
+            
+            // --- コイン配置アルゴリズム（レベルごとに間隔を広くする） ---
+            let stepSize = 2 + Math.floor(currentLevel / 2);
+            for(let i = stepSize - 1; i < shortestPath.length; i += stepSize) {
+                let p = shortestPath[i];
+                if(!(p.x === goalPos.x && p.y === goalPos.y)) {
+                    map[p.y][p.x] = 3; 
+                }
+            }
             
             dogs = [];
             let safetyZone = new Set();
@@ -198,7 +208,8 @@ function movePlayer(dx, dy, isAuto = false) {
         player.x = nx; player.y = ny;
         if (dogs.some(d => d.x === player.x && d.y === player.y)) {
             gameStarted = false; biteSnd.play().catch(e=>{});
-            setTimeout(() => { alert("~~ GAME OVER ~~"); resetGame(); }, 100);
+            let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
+            setTimeout(() => { alert(`~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100);
             return;
         }
         if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) growlSnd.play().catch(e=>{});
@@ -206,14 +217,9 @@ function movePlayer(dx, dy, isAuto = false) {
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
         } else if (map[ny][nx] === 3) {
-            let pIdx = shortestPath.findIndex(p => p.x === nx && p.y === ny);
-            if (pIdx !== -1) {
-                playCoinSound(coinsCollectedInLevel);
-                for(let i = 0; i <= pIdx; i++) {
-                    let p = shortestPath[i]; if (map[p.y][p.x] === 3) { map[p.y][p.x] = 0; totalCoins += (1 * coinMultiplier); }
-                }
-                coinsCollectedInLevel++; updateUI();
-            }
+            playCoinSound(coinsCollectedInLevel);
+            map[ny][nx] = 0; totalCoins += (1 * coinMultiplier);
+            coinsCollectedInLevel++; updateUI();
         }
     }
     draw();
@@ -245,10 +251,10 @@ function draw() {
     else if (hasFlashlight) {
         const cX = oX + player.x * size + size / 2, cY = oY + player.y * size + size / 2;
         ctx.beginPath();
-        ctx.arc(cX, cY, size * 0.5, 0, Math.PI * 2); // 半径0.5マス
+        ctx.arc(cX, cY, size * 0.5, 0, Math.PI * 2); 
         const angle = Math.atan2(lastDir.dy, lastDir.dx);
         ctx.moveTo(cX, cY);
-        ctx.arc(cX, cY, size * 0.7, angle - 0.5, angle + 0.5); // 距離0.7マス
+        ctx.arc(cX, cY, size * 0.7, angle - 0.5, angle + 0.5); 
         ctx.closePath();
         ctx.clip();
     } else { ctx.restore(); return; }
@@ -261,7 +267,6 @@ function draw() {
             let cs=3, rs=4, cw=size/cs, ch=size/rs;
             for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
         } else if (map[y][x] === 3) {
-            // コインのドルマーク描画を復元
             ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
         }
