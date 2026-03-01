@@ -22,7 +22,7 @@
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
         .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 300px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
-        .dev-btn { background: #6c757d; color: white; }
+        .dev-btn { color: white; }
         #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; text-shadow: 0 0 2px white; }
         #ammo-display { color: #ff4444; font-size: 16px; margin-top: 5px; }
     </style>
@@ -103,6 +103,7 @@ function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
+    document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
     const ammoIcons = "💥".repeat(shotgunAmmo);
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? `ショットガン: ${ammoIcons}` : "";
     let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ（視界確保）";
@@ -116,7 +117,7 @@ function updateUI() {
     document.getElementById('shotgun-btn').disabled = (shotgunAmmo > 0 || totalCoins < 4);
     document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
     document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
-    document.getElementById('dev-glass-btn').disabled = hasDevGlasses;
+    document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 }
 
