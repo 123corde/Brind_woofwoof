@@ -57,7 +57,7 @@
         <div id="flashlight-display"></div>
         <div id="mode-text">BLIND MODE</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
-        <div style="font-size: 15px; margin-top: 5px; color: #ffd700;">ver.1.28</div>
+        <div style="font-size: 15px; margin-top: 5px; color: #ffd700;">ver.1.40</div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
@@ -129,7 +129,6 @@ function updateUI() {
     else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
 
-    // 通常ボタン
     document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
     document.getElementById('shotgun-btn').disabled = (shotgunAmmo > 0 || totalCoins < 4);
     document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
@@ -137,14 +136,11 @@ function updateUI() {
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 
-    // 音楽アイテムの進化表示ロジック
     const hBtn = document.getElementById('headphone-btn');
     const m1Btn = document.getElementById('music1-btn');
     const m2Btn = document.getElementById('music2-btn');
 
-    hBtn.style.display = "none";
-    m1Btn.style.display = "none";
-    m2Btn.style.display = "none";
+    hBtn.style.display = "none"; m1Btn.style.display = "none"; m2Btn.style.display = "none";
 
     if (!hasHeadphone) {
         hBtn.style.display = "inline-block";
@@ -157,7 +153,6 @@ function updateUI() {
         m2Btn.style.display = "inline-block";
         m2Btn.disabled = (totalCoins < 4);
     } else {
-        // 完売状態
         hBtn.style.display = "inline-block";
         hBtn.innerText = "🎧 ヘッドフォン (完売)";
         hBtn.disabled = true;
@@ -297,6 +292,7 @@ async function startGame() {
         const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
         m1.pause(); m2.pause();
         const active = (currentBGM === 1) ? m1 : m2;
+        active.volume = 0.3; // BGM音量を0.3倍に設定
         active.currentTime = 0; active.play().catch(e => {});
     }
     generateSimpleMaze(); updateUI(); draw(); 
@@ -317,7 +313,6 @@ function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; has
 function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
 function buyFlashlight() { if (totalCoins >= 10 && !hasFlashlight) { totalCoins -= 10; hasFlashlight = true; updateUI(); } }
 function buyShotgun() { if (totalCoins >= 4 && shotgunAmmo === 0) { totalCoins -= 4; shotgunAmmo = 2; updateUI(); } }
-
 function buyHeadphone() { if (totalCoins >= 2 && !hasHeadphone) { totalCoins -= 2; hasHeadphone = true; updateUI(); } }
 function buyMusic1() { if (totalCoins >= 1 && hasHeadphone && currentBGM !== 1) { totalCoins -= 1; currentBGM = 1; updateUI(); } }
 function buyMusic2() { if (totalCoins >= 4 && hasHeadphone && currentBGM !== 2) { totalCoins -= 4; currentBGM = 2; updateUI(); } }
