@@ -354,8 +354,8 @@ function draw() {
            // --- 2. 懐中電灯の照射（扇形） ---
             const gradFan = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.95);
             gradFan.addColorStop(0, 'rgba(0,0,0,1)');   // 中心
-            gradFan.addColorStop(0.7, 'rgba(0,0,0,1)'); // 7割までクッキリ
-            gradFan.addColorStop(1, 'rgba(0,0,0,0)');   // 先端だけボカす
+            gradFan.addColorStop(0.55, 'rgba(0,0,0,1)'); // ここから徐々に
+            gradFan.addColorStop(1, 'rgba(0,0,0,0)');   // ここまでボカす
             
             tCtx.fillStyle = gradFan;
             tCtx.beginPath();
@@ -369,12 +369,12 @@ function draw() {
             // 半径 size * 0.5 に合わせて、その範囲内で完結するグラデーションを作る
             const gradFoot = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.5);
             gradFoot.addColorStop(0, 'rgba(0,0,0,1)');   // 足元中心
-            gradFoot.addColorStop(0.5, 'rgba(0,0,0,1)'); // 半分までクッキリ
+            gradFoot.addColorStop(0.7, 'rgba(0,0,0,1)'); // 半分までクッキリ
             gradFoot.addColorStop(1, 'rgba(0,0,0,0)');   // 縁をじんわりボカす
             
             tCtx.fillStyle = gradFoot;
             tCtx.beginPath();
-            tCtx.arc(cX, cY, size * 0.5, 0, Math.PI * 2);
+            tCtx.arc(cX, cY, size * 0.6, 0, Math.PI * 2);
             tCtx.fill();
             
             // メインキャンバスに重ねる
