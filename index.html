@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち (Shotgun Edition)</title>
+    <title>イッヌと寝落ち (Simplified Shotgun Edition)</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -55,16 +55,16 @@ const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.co
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
-const shotgunSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Shotgun.wav');
+// ショットガン音はCane.wavに統合されているため削除
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane.wav');
 
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false, hasFlashlight = false;
-let shotgunAmmo = 0; // ショットガンの残弾
+let shotgunAmmo = 0; 
 let lastDir = { dx: 0, dy: -1 }; 
-let flipX = false;
+let flipX = false; 
 
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = [], coinsCollectedInLevel = 0;
@@ -85,16 +85,27 @@ function unlockAudio() {
     if (soundReady) return;
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
-    const silentPlay = (audio) => { audio.play().then(() => { setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1); }).catch(e => {}); };
-    [growlSnd, biteSnd, shotgunSnd, dogCrySnd].forEach(silentPlay);
+    const silentPlay = (audio) => { 
+        audio.play().then(() => { 
+            setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1); 
+        }).catch(e => {}); 
+    };
+    [growlSnd, biteSnd, dogCrySnd].forEach(silentPlay);
     soundReady = true;
+}
+
+function playSound(audio) {
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+    audio.play().catch(e => {});
 }
 
 function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
-    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? `💥 残弾: ${shotgunAmmo}` : "";
+    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? `💥 ショットガン残弾: ${shotgunAmmo}` : "";
 
     let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ（視界確保）";
     document.getElementById('mode-text').innerText = modeLabel;
@@ -227,26 +238,26 @@ function movePlayer(dx, dy, isAuto = false) {
     } else {
         player.x = nx; player.y = ny;
         
-        // 犬との遭遇判定
         let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
         if (dogIndex !== -1) {
             if (shotgunAmmo > 0) {
-                // ショットガン発動
                 shotgunAmmo--;
-                shotgunSnd.play().catch(e=>{});
-                dogCrySnd.play().catch(e=>{});
-                dogs.splice(dogIndex, 1); // 犬を消去
+                playSound(dogCrySnd); // 発射音+悲鳴がセットになった音源を再生
+                dogs.splice(dogIndex, 1);
                 updateUI();
             } else {
-                // 通常のゲームオーバー
-                gameStarted = false; biteSnd.play().catch(e=>{});
+                gameStarted = false;
+                playSound(biteSnd);
                 let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
                 setTimeout(() => { alert(`~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100);
                 return;
             }
         }
         
-        if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) growlSnd.play().catch(e=>{});
+        if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) {
+            playSound(growlSnd);
+        }
+
         if (map[ny][nx] === 2) {
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
@@ -259,8 +270,22 @@ function movePlayer(dx, dy, isAuto = false) {
     draw();
 }
 
-async function startGame() { unlockAudio(); document.getElementById('start-container').style.display = 'none'; gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw(); }
-function resetGame() { currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; hasFlashlight = false; shotgunAmmo = 0; coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); }
+async function startGame() { 
+    unlockAudio(); 
+    document.getElementById('start-container').style.display = 'none'; 
+    gameStarted = true; lastMoveTime = Date.now(); 
+    generateSimpleMaze(); updateUI(); draw(); 
+}
+
+function resetGame() { 
+    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
+    hasDevGlasses = false; hasFlashlight = false; shotgunAmmo = 0; 
+    coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; 
+    stopAutoProcess(); 
+    document.getElementById('start-container').style.display = 'flex'; 
+    updateUI(); 
+}
+
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
 function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
 function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
@@ -282,6 +307,7 @@ function draw() {
     
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.save();
+    
     if (!isBlind) { ctx.beginPath(); ctx.rect(0, 0, canvas.width, canvas.height); ctx.clip(); } 
     else if (hasFlashlight) {
         const cX = oX + player.x * size + size / 2, cY = oY + player.y * size + size / 2;
