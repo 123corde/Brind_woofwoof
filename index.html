@@ -8,9 +8,9 @@
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
         #ui { 
-    position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; 
-    font-weight: bold; background: rgba(0,0,0,0.7); color: #fff; padding: 10px; border-radius: 6px;
-}
+            position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; 
+            font-weight: bold; background: rgba(0,0,0,0.7); color: #fff; padding: 10px; border-radius: 6px;
+        }
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
         #start-container { 
@@ -45,11 +45,8 @@
         <div id="ammo-display"></div>
         <div id="mode-text">ブラインド</div>
         <div id="total-coins">所持コイン: 0</div>
-        /* Ver.⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
-        ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
-        ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ */
-        <div style="font-size: 10px; margin-top: 5px; opacity: 0.5;">ver.1.10</div>
-</div>
+        <div style="font-size: 15px; margin-top: 5px; opacity: 0.5;">ver.1.12</div>
+    </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">Dev Mode</button></div>
     <canvas id="gameCanvas"></canvas>
@@ -242,7 +239,7 @@ function movePlayer(dx, dy, isAuto = false) {
         if (dogIndex !== -1) {
             if (shotgunAmmo > 0) {
                 shotgunAmmo--;
-                playSound(dogCrySnd); // 発射音+悲鳴がセットになった音源を再生
+                playSound(dogCrySnd);
                 dogs.splice(dogIndex, 1);
                 updateUI();
             } else {
@@ -305,7 +302,6 @@ function draw() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
     
-    // 1. まずは背景（マップ全体）を描画する
     ctx.fillStyle = "#fff"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -322,70 +318,48 @@ function draw() {
         dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
     }
     
-    // プレイヤー描画
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); }
     else { ctx.drawImage(playerImg, pX, pY, size, size); }
     ctx.restore();
 
-    // --- 2. 暗闇と懐中電灯のグラデーション処理 ---
     if (isBlind) {
-        // 一時的なキャンバスのように、現在の描画の上に「暗闇」を重ねる
         ctx.save();
         if (hasFlashlight) {
             const cX = oX + player.x * size + size / 2, cY = oY + player.y * size + size / 2;
-            
-            // 画面全体を黒く塗る準備
-            ctx.fillStyle = "black";
-            
-            // 「目的地以外を黒く塗る」のではなく、「黒い膜を懐中電灯でくり抜く」
-            // くり抜くために globalCompositeOperation を使う
-            // 別のレイヤーを作るイメージ
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
             const tCtx = tempCanvas.getContext('2d');
 
-            // 全体を黒く塗る
             tCtx.fillStyle = "black";
             tCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // ここから「消しゴムモード」開始
             tCtx.globalCompositeOperation = 'destination-out';
-
-            // --- 2. 暗闇と懐中電灯のぼかし処理 ---
-            const gradFan = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.95);
-            gradFan.addColorStop(0, 'rgba(0,0,0,1)');   // 中心はクッキリ
-            gradFan.addColorStop(0.5, 'rgba(0,0,0,1)'); // クッキリ範囲を少し狭める（ぼかしを強調）
-            gradFan.addColorStop(1, 'rgba(0,0,0,0)');   // 先端はじわっと消える
             
-            // ★ ここから強力なぼかし設定 ★
-            tCtx.save(); // 一旦設定を保存
-            
-            // ぼかしの幅を大幅にアップ（150）
+            tCtx.save();
             tCtx.shadowBlur = 150; 
-            // 影の色を完全に不透明な黒にする（消しゴム効果をボカす）
             tCtx.shadowColor = 'black'; 
-            
-            // 図形そのものの透明度を少し下げて（0.6）、ぼかしをさらに際立たせる
             tCtx.fillStyle = 'rgba(0,0,0,0.6)'; 
 
-            // 扇形を描画（直線部分も強力にボケる）
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
             tCtx.beginPath();
             tCtx.moveTo(cX, cY);
-            // ぼかしで光が広がる分、照射距離を少し短め（0.85）に調整
             tCtx.arc(cX, cY, size * 0.85, angle - 0.3, angle + 0.3);
             tCtx.closePath();
-            tCtx.fill(); // ここで全体が強力にボケる
+            tCtx.fill();
 
-            // 足元の円を描画（ここも一緒にボケる）
             tCtx.beginPath();
-            // 半径も少し小さめ（0.4）に調整
             tCtx.arc(cX, cY, size * 0.4, 0, Math.PI * 2);
             tCtx.fill(); 
 
-            tCtx.restore(); // 影の設定を元に戻す
+            tCtx.restore();
+            ctx.drawImage(tempCanvas, 0, 0);
+        } else {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.restore();
     }
 }
 
