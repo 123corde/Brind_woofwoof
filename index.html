@@ -47,7 +47,7 @@
     <div id="auto-status"></div>
     <div id="ammo-display"></div>
     <div id="amulet-display"></div>   <div id="flashlight-display"></div> <div id="mode-text">ブラインド</div>
-    <div id="total-coins">所持コイン: 0</div>
+    <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
     <div style="font-size: 15px; margin-top: 5px; opacity: 0.5;">ver.1.21</div>
 </div>
 
@@ -103,7 +103,6 @@ function playSound(audio) {
 }
 
 function updateUI() {
-    document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
