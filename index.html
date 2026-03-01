@@ -351,12 +351,13 @@ function draw() {
             // 懐中電灯の光を「透明なグラデーション」として描く
             tCtx.globalCompositeOperation = 'destination-out';
             
-            const grad = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.85);
-            grad.addColorStop(0, 'rgba(0,0,0,1)');   // 中心は完全に透明（見える）
-            grad.addColorStop(0.7, 'rgba(0,0,0,1)');   // ここから徐々に
-            grad.addColorStop(1, 'rgba(0,0,0,0)');   // 外側は不透明（見えない）
+           // --- 2. 懐中電灯の照射（扇形） ---
+            const gradFan = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.95);
+            gradFan.addColorStop(0, 'rgba(0,0,0,1)');   // 中心
+            gradFan.addColorStop(0.7, 'rgba(0,0,0,1)'); // 7割までクッキリ
+            gradFan.addColorStop(1, 'rgba(0,0,0,0)');   // 先端だけボカす
             
-            tCtx.fillStyle = grad;
+            tCtx.fillStyle = gradFan;
             tCtx.beginPath();
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
             tCtx.moveTo(cX, cY);
@@ -364,11 +365,18 @@ function draw() {
             tCtx.closePath();
             tCtx.fill();
 
-            // 足元の円も透明にくり抜く
+            // --- 3. 足元の円（専用のグラデーションでボカす） ---
+            // 半径 size * 0.5 に合わせて、その範囲内で完結するグラデーションを作る
+            const gradFoot = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.5);
+            gradFoot.addColorStop(0, 'rgba(0,0,0,1)');   // 足元中心
+            gradFoot.addColorStop(0.5, 'rgba(0,0,0,1)'); // 半分までクッキリ
+            gradFoot.addColorStop(1, 'rgba(0,0,0,0)');   // 縁をじんわりボカす
+            
+            tCtx.fillStyle = gradFoot;
             tCtx.beginPath();
             tCtx.arc(cX, cY, size * 0.5, 0, Math.PI * 2);
             tCtx.fill();
-
+            
             // メインキャンバスに重ねる
             ctx.drawImage(tempCanvas, 0, 0);
         } else {
