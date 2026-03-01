@@ -26,7 +26,7 @@
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
         .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 300px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
-        .dev-btn { color: white; }
+        .dev-btn { color: white; background-color: #d9534f; }
         #auto-status { color: #fff; font-size: 16px; height: 1.4em; font-weight: bold; }
     </style>
 </head>
@@ -36,16 +36,13 @@
         <div id="level-display" style="font-size: 28px; font-weight: bold;">Level 1</div>
         <div id="coin-status" style="font-size: 18px; margin: 5px 0;">所持コイン: 0枚</div>
         <br>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
-        <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()">💥 ショットガン (4コイン)</button>
-        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
-        <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (10コイン)</button>
+        <button id="music-upgrade-btn" class="shop-btn" onclick="upgradeMusic()">🎧 ヘッドフォン (10コイン)</button>
         
-        <button id="headphone-btn" class="shop-btn" onclick="buyHeadphone()">🎧 ヘッドフォン (2コイン)</button>
-        <button id="music1-btn" class="shop-btn" onclick="buyMusic1()">🎶 氷の華 (1コイン)</button>
-        <button id="music2-btn" class="shop-btn" onclick="buyMusic2()">🎵 忘れじの光 (4コイン)</button>
-        
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
+        <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()">💥 ショットガン (25コイン)</button>
+        <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (25コイン)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (30コイン)</button>
+        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (50コイン)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (130コイン)</button>
         <br><br>
         <button id="start-btn" onclick="startGame()">ゲームを開始する</button>
     </div>
@@ -57,7 +54,7 @@
         <div id="flashlight-display"></div>
         <div id="mode-text">BLIND MODE</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
-        <div style="font-size: 15px; margin-top: 5px; color: #ffd700;">ver.1.40</div>
+        <div style="font-size: 15px; margin-top: 5px; color: #ffd700;">ver.1.42</div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
@@ -129,34 +126,41 @@ function updateUI() {
     else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
 
-    document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
-    document.getElementById('shotgun-btn').disabled = (shotgunAmmo > 0 || totalCoins < 4);
-    document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
-    document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
-    document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
+    // 通常アイテムのボタン状態
+    document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 30);
+    document.getElementById('shotgun-btn').disabled = (shotgunAmmo > 0 || totalCoins < 25);
+    document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 50);
+    document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 25);
+    document.getElementById('dev-glass-btn').disabled = (hasDevGlasses || totalCoins < 130);    
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 
-    const hBtn = document.getElementById('headphone-btn');
-    const m1Btn = document.getElementById('music1-btn');
-    const m2Btn = document.getElementById('music2-btn');
-
-    hBtn.style.display = "none"; m1Btn.style.display = "none"; m2Btn.style.display = "none";
-
+    // 音楽アップグレードボタンの制御
+    const mBtn = document.getElementById('music-upgrade-btn');
     if (!hasHeadphone) {
-        hBtn.style.display = "inline-block";
-        hBtn.innerText = "🎧 ヘッドフォン (2コイン)";
-        hBtn.disabled = (totalCoins < 2);
+        mBtn.innerText = "🎧 ヘッドフォン (10コイン)";
+        mBtn.disabled = (totalCoins < 10);
     } else if (currentBGM === null) {
-        m1Btn.style.display = "inline-block";
-        m1Btn.disabled = (totalCoins < 1);
+        mBtn.innerText = "🎶 氷の華 (5コイン)";
+        mBtn.disabled = (totalCoins < 5);
     } else if (currentBGM === 1) {
-        m2Btn.style.display = "inline-block";
-        m2Btn.disabled = (totalCoins < 4);
+        mBtn.innerText = "🎵 忘れじの光 (40コイン)";
+        mBtn.disabled = (totalCoins < 40);
     } else {
-        hBtn.style.display = "inline-block";
-        hBtn.innerText = "🎧 ヘッドフォン (完売)";
-        hBtn.disabled = true;
+        mBtn.innerText = "🎧 音楽環境・完備";
+        mBtn.disabled = true;
     }
+}
+
+// 音楽アップグレード関数
+function upgradeMusic() {
+    if (!hasHeadphone) {
+        if (totalCoins >= 10) { totalCoins -= 10; hasHeadphone = true; }
+    } else if (currentBGM === null) {
+        if (totalCoins >= 5) { totalCoins -= 5; currentBGM = 1; }
+    } else if (currentBGM === 1) {
+        if (totalCoins >= 40) { totalCoins -= 40; currentBGM = 2; }
+    }
+    updateUI();
 }
 
 function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
@@ -292,7 +296,7 @@ async function startGame() {
         const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
         m1.pause(); m2.pause();
         const active = (currentBGM === 1) ? m1 : m2;
-        active.volume = 0.3; // BGM音量を0.3倍に設定
+        active.volume = 0.3; // BGM音量
         active.currentTime = 0; active.play().catch(e => {});
     }
     generateSimpleMaze(); updateUI(); draw(); 
@@ -308,14 +312,11 @@ function resetGame() {
 }
 
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
-function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
-function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
-function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
-function buyFlashlight() { if (totalCoins >= 10 && !hasFlashlight) { totalCoins -= 10; hasFlashlight = true; updateUI(); } }
-function buyShotgun() { if (totalCoins >= 4 && shotgunAmmo === 0) { totalCoins -= 4; shotgunAmmo = 2; updateUI(); } }
-function buyHeadphone() { if (totalCoins >= 2 && !hasHeadphone) { totalCoins -= 2; hasHeadphone = true; updateUI(); } }
-function buyMusic1() { if (totalCoins >= 1 && hasHeadphone && currentBGM !== 1) { totalCoins -= 1; currentBGM = 1; updateUI(); } }
-function buyMusic2() { if (totalCoins >= 4 && hasHeadphone && currentBGM !== 2) { totalCoins -= 4; currentBGM = 2; updateUI(); } }
+function buyDevGlasses() { if (totalCoins >= 130 && !hasDevGlasses) { totalCoins -= 130; hasDevGlasses = true; updateUI(); } }
+function buyAmulet() { if (totalCoins >= 30 && !hasAmulet) { totalCoins -= 30; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
+function buyAutoDevice() { if (totalCoins >= 50 && !hasAutoDevice) { totalCoins -= 50; hasAutoDevice = true; updateUI(); } }
+function buyFlashlight() { if (totalCoins >= 25 && !hasFlashlight) { totalCoins -= 25; hasFlashlight = true; updateUI(); } }
+function buyShotgun() { if (totalCoins >= 25 && shotgunAmmo === 0) { totalCoins -= 25; shotgunAmmo = 2; updateUI(); } }
 
 function playCoinSound(step) {
     let f = WHITE_KEYS[step % WHITE_KEYS.length];
