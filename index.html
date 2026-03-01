@@ -361,7 +361,7 @@ function draw() {
             tCtx.beginPath();
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
             tCtx.moveTo(cX, cY);
-            tCtx.arc(cX, cY, size * 0.95, angle - 0.3, angle + 0.3);
+            tCtx.arc(cX, cY, size * 0.75, angle - 0.3, angle + 0.3);
             tCtx.closePath();
             tCtx.fill();
 
