@@ -9,7 +9,7 @@
         canvas { display: block; }
         #ui { 
             position: absolute; bottom: 15px; left: 15px; pointer-events: none; 
-            z-index: 200; /* 購入画面より手前 */
+            z-index: 200; 
             font-weight: bold; 
             background: rgba(0,0,0,0.6);
             color: #fff; 
@@ -40,9 +40,11 @@
         <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()">💥 ショットガン (4コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (10コイン)</button>
+        
         <button id="headphone-btn" class="shop-btn" onclick="buyHeadphone()">🎧 ヘッドフォン (2コイン)</button>
         <button id="music1-btn" class="shop-btn" onclick="buyMusic1()">🎶 氷の華 (1コイン)</button>
         <button id="music2-btn" class="shop-btn" onclick="buyMusic2()">🎵 忘れじの光 (4コイン)</button>
+        
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
         <br><br>
         <button id="start-btn" onclick="startGame()">ゲームを開始する</button>
@@ -55,7 +57,7 @@
         <div id="flashlight-display"></div>
         <div id="mode-text">BLIND MODE</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
-        <div style="font-size: 15px; margin-top: 5px; color: #ffd700;">ver.1.27</div>
+        <div style="font-size: 15px; margin-top: 5px; color: #ffd700;">ver.1.28</div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
@@ -76,7 +78,7 @@ let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false, hasFlashlight = false;
-let hasHeadphone = false, currentBGM = null; // null: 無し, 1: 氷の花, 2: 忘れじの光
+let hasHeadphone = false, currentBGM = null; 
 let shotgunAmmo = 0; 
 let lastDir = { dx: 0, dy: -1 }; 
 let flipX = false; 
@@ -109,8 +111,7 @@ function unlockAudio() {
 
 function playSound(audio) {
     if (!audio) return;
-    audio.pause();
-    audio.currentTime = 0;
+    audio.pause(); audio.currentTime = 0;
     audio.play().catch(e => {});
 }
 
@@ -118,31 +119,49 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
-    
-    // アイテムアイコン表示
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     document.getElementById('flashlight-display').innerText = hasFlashlight ? "🔦" : "";
-    
-    // モードテキスト
     document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
-    
-    // 自動移動ステータス
+
     let statusText = "";
     if (autoLoadState === "LOADING") statusText = "  📡";
     else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
 
-    // ボタンの有効・無効化
+    // 通常ボタン
     document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
     document.getElementById('shotgun-btn').disabled = (shotgunAmmo > 0 || totalCoins < 4);
     document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
     document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
-    document.getElementById('headphone-btn').disabled = (hasHeadphone || totalCoins < 2);
-    document.getElementById('music1-btn').disabled = (!hasHeadphone || currentBGM === 1 || totalCoins < 1);
-    document.getElementById('music2-btn').disabled = (!hasHeadphone || currentBGM === 2 || totalCoins < 4);
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
+
+    // 音楽アイテムの進化表示ロジック
+    const hBtn = document.getElementById('headphone-btn');
+    const m1Btn = document.getElementById('music1-btn');
+    const m2Btn = document.getElementById('music2-btn');
+
+    hBtn.style.display = "none";
+    m1Btn.style.display = "none";
+    m2Btn.style.display = "none";
+
+    if (!hasHeadphone) {
+        hBtn.style.display = "inline-block";
+        hBtn.innerText = "🎧 ヘッドフォン (2コイン)";
+        hBtn.disabled = (totalCoins < 2);
+    } else if (currentBGM === null) {
+        m1Btn.style.display = "inline-block";
+        m1Btn.disabled = (totalCoins < 1);
+    } else if (currentBGM === 1) {
+        m2Btn.style.display = "inline-block";
+        m2Btn.disabled = (totalCoins < 4);
+    } else {
+        // 完売状態
+        hBtn.style.display = "inline-block";
+        hBtn.innerText = "🎧 ヘッドフォン (完売)";
+        hBtn.disabled = true;
+    }
 }
 
 function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
@@ -251,6 +270,7 @@ function movePlayer(dx, dy, isAuto = false) {
                 shotgunAmmo--; playSound(dogCrySnd); dogs.splice(dogIndex, 1); updateUI();
             } else {
                 gameStarted = false; playSound(biteSnd);
+                document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
                 let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
                 setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100);
                 return;
@@ -297,6 +317,7 @@ function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; has
 function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
 function buyFlashlight() { if (totalCoins >= 10 && !hasFlashlight) { totalCoins -= 10; hasFlashlight = true; updateUI(); } }
 function buyShotgun() { if (totalCoins >= 4 && shotgunAmmo === 0) { totalCoins -= 4; shotgunAmmo = 2; updateUI(); } }
+
 function buyHeadphone() { if (totalCoins >= 2 && !hasHeadphone) { totalCoins -= 2; hasHeadphone = true; updateUI(); } }
 function buyMusic1() { if (totalCoins >= 1 && hasHeadphone && currentBGM !== 1) { totalCoins -= 1; currentBGM = 1; updateUI(); } }
 function buyMusic2() { if (totalCoins >= 4 && hasHeadphone && currentBGM !== 2) { totalCoins -= 4; currentBGM = 2; updateUI(); } }
