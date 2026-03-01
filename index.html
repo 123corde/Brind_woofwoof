@@ -303,22 +303,10 @@ function draw() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
     
-    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    
-    if (!isBlind) { ctx.beginPath(); ctx.rect(0, 0, canvas.width, canvas.height); ctx.clip(); } 
-    else if (hasFlashlight) {
-        const cX = oX + player.x * size + size / 2, cY = oY + player.y * size + size / 2;
-        ctx.beginPath();
-        ctx.arc(cX, cY, size * 0.5, 0, Math.PI * 2); 
-        const angle = Math.atan2(lastDir.dy, lastDir.dx);
-        ctx.moveTo(cX, cY);
-        ctx.arc(cX, cY, size * 0.85, angle - 0.3, angle + 0.3); 
-        ctx.closePath();
-        ctx.clip();
-    } else { ctx.restore(); return; }
+    // 1. まずは背景（マップ全体）を描画する
+    ctx.fillStyle = "#fff"; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
         let px = oX+x*size, py = oY+y*size;
         if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
@@ -332,17 +320,63 @@ function draw() {
         dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
     }
     
+    // プレイヤー描画
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
-    if (flipX) {
-        ctx.translate(pX + size, pY);
-        ctx.scale(-1, 1);
-        ctx.drawImage(playerImg, 0, 0, size, size);
-    } else {
-        ctx.drawImage(playerImg, pX, pY, size, size);
+    if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); }
+    else { ctx.drawImage(playerImg, pX, pY, size, size); }
+    ctx.restore();
+
+    // --- 2. 暗闇と懐中電灯のグラデーション処理 ---
+    if (isBlind) {
+        // 一時的なキャンバスのように、現在の描画の上に「暗闇」を重ねる
+        ctx.save();
+        if (hasFlashlight) {
+            const cX = oX + player.x * size + size / 2, cY = oY + player.y * size + size / 2;
+            
+            // 画面全体を黒く塗る準備
+            ctx.fillStyle = "black";
+            
+            // 「目的地以外を黒く塗る」のではなく、「黒い膜を懐中電灯でくり抜く」
+            // くり抜くために globalCompositeOperation を使う
+            // 別のレイヤーを作るイメージ
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+            const tCtx = tempCanvas.getContext('2d');
+
+            // 全体を黒く塗る
+            tCtx.fillStyle = "black";
+            tCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 懐中電灯の光を「透明なグラデーション」として描く
+            tCtx.globalCompositeOperation = 'destination-out';
+            
+            const grad = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.85);
+            grad.addColorStop(0, 'rgba(0,0,0,1)');   // 中心は完全に透明（見える）
+            grad.addColorStop(1, 'rgba(0,0,0,0)');   // 外側は不透明（見えない）
+            
+            tCtx.fillStyle = grad;
+            tCtx.beginPath();
+            const angle = Math.atan2(lastDir.dy, lastDir.dx);
+            tCtx.moveTo(cX, cY);
+            tCtx.arc(cX, cY, size * 0.85, angle - 0.3, angle + 0.3);
+            tCtx.closePath();
+            tCtx.fill();
+
+            // 足元の円も透明にくり抜く
+            tCtx.beginPath();
+            tCtx.arc(cX, cY, size * 0.4, 0, Math.PI * 2);
+            tCtx.fill();
+
+            // メインキャンバスに重ねる
+            ctx.drawImage(tempCanvas, 0, 0);
+        } else {
+            // 懐中電灯がない場合はただの真っ暗
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+        ctx.restore();
     }
-    ctx.restore();
-    ctx.restore();
 }
 
 let tsX = null, tsY = null;
