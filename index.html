@@ -105,12 +105,12 @@ function updateUI() {
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
     const ammoIcons = "💥".repeat(shotgunAmmo);
-    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? `ショットガン: ${ammoIcons}` : "";
-    let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ（視界確保）";
+    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? `  ${ammoIcons}` : "";
+    let modeLabel = isBlind ? (hasFlashlight ? "  🔦" : "ブラインド") : "デバッグ（視界確保）";
     document.getElementById('mode-text').innerText = modeLabel;
     let statusText = "";
-    if (autoLoadState === "LOADING") statusText = "📡 Google Map読み込み中...";
-    else if (autoLoadState === "MOVING") statusText = `📍 案内中 (${(calculateInterval()/1000).toFixed(2)}s)`;
+    if (autoLoadState === "LOADING") statusText = "  📡";
+    else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
 
     document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
