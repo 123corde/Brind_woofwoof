@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち (Direction Flip Edition)</title>
+    <title>イッヌと寝落ち (Shotgun Edition)</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -24,6 +24,7 @@
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { background: #6c757d; color: white; }
         #auto-status { color: #4285F4; font-size: 14px; height: 1.4em; font-weight: bold; text-shadow: 0 0 2px white; }
+        #ammo-display { color: #ff4444; font-size: 16px; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -32,6 +33,7 @@
         <div id="level-display" style="font-size: 28px; font-weight: bold;">Level 1</div>
         <div id="coin-status">所持コイン: 0枚</div>
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (3コイン)</button>
+        <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()">💥 ショットガン (4コイン/2発)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (5コイン)</button>
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (10コイン)</button>
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
@@ -42,6 +44,7 @@
         <div id="auto-status"></div>
         <div id="mode-text">ブラインド</div>
         <div id="total-coins">所持コイン: 0</div>
+        <div id="ammo-display"></div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">Dev Mode</button></div>
@@ -52,13 +55,16 @@ const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.co
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
+const shotgunSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Shotgun.wav');
+const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane.wav');
 
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false, hasFlashlight = false;
+let shotgunAmmo = 0; // ショットガンの残弾
 let lastDir = { dx: 0, dy: -1 }; 
-let flipX = false; // 右なら反転、左なら通常
+let flipX = false;
 
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = [], coinsCollectedInLevel = 0;
@@ -80,7 +86,7 @@ function unlockAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const silentPlay = (audio) => { audio.play().then(() => { setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1); }).catch(e => {}); };
-    silentPlay(growlSnd); silentPlay(biteSnd);
+    [growlSnd, biteSnd, shotgunSnd, dogCrySnd].forEach(silentPlay);
     soundReady = true;
 }
 
@@ -88,6 +94,8 @@ function updateUI() {
     document.getElementById('coin-status').innerText = `所持コイン: ${totalCoins}枚`;
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
+    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? `💥 残弾: ${shotgunAmmo}` : "";
+
     let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ（視界確保）";
     document.getElementById('mode-text').innerText = modeLabel;
     
@@ -97,6 +105,7 @@ function updateUI() {
     document.getElementById('auto-status').innerText = statusText;
 
     document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 3);
+    document.getElementById('shotgun-btn').disabled = (shotgunAmmo > 0 || totalCoins < 4);
     document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 5);
     document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;
@@ -208,7 +217,6 @@ function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
     if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
     
-    // 反転ロジック修正: 左(-1)で通常(false), 右(1)で反転(true)
     if (dx === -1) flipX = false;
     if (dx === 1) flipX = true;
 
@@ -218,12 +226,26 @@ function movePlayer(dx, dy, isAuto = false) {
         if(!isAuto) playOscillator(150, 'square', 0.1);
     } else {
         player.x = nx; player.y = ny;
-        if (dogs.some(d => d.x === player.x && d.y === player.y)) {
-            gameStarted = false; biteSnd.play().catch(e=>{});
-            let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
-            setTimeout(() => { alert(`~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100);
-            return;
+        
+        // 犬との遭遇判定
+        let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
+        if (dogIndex !== -1) {
+            if (shotgunAmmo > 0) {
+                // ショットガン発動
+                shotgunAmmo--;
+                shotgunSnd.play().catch(e=>{});
+                dogCrySnd.play().catch(e=>{});
+                dogs.splice(dogIndex, 1); // 犬を消去
+                updateUI();
+            } else {
+                // 通常のゲームオーバー
+                gameStarted = false; biteSnd.play().catch(e=>{});
+                let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
+                setTimeout(() => { alert(`~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100);
+                return;
+            }
         }
+        
         if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) growlSnd.play().catch(e=>{});
         if (map[ny][nx] === 2) {
             playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
@@ -238,12 +260,13 @@ function movePlayer(dx, dy, isAuto = false) {
 }
 
 async function startGame() { unlockAudio(); document.getElementById('start-container').style.display = 'none'; gameStarted = true; lastMoveTime = Date.now(); generateSimpleMaze(); updateUI(); draw(); }
-function resetGame() { currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; hasFlashlight = false; coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); }
+function resetGame() { currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; hasDevGlasses = false; hasFlashlight = false; shotgunAmmo = 0; coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); }
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
 function buyDevGlasses() { hasDevGlasses = true; updateUI(); }
 function buyAmulet() { if (totalCoins >= 3 && !hasAmulet) { totalCoins -= 3; hasAmulet = true; coinMultiplier = 10; updateUI(); } }
 function buyAutoDevice() { if (totalCoins >= 5 && !hasAutoDevice) { totalCoins -= 5; hasAutoDevice = true; updateUI(); } }
 function buyFlashlight() { if (totalCoins >= 10 && !hasFlashlight) { totalCoins -= 10; hasFlashlight = true; updateUI(); } }
+function buyShotgun() { if (totalCoins >= 4 && shotgunAmmo === 0) { totalCoins -= 4; shotgunAmmo = 2; updateUI(); } }
 
 function playCoinSound(step) {
     let f = WHITE_KEYS[step % WHITE_KEYS.length];
@@ -285,7 +308,6 @@ function draw() {
         dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
     }
     
-    // プレイヤー描画（反転対応）
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
     if (flipX) {
@@ -296,7 +318,6 @@ function draw() {
         ctx.drawImage(playerImg, pX, pY, size, size);
     }
     ctx.restore();
-    
     ctx.restore();
 }
 
