@@ -9,17 +9,8 @@
         canvas { display: block; }
         #ui { 
     position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 10; 
-    font-weight: bold; padding: 10px; border-radius: 6px;
-    /* 背景色を少し薄くして、どちらの色でも馴染むようにします */
-    background: rgba(128, 128, 128, 0.2); 
-    transition: color 0.3s; /* 色の変化を滑らかに */
+    font-weight: bold; background: rgba(0,0,0,0.7); color: #fff; padding: 10px; border-radius: 6px;
 }
-
-/* プレイ中（暗い背景用） */
-.ui-light { color: #ffffff; text-shadow: 0 0 3px #000; }
-
-/* メニュー・ショップ中（白い背景用） */
-.ui-dark { color: #333333; text-shadow: none; }
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
         #start-container { 
@@ -52,10 +43,13 @@
     <div id="ui">
         <div id="auto-status"></div>
         <div id="ammo-display"></div>
-        <div id="total-coins">所持コイン: 0</div>
         <div id="mode-text">ブラインド</div>
-        <div style="font-size: 10px; margin-top: 5px; opacity: 0.7;">ver.1.0</div>
-    </div>
+        <div id="total-coins">所持コイン: 0</div>
+        /* Ver.⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+        ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+        ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️ */
+        <div style="font-size: 10px; margin-top: 5px; opacity: 0.5;">ver.1.10</div>
+</div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">Dev Mode</button></div>
     <canvas id="gameCanvas"></canvas>
@@ -116,7 +110,6 @@ function updateUI() {
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? `ショットガン: ${ammoIcons}` : "";
     let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ（視界確保）";
     document.getElementById('mode-text').innerText = modeLabel;
-    
     let statusText = "";
     if (autoLoadState === "LOADING") statusText = "📡 Google Map読み込み中...";
     else if (autoLoadState === "MOVING") statusText = `📍 案内中 (${(calculateInterval()/1000).toFixed(2)}s)`;
@@ -360,39 +353,39 @@ function draw() {
             // ここから「消しゴムモード」開始
             tCtx.globalCompositeOperation = 'destination-out';
 
-            // --- ★ここから直線部分も含めてボカす処理 ★---
-            tCtx.save(); // 一旦設定を保存
-
-            // Canvasの影機能を使って、消しゴム全体に強力なぼかしをかける
-            tCtx.shadowBlur = 40;            // ぼかしの強さ（数値を上げるともっとじわっとします）
-            tCtx.shadowColor = 'black';     // 影の色（消しゴムモードなので何色でもOK、便宜上black）
+            // --- 2. 暗闇と懐中電灯のぼかし処理 ---
+            const gradFan = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.95);
+            gradFan.addColorStop(0, 'rgba(0,0,0,1)');   // 中心はクッキリ
+            gradFan.addColorStop(0.5, 'rgba(0,0,0,1)'); // クッキリ範囲を少し狭める（ぼかしを強調）
+            gradFan.addColorStop(1, 'rgba(0,0,0,0)');   // 先端はじわっと消える
             
-            // ぼかしを効かせるために、少しだけ透明度を下げる（1.0だとパキッとする）
-            tCtx.fillStyle = 'rgba(0,0,0,0.8)'; 
+            // ★ ここから強力なぼかし設定 ★
+            tCtx.save(); // 一旦設定を保存
+            
+            // ぼかしの幅を大幅にアップ（150）
+            tCtx.shadowBlur = 150; 
+            // 影の色を完全に不透明な黒にする（消しゴム効果をボカす）
+            tCtx.shadowColor = 'black'; 
+            
+            // 図形そのものの透明度を少し下げて（0.6）、ぼかしをさらに際立たせる
+            tCtx.fillStyle = 'rgba(0,0,0,0.6)'; 
 
-            // 扇形（照射距離 0.95 / 角度 ±0.3）
+            // 扇形を描画（直線部分も強力にボケる）
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
             tCtx.beginPath();
             tCtx.moveTo(cX, cY);
-            tCtx.arc(cX, cY, size * 0.95, angle - 0.3, angle + 0.3);
+            // ぼかしで光が広がる分、照射距離を少し短め（0.85）に調整
+            tCtx.arc(cX, cY, size * 0.85, angle - 0.3, angle + 0.3);
             tCtx.closePath();
-            tCtx.fill(); // ここで直線も含めて全体がボケる
+            tCtx.fill(); // ここで全体が強力にボケる
 
-            // 足元（半径 0.5）
+            // 足元の円を描画（ここも一緒にボケる）
             tCtx.beginPath();
-            tCtx.arc(cX, cY, size * 0.5, 0, Math.PI * 2);
-            tCtx.fill(); // ここもボケる
+            // 半径も少し小さめ（0.4）に調整
+            tCtx.arc(cX, cY, size * 0.4, 0, Math.PI * 2);
+            tCtx.fill(); 
 
             tCtx.restore(); // 影の設定を元に戻す
-
-            // メインキャンバスに重ねる
-            ctx.drawImage(tempCanvas, 0, 0);
-        } else {
-            // 懐中電灯がない場合はただの真っ暗
-            ctx.fillStyle = "black";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-        ctx.restore();
     }
 }
 
