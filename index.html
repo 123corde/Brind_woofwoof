@@ -42,9 +42,10 @@
 
     <div id="ui">
         <div id="auto-status"></div>
-        <div id="mode-text">ブラインド</div>
-        <div id="total-coins">所持コイン: 0</div>
         <div id="ammo-display"></div>
+        <div id="total-coins">所持コイン: 0</div>
+        <div id="mode-text">ブラインド</div>
+        <div style="font-size: 10px; margin-top: 5px; opacity: 0.7;">ver.1.0</div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">Dev Mode</button></div>
@@ -55,7 +56,6 @@ const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.co
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
-// ショットガン音はCane.wavに統合されているため削除
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane.wav');
 
 let audioCtx = null, soundReady = false;
@@ -348,35 +348,34 @@ function draw() {
             tCtx.fillStyle = "black";
             tCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 懐中電灯の光を「透明なグラデーション」として描く
+            // ここから「消しゴムモード」開始
             tCtx.globalCompositeOperation = 'destination-out';
-            
-           // --- 2. 懐中電灯の照射（扇形） ---
-            const gradFan = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.95);
-            gradFan.addColorStop(0, 'rgba(0,0,0,1)');   // 中心
-            gradFan.addColorStop(0.55, 'rgba(0,0,0,1)'); // ここから徐々に
-            gradFan.addColorStop(1, 'rgba(0,0,0,0)');   // ここまでボカす
-            
-            tCtx.fillStyle = gradFan;
-            tCtx.beginPath();
-            const angle = Math.atan2(lastDir.dy, lastDir.dx);
-            tCtx.moveTo(cX, cY);
-            tCtx.arc(cX, cY, size * 0.75, angle - 0.3, angle + 0.3);
-            tCtx.closePath();
-            tCtx.fill();
 
-            // --- 3. 足元の円（専用のグラデーションでボカす） ---
-            // 半径 size * 0.5 に合わせて、その範囲内で完結するグラデーションを作る
-            const gradFoot = tCtx.createRadialGradient(cX, cY, size * 0.1, cX, cY, size * 0.5);
-            gradFoot.addColorStop(0, 'rgba(0,0,0,1)');   // 足元中心
-            gradFoot.addColorStop(0.7, 'rgba(0,0,0,1)'); // 半分までクッキリ
-            gradFoot.addColorStop(1, 'rgba(0,0,0,0)');   // 縁をじんわりボカす
+            // --- ★ここから直線部分も含めてボカす処理 ★---
+            tCtx.save(); // 一旦設定を保存
+
+            // Canvasの影機能を使って、消しゴム全体に強力なぼかしをかける
+            tCtx.shadowBlur = 40;            // ぼかしの強さ（数値を上げるともっとじわっとします）
+            tCtx.shadowColor = 'black';     // 影の色（消しゴムモードなので何色でもOK、便宜上black）
             
-            tCtx.fillStyle = gradFoot;
+            // ぼかしを効かせるために、少しだけ透明度を下げる（1.0だとパキッとする）
+            tCtx.fillStyle = 'rgba(0,0,0,0.8)'; 
+
+            // 扇形（照射距離 0.95 / 角度 ±0.3）
+            const angle = Math.atan2(lastDir.dy, lastDir.dx);
             tCtx.beginPath();
-            tCtx.arc(cX, cY, size * 0.6, 0, Math.PI * 2);
-            tCtx.fill();
-            
+            tCtx.moveTo(cX, cY);
+            tCtx.arc(cX, cY, size * 0.95, angle - 0.3, angle + 0.3);
+            tCtx.closePath();
+            tCtx.fill(); // ここで直線も含めて全体がボケる
+
+            // 足元（半径 0.5）
+            tCtx.beginPath();
+            tCtx.arc(cX, cY, size * 0.5, 0, Math.PI * 2);
+            tCtx.fill(); // ここもボケる
+
+            tCtx.restore(); // 影の設定を元に戻す
+
             // メインキャンバスに重ねる
             ctx.drawImage(tempCanvas, 0, 0);
         } else {
