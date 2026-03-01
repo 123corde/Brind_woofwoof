@@ -111,7 +111,7 @@ function updateUI() {
     // 🔦 懐中電灯（縦に並べるため独立）
     document.getElementById('flashlight-display').innerText = hasFlashlight ? "🔦" : "";
     // モードテキスト
-    let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ";
+    let modeLabel = isBlind ? "BLIND MODE" : "DEBUG MODE";
     document.getElementById('mode-text').innerText = modeLabel;
     let statusText = "";
     if (autoLoadState === "LOADING") statusText = "  📡";
