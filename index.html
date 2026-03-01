@@ -40,12 +40,12 @@
     </div>
 
     <div id="ui">
-        <div id="auto-status"></div>
-        <div id="ammo-display"></div>
-        <div id="item-display" style="font-size: 20px; margin-top: 5px;"></div> <div id="mode-text">ブラインド</div>
-        <div id="total-coins">所持コイン: 0</div>
-        <div style="font-size: 15px; margin-top: 5px; opacity: 0.5;">ver.1.2</div>
-    </div>
+    <div id="auto-status"></div>
+    <div id="ammo-display"></div>
+    <div id="amulet-display"></div>   <div id="flashlight-display"></div> <div id="mode-text">ブラインド</div>
+    <div id="total-coins">所持コイン: 0</div>
+    <div style="font-size: 15px; margin-top: 5px; opacity: 0.5;">ver.1.2</div>
+</div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">Dev Mode</button></div>
     <canvas id="gameCanvas"></canvas>
@@ -103,16 +103,15 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 10);
-    // ショットガン
+    // ショットガン (💥)
     const ammoIcons = "💥".repeat(shotgunAmmo);
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? ammoIcons : "";
-    // お守りと懐中電灯
-    let items = "";
-    if (hasAmulet) items += "  ⛩️";
-    if (hasFlashlight) items += "  🔦";
-    document.getElementById('item-display').innerText = items;
+    // ⛩️ お守り（縦に並べるため独立）
+    document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
+    // 🔦 懐中電灯（縦に並べるため独立）
+    document.getElementById('flashlight-display').innerText = hasFlashlight ? "🔦" : "";
     // モードテキスト
-    let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ（視界確保）";
+    let modeLabel = isBlind ? (hasFlashlight ? "懐中電灯モード" : "ブラインド") : "デバッグ";
     document.getElementById('mode-text').innerText = modeLabel;
     let statusText = "";
     if (autoLoadState === "LOADING") statusText = "  📡";
