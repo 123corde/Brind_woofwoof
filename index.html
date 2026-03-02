@@ -73,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.34";
+const GAME_VERSION = "6.35";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -469,6 +469,7 @@ function draw() {
     ctx.restore();
 
     // --- 描画レイヤー2: 暗闇とライト (BLIND MODE用) ---
+    // メガネ(DevGlasses)を持っていても isBlind が true なら暗闇を描画するように修正
     if (isBlind) {
         ctx.save();
         const tempCanvas = document.createElement('canvas');
@@ -487,26 +488,30 @@ function draw() {
             tCtx.globalCompositeOperation = 'destination-out';
 
             // ==========================================
-            // 数値設定（ここをいじるとライトが変わります）
+            // 数値設定（カスタマイズ済み）
             // ==========================================
             const footRadius = size * 1.2;     // 足元の円の半径
-            const fanRadius  = size * 5.5;     // 扇形の長さ（射程）
-            const fanWidth   = 0.45;           // 扇形の広さ（0.1〜1.0くらいで調整）
+            const fanRadius  = size * 1.5;     // 扇形の長さ（以前の1/3程度に短縮）
+            const fanWidth   = 0.3;            // 扇形の広さ（0.3に固定）
             // ==========================================
 
-            // 1. 足元の視界 (円形グラデーション)
+            // 1. 足元の視界 (指定のグラデーション設定)
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
+            // 0〜0.8まではしっかり見える（透明）、0.8〜1.0で黒くフェード
             footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
+            footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness})`); 
             footGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            
             tCtx.fillStyle = footGrad;
             tCtx.beginPath();
             tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2);
             tCtx.fill();
 
-            // 2. 前方の視界 (扇形グラデーション)
+            // 2. 前方の視界 (扇形)
             const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
             fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
             fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            
             tCtx.fillStyle = fanGrad;
             tCtx.beginPath();
             tCtx.moveTo(cX, cY);
