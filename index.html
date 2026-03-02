@@ -86,7 +86,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "8.03"; 
+const GAME_VERSION = "8.13"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -124,7 +124,8 @@ const gameOverMessages = [
     "ガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
     "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
     "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。",
-    "画面🐾🐾🐾🐾🐾示の部分を🐾🐾🐾🐾🐾🐾すると...？" 
+    "画面🐾🐾🐾🐾🐾示の部分を🐾🐾🐾🐾🐾🐾すると...？",
+    "懐中電🐾🐾🐾🐾離が短い？ケチらず🐾🐾🐾🐾🐾よう"
 ];
 
 function unlockAudio() {
@@ -636,7 +637,7 @@ function draw() {
         tCtx.globalCompositeOperation = 'destination-out';
 
         const footRadius = size * 0.5;
-        const fanRadius  = size * 1.5;
+        const fanRadius = (flashlightBattery >= 260) ? size * 3.0 : size * 1.5;
         const fanWidth   = 0.3;
 
         const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
