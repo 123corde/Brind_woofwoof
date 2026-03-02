@@ -44,7 +44,7 @@
         <br>
         <button id="music-upgrade-btn" class="shop-btn" onclick="upgradeMusic()">🎧 ヘッドフォン (0コイン)</button>
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (0コイン)</button>
-        <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()">💥 ショットガン (0コイン)</button>
+        <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()"></button>
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 神社に行く (0コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (0コイン)</button>
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
@@ -70,7 +70,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "5.00";
+const GAME_VERSION = "6.00";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -82,7 +82,7 @@ let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false, hasFlashlight = false;
 let hasHeadphone = false, currentBGM = null; 
-let shotgunAmmo = 0; 
+let hasShotgun = false, shotgunAmmo = 0; 
 let lastDir = { dx: 0, dy: -1 }; 
 let flipX = false; 
 
@@ -129,7 +129,6 @@ function updateUI() {
         verDisplay.innerText = `ver.${GAME_VERSION}${hasDevGlasses ? " (Debug Mode)" : ""}`;
     }
     
-    // Level表示とHARD演出
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
     
@@ -156,10 +155,19 @@ function updateUI() {
     else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
     
-    document.getElementById('amulet-btn').disabled = hasAmulet;
-    document.getElementById('shotgun-btn').disabled = shotgunAmmo > 0;
-    document.getElementById('auto-device-btn').disabled = hasAutoDevice;
-    document.getElementById('flashlight-btn').disabled = hasFlashlight;
+    // ショットガンボタンの更新
+    const sBtn = document.getElementById('shotgun-btn');
+    if (!hasShotgun) {
+        sBtn.innerText = "💥 ショットガン (3コイン)";
+        sBtn.disabled = totalCoins < 3;
+    } else {
+        sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (1コイン)`;
+        sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 1);
+    }
+
+    document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 0);
+    document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 0);
+    document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 0);
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 
@@ -183,6 +191,22 @@ function upgradeMusic() {
     if (!hasHeadphone) hasHeadphone = true;
     else if (currentBGM === null) currentBGM = 1;
     else if (currentBGM === 1) currentBGM = 2;
+    updateUI();
+}
+
+function buyShotgun() {
+    if (!hasShotgun) {
+        if (totalCoins >= 3) {
+            totalCoins -= 3;
+            hasShotgun = true;
+            shotgunAmmo = 2;
+        }
+    } else {
+        if (totalCoins >= 1 && shotgunAmmo < 2) {
+            totalCoins -= 1;
+            shotgunAmmo += 1;
+        }
+    }
     updateUI();
 }
 
@@ -277,18 +301,15 @@ function generateSimpleMaze() {
                 if(!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
             }
 
-            // イッヌの配置ロジック
             dogs = [];
             let safetyZone = new Set();
             for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${player.x + dx},${player.y + dy}`);
 
             if (currentLevel <= 10) {
-                // Level 10までは広めの安全圏
                 shortestPath.forEach(p => {
                     for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${p.x + dx},${p.y + dy}`);
                 });
             } else {
-                // Level 11から(HARD)は最短経路の点そのもののみ安全
                 shortestPath.forEach(p => safetyZone.add(`${p.x},${p.y}`));
             }
             
@@ -395,7 +416,7 @@ async function startGame() {
 
 function resetGame() { 
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
-    hasDevGlasses = false; hasFlashlight = false; shotgunAmmo = 0; 
+    hasDevGlasses = false; hasFlashlight = false; hasShotgun = false; shotgunAmmo = 0; 
     hasHeadphone = false; currentBGM = null;
     document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
     coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; 
@@ -404,10 +425,9 @@ function resetGame() {
 
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
 function buyDevGlasses() { if (!hasDevGlasses) { hasDevGlasses = true; updateUI(); } }
-function buyAmulet() { if (!hasAmulet) { hasAmulet = true; coinMultiplier = 3; updateUI(); } }
-function buyAutoDevice() { if (!hasAutoDevice) { hasAutoDevice = true; updateUI(); } }
-function buyFlashlight() { if (!hasFlashlight) { hasFlashlight = true; updateUI(); } }
-function buyShotgun() { if (shotgunAmmo === 0) { shotgunAmmo = 2; updateUI(); } }
+function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; coinMultiplier = 3; updateUI(); } }
+function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 0) { hasAutoDevice = true; updateUI(); } }
+function buyFlashlight() { if (!hasFlashlight && totalCoins >= 0) { hasFlashlight = true; updateUI(); } }
 
 function playCoinSound(step) {
     let f = WHITE_KEYS[step % WHITE_KEYS.length];
