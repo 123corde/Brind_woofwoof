@@ -116,13 +116,13 @@ function updateUI() {
     } else if (currentBGM === 1) {
         mBtn.innerText = "🎵 忘れじの光 に変更 (0コイン)";
     } else if (currentBGM === 2) {
-        mBtn.innerText = "🎧 BGMなし (0コイン)";
+        mBtn.innerText = "🎧 BGMなし に変更 (0コイン)";
     }
 
     // アイテムボタン状態
     const sBtn = document.getElementById('shotgun-btn');
     sBtn.disabled = shotgunAmmo >= 2;
-    sBtn.innerText = shotgunAmmo >= 2 ? "💥 2発装填済 (0コイン)" : `💥 ショットガン (0コイン) [${shotgunAmmo}/2]`;
+    sBtn.innerText = "💥 ショットガン (0コイン) [${shotgunAmmo}/2]";
     
     document.getElementById('flashlight-btn').disabled = hasFlashlight;
     document.getElementById('amulet-btn').disabled = hasAmulet;
