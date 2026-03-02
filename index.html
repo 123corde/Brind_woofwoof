@@ -27,6 +27,7 @@
             background: rgba(255,255,255,0.95); display: flex; flex-direction: column; 
             justify-content: center; align-items: center; z-index: 100; text-align: center;
             padding: 20px; box-sizing: border-box;
+            transition: all 0.3s ease;
         }
         
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
@@ -34,7 +35,6 @@
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { color: white; background-color: #d9534f; }
         #auto-status { color: #fff; font-size: 1.1em; height: 1.4em; font-weight: bold; }
-        #hard-mode-text { color: #ff4444; font-weight: bold; margin-top: 5px; display: none; }
     </style>
 </head>
 <body>
@@ -70,7 +70,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "4.01";
+const GAME_VERSION = "5.00";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -128,28 +128,24 @@ function updateUI() {
     if (verDisplay) {
         verDisplay.innerText = `ver.${GAME_VERSION}${hasDevGlasses ? " (Debug Mode)" : ""}`;
     }
-    let hardModeElem = document.getElementById('hard-mode-text');
-    if (!hardModeElem) {
-        hardModeElem = document.createElement('div');
-        hardModeElem.id = 'hard-mode-text';
-        hardModeElem.innerText = 'HARD MODE';
-        hardModeElem.style.color = '#ff4444';
-        const uiContainer = document.getElementById('ui');
-        uiContainer.insertBefore(hardModeElem, uiContainer.firstChild);
-    }
-    hardModeElem.style.display = currentLevel >= 10 ? 'block' : 'none';
     
+    // Level表示とHARD演出
+    const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
-    if (currentLevel >= 10) {
-        startContainer.style.border = "5px solid #ff4444";
-        startContainer.style.boxShadow = "0 0 20px #ff0000";
+    
+    if (currentLevel >= 11) {
+        levelDisplay.innerText = `Level ${currentLevel} (HARD)`;
+        levelDisplay.style.color = "#ff4444";
+        startContainer.style.border = "6px solid #ff4444";
+        startContainer.style.boxShadow = "0 0 25px #ff0000";
     } else {
+        levelDisplay.innerText = `Level ${currentLevel}`;
+        levelDisplay.style.color = "#333";
         startContainer.style.border = "none";
         startContainer.style.boxShadow = "none";
     }
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
-    document.getElementById('level-display').innerText = `Level ${currentLevel}`;
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     document.getElementById('flashlight-display').innerText = hasFlashlight ? "🔦" : "";
@@ -159,6 +155,7 @@ function updateUI() {
     if (autoLoadState === "LOADING") statusText = "  📡";
     else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
+    
     document.getElementById('amulet-btn').disabled = hasAmulet;
     document.getElementById('shotgun-btn').disabled = shotgunAmmo > 0;
     document.getElementById('auto-device-btn').disabled = hasAutoDevice;
@@ -191,16 +188,7 @@ function upgradeMusic() {
 
 function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
 
-
-
-
-
-
-
-
-
 function generateSimpleMaze() {
-    // 1. サイズ決定 (奇数固定)
     COLS = Math.min(17, 5 + Math.floor((currentLevel - 1) * 1.34));
     ROWS = Math.min(21, Math.floor(COLS * 1.2));
     if (COLS % 2 === 0) COLS++;
@@ -213,13 +201,11 @@ function generateSimpleMaze() {
         attempts++;
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
         
-        // スタート地点
         let sX = 1 + Math.floor(Math.random() * ((COLS - 1) / 2)) * 2;
         let sY = 1 + Math.floor(Math.random() * ((ROWS - 1) / 2)) * 2;
         player = { x: sX, y: sY }; 
         map[sY][sX] = 0;
 
-        // --- 2. メインルート作成 (ランダムウォーク) ---
         let walkTarget = Math.floor(ROWS * COLS * 0.35);
         let walked = 1;
         let rx = sX, ry = sY;
@@ -248,7 +234,6 @@ function generateSimpleMaze() {
             }
         }
 
-        // --- 3. 穴掘り法 ---
         const dig = (x, y) => {
             let dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random() - 0.5);
             for(let [dx, dy] of dirs) {
@@ -262,7 +247,6 @@ function generateSimpleMaze() {
         };
         for(let y = 1; y < ROWS; y += 2) for(let x = 1; x < COLS; x += 2) if(map[y][x] === 0) dig(x, y);
 
-        // --- 4. 距離計算 (BFS) ---
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; 
         dists[sY][sX] = 0;
         let allWalkable = [];
@@ -278,53 +262,37 @@ function generateSimpleMaze() {
             }
         }
 
-        // --- 5. 配置 ---
         allWalkable.sort((a, b) => dists[b.y][b.x] - dists[a.y][a.x]);
         let target = allWalkable[0];
 
         if(target && dists[target.y][target.x] > 2) {
-            map[target.y][target.x] = 2; // ゴール
+            map[target.y][target.x] = 2;
             goalPos = { x: target.x, y: target.y };
             shortestPath = target.fullPath; 
             coinsCollectedInLevel = 0;
 
-            // コイン配置
-            let stepSize = currentLevel <= 9 ? (currentLevel === 1 ? 1 : Math.floor((currentLevel + 1) / 2)) : 5;
+            let stepSize = currentLevel <= 10 ? (currentLevel === 1 ? 1 : Math.floor((currentLevel + 1) / 2)) : 5;
             for(let i = stepSize - 1; i < shortestPath.length; i += stepSize) {
                 let p = shortestPath[i]; 
                 if(!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
             }
 
-            // --- イッヌの配置ロジック ---
+            // イッヌの配置ロジック
             dogs = [];
             let safetyZone = new Set();
-            
-            // スタート地点の周囲3x3は常に安全
-            for(let dy = -1; dy <= 1; dy++) {
-                for(let dx = -1; dx <= 1; dx++) {
-                    safetyZone.add(`${player.x + dx},${player.y + dy}`);
-                }
-            }
+            for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${player.x + dx},${player.y + dy}`);
 
-            // レベルに応じた安全圏の判定
-            if (currentLevel <= 9) {
-                // Level 9までは最短経路の「隣接」も安全（広い道を確保）
+            if (currentLevel <= 10) {
+                // Level 10までは広めの安全圏
                 shortestPath.forEach(p => {
-                    for(let dy = -1; dy <= 1; dy++) {
-                        for(let dx = -1; dx <= 1; dx++) {
-                            safetyZone.add(`${p.x + dx},${p.y + dy}`);
-                        }
-                    }
+                    for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${p.x + dx},${p.y + dy}`);
                 });
             } else {
-                // Level 10以上(HARD MODE)は「最短経路上」のみ安全（それ以外はどこにでも出る）
+                // Level 11から(HARD)は最短経路の点そのもののみ安全
                 shortestPath.forEach(p => safetyZone.add(`${p.x},${p.y}`));
             }
             
-            // 安全圏ではない通行可能マスを抽出
             let spawnCandidates = allWalkable.filter(p => !safetyZone.has(`${p.x},${p.y}`));
-            
-            // イッヌの数（最大15匹）
             let dogNum = Math.min(15, currentLevel - 1);
             for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) {
                 let idx = Math.floor(Math.random() * spawnCandidates.length);
@@ -336,12 +304,6 @@ function generateSimpleMaze() {
     }
 }
 
-    
-
-
-    
-    
-    
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
