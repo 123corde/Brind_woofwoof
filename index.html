@@ -73,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.36";
+const GAME_VERSION = "6.37";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -445,13 +445,19 @@ async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTime
 function draw() {
     const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    const size = Math.min(canvas.width/COLS, canvas.height/ROWS), offsetX = (canvas.width-size*COLS)/2, offsetY = (canvas.height-size*ROWS)/2;
+    
+    // 1. 基本設定
+    const size = Math.min(canvas.width/COLS, canvas.height/ROWS);
+    const offsetX = (canvas.width - size * COLS) / 2;
+    const offsetY = (canvas.height - size * ROWS) / 2;
 
-    // --- 1. まず、迷路全体を描画する ---
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // --- A: まず迷路とプレイヤーを「普通に」全部描く ---
+    ctx.fillStyle = "#fff"; 
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     for(let y=0; y<ROWS; y++) {
         for(let x=0; x<COLS; x++) {
-            let px = offsetX + x*size, py = offsetY + y*size;
+            let px = offsetX + x * size, py = offsetY + y * size;
             if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
             else if (map[y][x] === 2) {
                 const cs = 3, rs = 4, cw = size / cs, ch = size / rs;
@@ -467,49 +473,52 @@ function draw() {
         }
     }
 
-    // --- 2. プレイヤーを描画する ---
+    // プレイヤー描画
     const pX = offsetX + player.x * size, pY = offsetY + player.y * size;
     ctx.save();
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); }
     else { ctx.drawImage(playerImg, pX, pY, size, size); }
     ctx.restore();
 
-    // --- 3. 最後に「暗闇」を上から被せ、懐中電灯の場所だけ「消しゴム」で消す ---
+    // --- B: その上から「暗闇のレイヤー」を重ねる ---
     if (isBlind) {
+        // 一時的な別のキャンバス（バッファ）のような仕組みを ctx.save で作る
         ctx.save();
-        const cX = pX + size / 2, cY = pY + size / 2;
         
-        // 画面全体を一旦真っ黒にする
-        ctx.fillStyle = "#000";
+        // 画面全体を真っ黒なカーテンで覆う
+        ctx.fillStyle = "black";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        let visibility = (hasFlashlight && flashlightBattery > 0) ? 1.0 : 0.0;
-        if (hasDevGlasses) visibility = 1.0;
+        let visibility = (hasFlashlight && flashlightBattery > 0) || hasDevGlasses;
 
-        if (visibility > 0) {
-            // 消しゴムモード発動
+        if (visibility) {
+            // ここで「消しゴム」に切り替える（黒いカーテンを切り抜く）
             ctx.globalCompositeOperation = 'destination-out';
+            const cX = pX + size / 2, cY = pY + size / 2;
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
 
-            // A: 足元の穴（クッキリ）
-            const footSize = size * 1.5;
-            const footGrad = ctx.createRadialGradient(cX, cY, 0, cX, cY, footSize);
-            footGrad.addColorStop(0, 'rgba(0,0,0,1)');
-            footGrad.addColorStop(0.8, 'rgba(0,0,0,1)');
-            footGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            // 1. 足元の穴あけ
+            const footR = size * 1.5;
+            const footGrad = ctx.createRadialGradient(cX, cY, 0, cX, cY, footR);
+            footGrad.addColorStop(0, 'rgba(0,0,0,1)'); // 完全に消す（明るい）
+            footGrad.addColorStop(1, 'rgba(0,0,0,0)'); // 消さない（暗い）
             ctx.fillStyle = footGrad;
-            ctx.beginPath(); ctx.arc(cX, cY, footSize, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cX, cY, footR, 0, Math.PI * 2); ctx.fill();
 
-            // B: 懐中電灯の穴（扇形）
-            const lightRange = size * 5.0;
-            const fanGrad = ctx.createRadialGradient(cX, cY, size * 0.5, cX, cY, lightRange);
+            // 2. 懐中電灯の穴あけ
+            const lightR = size * 5.0;
+            const fanGrad = ctx.createRadialGradient(cX, cY, size * 0.5, cX, cY, lightR);
             fanGrad.addColorStop(0, 'rgba(0,0,0,1)');
             fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = fanGrad;
-            ctx.beginPath(); ctx.moveTo(cX, cY);
-            ctx.arc(cX, cY, lightRange, angle - 0.4, angle + 0.4);
-            ctx.closePath(); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(cX, cY);
+            ctx.arc(cX, cY, lightR, angle - 0.4, angle + 0.4);
+            ctx.closePath();
+            ctx.fill();
         }
+        
+        // 設定を元に戻す（重要！）
         ctx.restore();
     }
 }
