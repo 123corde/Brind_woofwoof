@@ -83,7 +83,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "13.1.4"; 
+const GAME_VERSION = "13.1.5"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -687,11 +687,28 @@ function draw() {
             
             tCtx.globalCompositeOperation = 'destination-out';
 
-            // --- 🔦 懐中電灯のスペック設定 ---
-            const isHigh = (flashlightBattery >= FLASHLIGHT_BONUS);
-            const footRadius = isHigh ? size * 1.5 : size * 0.6;
-            const fanRadius  = isHigh ? size * 4.5 : size * 1.8; 
-            const fanWidth   = isHigh ? 0.5 : 0.3; // 照射角も少し広がる
+// --- 🔦 懐中電灯のスペック設定（動的変化） ---
+            let fanRadius, footRadius, fanWidth;
+
+            if (flashlightBattery >= FLASHLIGHT_BONUS) {
+                // 180s以上の時は常に最大値
+                footRadius = size * 1.5;
+                fanRadius  = size * 4.5;
+                fanWidth   = 0.5;
+            } else if (flashlightBattery >= FLASHLIGHT_BONUS - 10) {
+                // 【重要】180s〜170sの間で、現在の値に応じて数値を線形補完
+                let ratio = (flashlightBattery - (FLASHLIGHT_BONUS - 10)) / 10; // 1.0(180s) -> 0.0(170s)
+
+                // 各数値を ratio に基づいて混ぜ合わせる (最大値 * ratio + 通常値 * (1 - ratio))
+                footRadius = (size * 1.5) * ratio + (size * 0.6) * (1 - ratio);
+                fanRadius  = (size * 4.5) * ratio + (size * 1.8) * (1 - ratio);
+                fanWidth   = (0.5) * ratio + (0.3) * (1 - ratio);
+            } else {
+                // 170s以下の通常時
+                footRadius = size * 0.6;
+                fanRadius  = size * 1.8;
+                fanWidth   = 0.3;
+            }
 
             // 1. 足元の光（ぼかしの効いた円形）
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
