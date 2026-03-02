@@ -96,7 +96,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "16.0.0"; 
+const GAME_VERSION = "16.0.1"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -144,7 +144,7 @@ const gameOverMessages = [
     "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
     "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。",
     "画面🐾🐾🐾🐾🐾示の部分を🐾🐾🐾🐾🐾🐾すると...？",
-    "懐中電🐾🐾🐾🐾離が短い？ケチらず🐾🐾🐾🐾🐾よう"
+    "懐中電🐾🐾🐾🐾離が短い？ケチらずフ🐾🐾🐾しよう"
     ];
     
 function unlockAudio() {
@@ -835,7 +835,7 @@ window.addEventListener('touchend', e => {
     tsX = null; tsY = null;
 });
 window.onresize = draw; updateUI(); draw();
-    // --- 📱 ここから追加：iOSのズーム・ピンチ強制無効化 ---
+/*    // --- 📱 ここから追加：iOSのズーム・ピンチ強制無効化 ---
 let lastTouchEnd = 0;
 document.addEventListener('touchend', (e) => {
     const now = Date.now();
@@ -852,6 +852,7 @@ document.addEventListener('touchstart', (e) => {
         e.preventDefault();
     }
 }, { passive: false });
+*/
 </script>
 </body>
 </html>
