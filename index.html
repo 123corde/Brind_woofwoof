@@ -73,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.32";
+const GAME_VERSION = "6.33";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -467,23 +467,42 @@ function draw() {
 
     if (isBlind) {
         ctx.save();
-        if (hasFlashlight && flashlightBattery > 0) {
-            let brightness = flashlightBattery > 10 ? 1.0 : (flashlightBattery / 10);
-            const cX = pX + size / 2, cY = pY + size / 2;
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
-            const tCtx = tempCanvas.getContext('2d');
-            tCtx.fillStyle = "black"; tCtx.fillRect(0, 0, canvas.width, canvas.height);
-            tCtx.globalCompositeOperation = 'destination-out';
+        const cX = pX + size / 2, cY = pY + size / 2;
+        
+        // 1. 画面全体を真っ黒に塗る
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        let visibility = (hasFlashlight && flashlightBattery > 0) ? 1.0 : 0.0;
+        if (hasDevGlasses) visibility = 1.0;
+
+        if (visibility > 0) {
+            ctx.globalCompositeOperation = 'destination-out'; // 重なった部分を「消しゴム」で抜く
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
-            for (let i = 0; i < 20; i++) {
-                const opacity = 0.06 * brightness; tCtx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-                const fanRadius = size * (1.5 + i * 0.02), footRadius = size * (0.8 + i * 0.015);
-                tCtx.beginPath(); tCtx.moveTo(cX, cY); tCtx.arc(cX, cY, fanRadius, angle - 0.35, angle + 0.35); tCtx.closePath(); tCtx.fill();
-                tCtx.beginPath(); tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2); tCtx.fill();
-            }
-            ctx.drawImage(tempCanvas, 0, 0);
-        } else { ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+
+            // --- A: 足元の円形視界 (クッキリ見える範囲) ---
+            const footSize = size * 1.2; // ★足元の見える半径 (1.2をいじると広さが変わる)
+            const footGrad = ctx.createRadialGradient(cX, cY, 0, cX, cY, footSize);
+            footGrad.addColorStop(0, 'rgba(0,0,0,1)');   // 中心は完全透明
+            footGrad.addColorStop(0.8, 'rgba(0,0,0,1)'); // 8割の地点までクッキリ
+            footGrad.addColorStop(1, 'rgba(0,0,0,0)');   // 端っこだけ少しボケる
+            ctx.fillStyle = footGrad;
+            ctx.beginPath();
+            ctx.arc(cX, cY, footSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // --- B: 前方の扇形ライト (懐中電灯) ---
+            const lightRange = size * 4.0; // ★懐中電灯の届く距離
+            const fanGrad = ctx.createRadialGradient(cX, cY, size * 0.5, cX, cY, lightRange);
+            fanGrad.addColorStop(0, 'rgba(0,0,0,1)');   // 手前は明るい
+            fanGrad.addColorStop(1, 'rgba(0,0,0,0)');   // 先に行くほど暗くなる
+            ctx.fillStyle = fanGrad;
+            ctx.beginPath();
+            ctx.moveTo(cX, cY);
+            ctx.arc(cX, cY, lightRange, angle - 0.3, angle + 0.3);
+            ctx.closePath();
+            ctx.fill();
+        }
         ctx.restore();
     }
 }
