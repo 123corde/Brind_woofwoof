@@ -83,7 +83,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "12.0.1"; 
+const GAME_VERSION = "13.0.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -433,13 +433,46 @@ function generateSimpleMaze() {
             }
 
             dogs = [];
+            // 1. 安全地帯の定義 (プレイヤーの現在地 + 上下左右)
             let safetyZone = new Set();
-            for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${player.x + dx},${player.y + dy}`);
-            let spawnCandidates = allWalkable.filter(p => !safetyZone.has(`${p.x},${p.y}`) && map[p.y][p.x] !== 2);
+            safetyZone.add(`${player.x},${player.y}`);
+            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
+                safetyZone.add(`${player.x + dx},${player.y + dy}`);
+            });
+
+            // 2. 最短経路およびその周辺のセットを作成
+            let pathSet = new Set();
+            let pathSurroundSet = new Set();
+            shortestPath.forEach(p => {
+                pathSet.add(`${p.x},${p.y}`);
+                // 最短経路の隣接マスを計算
+                [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
+                    pathSurroundSet.add(`${p.x + dx},${p.y + dy}`);
+                });
+            });
+
+            // 3. 配置候補地のフィルタリング
+            let spawnCandidates = allWalkable.filter(p => {
+                const posKey = `${p.x},${p.y}`;
+                
+                // 共通：安全地帯(スタート隣接)とゴールには置かない
+                if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false;
+
+                if (currentLevel <= 10) {
+                    // Level 10まで：最短経路とその隣接マスを除外
+                    return !pathSet.has(posKey) && !pathSurroundSet.has(posKey);
+                } else {
+                    // Level 11以降：最短経路のみ除外（隣には湧く）
+                    return !pathSet.has(posKey);
+                }
+            });
+
+            // 4. 犬を配置
             let dogNum = Math.min(15, currentLevel - 1);
             for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) {
                 let idx = Math.floor(Math.random() * spawnCandidates.length);
-                dogs.push(spawnCandidates[idx]); spawnCandidates.splice(idx, 1);
+                dogs.push(spawnCandidates[idx]);
+                spawnCandidates.splice(idx, 1);
             }
             found = true;
         }
