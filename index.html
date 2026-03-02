@@ -73,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.32";
+const GAME_VERSION = "6.33";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -446,6 +446,8 @@ function draw() {
     const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
+    
+    // --- 描画レイヤー1: 迷路・アイテム・犬・プレイヤー ---
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
         let px = oX+x*size, py = oY+y*size;
@@ -457,33 +459,63 @@ function draw() {
             ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
             ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
         }
-        dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
     }
+    dogs.forEach(d => { ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size); });
+    
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); }
     else { ctx.drawImage(playerImg, pX, pY, size, size); }
     ctx.restore();
 
-    if (isBlind) {
+    // --- 描画レイヤー2: 暗闇とライト (BLIND MODE用) ---
+    if (isBlind && !hasDevGlasses) {
         ctx.save();
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+        const tCtx = tempCanvas.getContext('2d');
+
+        // 背景を真っ暗に塗る
+        tCtx.fillStyle = "black";
+        tCtx.fillRect(0, 0, canvas.width, canvas.height);
+
         if (hasFlashlight && flashlightBattery > 0) {
-            let brightness = flashlightBattery > 10 ? 1.0 : (flashlightBattery / 10);
             const cX = pX + size / 2, cY = pY + size / 2;
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
-            const tCtx = tempCanvas.getContext('2d');
-            tCtx.fillStyle = "black"; tCtx.fillRect(0, 0, canvas.width, canvas.height);
-            tCtx.globalCompositeOperation = 'destination-out';
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
-            for (let i = 0; i < 20; i++) {
-                const opacity = 0.06 * brightness; tCtx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-                const fanRadius = size * (1.5 + i * 0.02), footRadius = size * (0.8 + i * 0.015);
-                tCtx.beginPath(); tCtx.moveTo(cX, cY); tCtx.arc(cX, cY, fanRadius, angle - 0.35, angle + 0.35); tCtx.closePath(); tCtx.fill();
-                tCtx.beginPath(); tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2); tCtx.fill();
-            }
-            ctx.drawImage(tempCanvas, 0, 0);
-        } else { ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+            const brightness = flashlightBattery > 10 ? 1.0 : (flashlightBattery / 10);
+            
+            tCtx.globalCompositeOperation = 'destination-out';
+
+            // ==========================================
+            // 数値設定（ここをいじるとライトが変わります）
+            // ==========================================
+            const footRadius = size * 1.2;     // 足元の円の半径
+            const fanRadius  = size * 5.5;     // 扇形の長さ（射程）
+            const fanWidth   = 0.45;           // 扇形の広さ（0.1〜1.0くらいで調整）
+            // ==========================================
+
+            // 1. 足元の視界 (円形グラデーション)
+            const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
+            footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
+            footGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            tCtx.fillStyle = footGrad;
+            tCtx.beginPath();
+            tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2);
+            tCtx.fill();
+
+            // 2. 前方の視界 (扇形グラデーション)
+            const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
+            fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
+            fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            tCtx.fillStyle = fanGrad;
+            tCtx.beginPath();
+            tCtx.moveTo(cX, cY);
+            tCtx.arc(cX, cY, fanRadius, angle - fanWidth, angle + fanWidth);
+            tCtx.closePath();
+            tCtx.fill();
+        }
+
+        ctx.drawImage(tempCanvas, 0, 0);
         ctx.restore();
     }
 }
