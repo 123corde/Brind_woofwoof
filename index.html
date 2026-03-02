@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち - Ver 8.20</title>
+    <title>イッヌと寝落ち</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -51,14 +51,14 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 28px; font-weight: bold;" onclick="triggerDebugJump()">Level 1</div>
         <br>
-        <button id="hp-buy-btn" class="shop-btn" onclick="buyHeadphone()">🎹 キーボード (1コイン)</button>
+        <button id="hp-buy-btn" class="shop-btn" onclick="buyHeadphone()">🎹 キーボード (5コイン)</button>
         <button id="bgm-cycle-btn" class="shop-btn" style="display:none;" onclick="cycleBGM()"></button>
         
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()"></button>
         <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()" style="display: none;"></button>
-        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()" style="display: none;">📍 Google Map (1コイン)</button>
+        <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()" style="display: none;">📍 Google Map (200コイン)</button>
         
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運アップお守り (0コイン)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運アップお守り (25コイン)</button>
         <button id="dev-glass-btn" class="shop-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (1000コイン)</button>
         <br>
         <button id="start-btn" onclick="startGame()">START</button>
@@ -85,7 +85,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "9.0.4"; 
+const GAME_VERSION = "10.0.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -95,7 +95,9 @@ const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_wo
 
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
-let currentLevel = 1, totalCoins = 100000, coinMultiplier = 1; 
+
+//💰💰💰💰所持金デバッグ変更用    
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 
 // 🎹 音楽関連
@@ -107,8 +109,7 @@ let hasShotgun = false, shotgunAmmo = 0;
 
 // 🔦 懐中電灯関連
 let hasFlashlight = false, flashlightBattery = 0;
-const FLASHLIGHT_MAX = 200;       // 最大電池 200s
-const FLASHLIGHT_BONUS = 180;     // 180s以上でフルチャージボーナス
+const FLASHLIGHT_MAX = 200; 
 
 let lastDir = { dx: 0, dy: -1 }; 
 let flipX = false; 
@@ -129,8 +130,8 @@ const gameOverMessages = [
     "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。",
     "画面🐾🐾🐾🐾🐾示の部分を🐾🐾🐾🐾🐾🐾すると...？",
     "懐中電🐾🐾🐾🐾離が短い？ケチらず🐾🐾🐾🐾🐾よう"
-];
-
+    ];
+    
 function unlockAudio() {
     if (soundReady) return;
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -207,80 +208,77 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     
-    // 🎹 アイコン表示
+    // 🎹 音楽UI更新
+    const hpBuyBtn = document.getElementById('hp-buy-btn');
+    const cycleBtn = document.getElementById('bgm-cycle-btn');
     const hpDisplay = document.getElementById('headphone-display');
+
     if (hasHeadphone) {
         let bgmStatusIcon = "🔕";
         if (currentBGM === 1) bgmStatusIcon = "❄️";
         else if (currentBGM === 2) bgmStatusIcon = "🏝️";
         hpDisplay.innerText = `🎹${bgmStatusIcon}`;
-    } else {
-        hpDisplay.innerText = "";
-    }
-
-    const hpBuyBtn = document.getElementById('hp-buy-btn');
-    const cycleBtn = document.getElementById('bgm-cycle-btn');
-
-    if (!hasHeadphone) {
-        hpBuyBtn.style.display = 'block';
-        hpBuyBtn.disabled = totalCoins < 1;
-        cycleBtn.style.display = 'none';
-    } else {
+        
         hpBuyBtn.style.display = 'none';
         cycleBtn.style.display = 'block';
+
         if (!purchasedBGM[1]) {
-            cycleBtn.innerText = `🎹❄️ 氷の華 (1コイン)`;
-            cycleBtn.disabled = totalCoins < 1;
+            cycleBtn.innerText = `🎹❄️ 氷の華 (5コイン)`;
+            cycleBtn.disabled = totalCoins < 5;
         } else if (!purchasedBGM[2]) {
             if (currentBGM === 1) {
-                cycleBtn.innerText = `🎹🏝️ 最果ての島 (3コイン)`;
-                cycleBtn.disabled = totalCoins < 3;
+                cycleBtn.innerText = `🎹🏝️ 最果ての島 (20コイン)`;
+                cycleBtn.disabled = totalCoins < 20;
             } else {
                 cycleBtn.innerText = `🎹❄️ 氷の華 (0コイン)`;
                 cycleBtn.disabled = false;
             }
         } else {
-            let nextName = "🔕 BGMなし";
-            if (currentBGM === null) nextName = "❄️ 氷の華";
-            else if (currentBGM === 1) nextName = "🏝️ 最果ての島";
+            let nextName = (currentBGM === null) ? "❄️ 氷の華" : (currentBGM === 1 ? "🏝️ 最果ての島" : "🔕 BGMなし");
             cycleBtn.innerText = `🎹${nextName} (0コイン)`;
             cycleBtn.disabled = false;
         }
+    } else {
+        hpDisplay.innerText = "";
+        hpBuyBtn.style.display = 'block';
+        hpBuyBtn.disabled = totalCoins < 5;
+        cycleBtn.style.display = 'none';
     }
 
+    // 💥 ショットガンUI更新
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) {
-        sBtn.innerText = "💥 ショットガン (3コイン)";
-        sBtn.disabled = totalCoins < 3;
+        sBtn.innerText = "💥 ショットガン (50コイン)";
+        sBtn.disabled = totalCoins < 50;
     } else {
-        sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (1コイン)`;
-        sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 1);
+        sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`;
+        sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30);
     }
 
-    // 🔦 懐中電灯UI更新 (修正反映)
+    // 🔦 懐中電灯UI更新
     const fBtn = document.getElementById('flashlight-btn');
     if (!hasFlashlight) {
-        fBtn.innerText = "🔦 懐中電灯 (20コイン)";
-        fBtn.disabled = totalCoins < 20;
+        fBtn.innerText = "🔦 懐中電灯 (15コイン)";
+        fBtn.disabled = totalCoins < 15;
     } else {
         fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`;
         fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5);
     }
 
+    // 📍 Google Map
     const aBtn = document.getElementById('auto-device-btn');
-    aBtn.innerText = "📍 Google Map (1コイン)";
-    aBtn.disabled = (hasAutoDevice || totalCoins < 1);
+    aBtn.innerText = "📍 Google Map (200コイン)";
+    aBtn.disabled = (hasAutoDevice || totalCoins < 200);
 
-    const devBtn = document.getElementById('dev-glass-btn');
-    devBtn.innerText = "👁️購入👁️しては👁️いけない👁️ (1000コイン)";
-    devBtn.disabled = (hasDevGlasses || totalCoins < 1000);
+    // ⛩️ お守り
+    const amuletBtn = document.getElementById('amulet-btn');
+    amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`;
+    amuletBtn.disabled = (hasAmulet || totalCoins < 25);
 
-    document.getElementById('amulet-btn').disabled = (hasAmulet);
-    document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
+    document.getElementById('dev-glass-btn').disabled = (hasDevGlasses || totalCoins < 1000);
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
     
-    // 電池残量表示
     let fDisplay = document.getElementById('flashlight-display');
     if (hasFlashlight && flashlightBattery > 0) {
         fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
@@ -301,15 +299,15 @@ function updateUI() {
 }
 
 function buyHeadphone() {
-    if (totalCoins >= 1) { totalCoins -= 1; hasHeadphone = true; currentBGM = null; updateUI(); }
+    if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; currentBGM = null; updateUI(); }
 }
 
 function cycleBGM() {
     if (!purchasedBGM[1]) {
-        if (totalCoins >= 1) { totalCoins -= 1; purchasedBGM[1] = true; currentBGM = 1; }
+        if (totalCoins >= 5) { totalCoins -= 5; purchasedBGM[1] = true; currentBGM = 1; }
     } else if (!purchasedBGM[2]) {
         if (currentBGM === 1) {
-            if (totalCoins >= 3) { totalCoins -= 3; purchasedBGM[2] = true; currentBGM = 2; }
+            if (totalCoins >= 20) { totalCoins -= 20; purchasedBGM[2] = true; currentBGM = 2; }
         } else { currentBGM = 1; }
     } else {
         if (currentBGM === null) currentBGM = 1;
@@ -321,18 +319,17 @@ function cycleBGM() {
 
 function buyShotgun() {
     if (!hasShotgun) {
-        if (totalCoins >= 3) { totalCoins -= 3; hasShotgun = true; shotgunAmmo = 2; }
+        if (totalCoins >= 50) { totalCoins -= 50; hasShotgun = true; shotgunAmmo = 2; }
     } else {
-        if (totalCoins >= 1 && shotgunAmmo < 2) { totalCoins -= 1; shotgunAmmo += 1; }
+        if (totalCoins >= 30 && shotgunAmmo < 2) { totalCoins -= 30; shotgunAmmo += 1; }
     }
     updateUI();
 }
 
-// 🔦 懐中電灯購入
 function buyFlashlight() {
     if (!hasFlashlight) {
-        if (totalCoins >= 20) { 
-            totalCoins -= 20; 
+        if (totalCoins >= 15) { 
+            totalCoins -= 15; 
             hasFlashlight = true; 
             flashlightBattery = 60;
         }
@@ -343,6 +340,23 @@ function buyFlashlight() {
         }
     }
     updateUI();
+}
+
+function buyAmulet() { 
+    if (!hasAmulet && totalCoins >= 25) { 
+        totalCoins -= 25;
+        hasAmulet = true; 
+        coinMultiplier = 3; 
+        updateUI(); 
+    } 
+}
+
+function buyAutoDevice() { 
+    if (!hasAutoDevice && totalCoins >= 200) { 
+        totalCoins -= 200; 
+        hasAutoDevice = true; 
+        updateUI(); 
+    } 
 }
 
 function calculateInterval() { return 1000; }
@@ -373,24 +387,7 @@ function generateSimpleMaze() {
             let nx = rx + dx, ny = ry + dy;
             if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) {
                 if(map[ny][nx] === 1) { map[ny][nx] = 0; walked++; }
-                if (Math.random() > 0.6) {
-                    for(let ey = -1; ey <= 1; ey++) {
-                        for(let ex = -1; ex <= 1; ex++) {
-                            let bx = nx + ex, by = ny + ey;
-                            if(bx > 0 && bx < COLS - 1 && by > 0 && by < ROWS - 1) {
-                                if(map[by][bx] === 1) { map[by][bx] = 0; walked++; }
-                            }
-                        }
-                    }
-                }
                 rx = nx; ry = ny;
-            } else {
-                let walkablePoints = [];
-                for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) walkablePoints.push({x, y});
-                if (walkablePoints.length > 0) {
-                    let nextStart = walkablePoints[Math.floor(Math.random() * walkablePoints.length)];
-                    rx = nextStart.x; ry = nextStart.y;
-                }
             }
         }
 
@@ -424,39 +421,19 @@ function generateSimpleMaze() {
         if(target && dists[target.y][target.x] > 2) {
             map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
             shortestPath = target.fullPath; coinsCollectedInLevel = 0;
-            if (currentLevel <= 10) {
-                // あなたの指定した「○マスおき」のテーブル
-                // 1:0マス, 2:0, 3:1, 4:1, 5:2, 6:2, 7:3, 8:3, 9:4, 10:4
-                const stepTable = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 };
-                let stepSize = stepTable[currentLevel];
-                for (let i = 0; i < shortestPath.length; i += stepSize) {
-                    let p = shortestPath[i];
-                    if (!(p.x === goalPos.x && p.y === goalPos.y)) {
-                        map[p.y][p.x] = 3; 
-                    }
-                }
-            } else {
-                // Level 11以降: マップ全体の床からランダムに n個 配置
-                let coinCandidates = allWalkable.filter(p => 
-                    !(p.x === player.x && p.y === player.y) && 
-                    !(p.x === goalPos.x && p.y === goalPos.y)
-                );
-
-                let numCoins = Math.min(currentLevel, coinCandidates.length);
-                for (let i = 0; i < numCoins; i++) {
-                    let idx = Math.floor(Math.random() * coinCandidates.length);
-                    let p = coinCandidates[idx];
-                    map[p.y][p.x] = 3;
-                    coinCandidates.splice(idx, 1);
-                }
+            
+            // コイン配置
+            let stepTable = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 };
+            let stepSize = stepTable[currentLevel] || 5;
+            for (let i = 0; i < shortestPath.length; i += stepSize) {
+                let p = shortestPath[i];
+                if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3; 
             }
+
             dogs = [];
             let safetyZone = new Set();
             for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${player.x + dx},${player.y + dy}`);
-            if (currentLevel <= 10) {
-                shortestPath.forEach(p => { for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${p.x + dx},${p.y + dy}`); });
-            } else { shortestPath.forEach(p => safetyZone.add(`${p.x},${p.y}`)); }
-            let spawnCandidates = allWalkable.filter(p => !safetyZone.has(`${p.x},${p.y}`));
+            let spawnCandidates = allWalkable.filter(p => !safetyZone.has(`${p.x},${p.y}`) && map[p.y][p.x] !== 2);
             let dogNum = Math.min(15, currentLevel - 1);
             for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) {
                 let idx = Math.floor(Math.random() * spawnCandidates.length);
@@ -495,10 +472,9 @@ function stopAutoProcess() { autoLoadState = "NONE"; if (autoMoveTimeout) { clea
 
 setInterval(() => {
     if (!gameStarted) return;
-    // 懐中電灯バッテリー消費
     if (hasFlashlight && flashlightBattery > 0) { 
         flashlightBattery = Math.max(0, flashlightBattery - 0.1); 
-        if (Math.ceil(flashlightBattery * 10) % 10 === 0) updateUI(); // 1秒ごとにUI更新
+        if (Math.ceil(flashlightBattery * 10) % 10 === 0) updateUI();
         draw(); 
     }
     if (!hasAutoDevice) return;
@@ -565,7 +541,6 @@ async function startGame() {
     isAutoDeviceUsedInThisLevel = false;
     if (hasHeadphone && currentBGM !== null) {
         const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
-        m1.pause(); m2.pause();
         const active = (currentBGM === 1) ? m1 : m2;
         active.volume = 0.3; active.currentTime = 0; active.play().catch(e => {});
     }
@@ -575,15 +550,13 @@ async function startGame() {
 function resetGame() { 
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
-    hasShotgun = false; shotgunAmmo = 0; debugClickCount = 0;
+    hasShotgun = false; shotgunAmmo = 0;
     hasHeadphone = false; currentBGM = null; purchasedBGM = { 1: false, 2: false };
-    isAutoDeviceUsedInThisLevel = false;
-    document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
-    coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; 
+    coinMultiplier = 1; gameStarted = false; isBlind = true; 
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
 
-function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
+function toggleBlind() { isBlind = !isBlind; draw(); }
 function buyDevGlasses() { 
     if (!hasDevGlasses && totalCoins >= 1000) { 
         totalCoins -= 1000;
@@ -591,28 +564,13 @@ function buyDevGlasses() {
         updateUI(); 
     } 
 }
-function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; coinMultiplier = 3; updateUI(); } }
-function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 1) { totalCoins -= 1; hasAutoDevice = true; updateUI(); } }
 
 function playCoinSound(step) {
-    const triggerTone = () => {
-        let f = WHITE_KEYS[step % WHITE_KEYS.length];
-        if (hasAmulet) {
-            [1, 1.25, 1.5].forEach((r, i) => {
-                setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25);
-            });
-        } else {
-            playOscillator(f, 'sine', 0.15);
-        }
-    };
-    if (currentLevel >= 11) {
-        setTimeout(triggerTone, 0);
-        setTimeout(triggerTone, 100);
-        setTimeout(triggerTone, 200);
-        setTimeout(triggerTone, 300);
-        setTimeout(triggerTone, 400);
+    let f = WHITE_KEYS[step % WHITE_KEYS.length];
+    if (hasAmulet) {
+        [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25));
     } else {
-        triggerTone();
+        playOscillator(f, 'sine', 0.15);
     }
 }
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
@@ -637,13 +595,11 @@ function draw() {
                 }
             } else if (map[y][x] === 3) {
                 ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
             }
         }
     }
 
     dogs.forEach(d => { ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size); });
-    
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); } 
@@ -655,43 +611,28 @@ function draw() {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
         const tCtx = tempCanvas.getContext('2d');
-        tCtx.fillStyle = "black";
-        tCtx.fillRect(0, 0, canvas.width, canvas.height);
+        tCtx.fillStyle = "black"; tCtx.fillRect(0, 0, canvas.width, canvas.height);
 
         if (hasFlashlight && flashlightBattery > 0) {
             const cX = pX + size / 2, cY = pY + size / 2;
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
-            
-            // 明るさ計算: 10s以下で減衰、4s以下で時々点滅
-            let brightness = 1.0;
-            if (flashlightBattery < 10) {
-                brightness = flashlightBattery / 10;
-                if (flashlightBattery < 4 && Math.random() > 0.8) brightness *= 0.3;
-            }
-            
+            let brightness = flashlightBattery < 10 ? flashlightBattery / 10 : 1.0;
             tCtx.globalCompositeOperation = 'destination-out';
-
-            // 180s以上のボーナス判定
-            const isHigh = (flashlightBattery >= FLASHLIGHT_BONUS);
-            const footRadius = isHigh ? size * 1.2 : size * 0.5;
-            const fanRadius  = isHigh ? size * 3.5 : size * 1.5;
-            const fanWidth   = 0.3;
-
+            
+            const footRadius = size * 0.5;
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
             footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness})`); 
             footGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            
             tCtx.fillStyle = footGrad;
             tCtx.beginPath(); tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2); tCtx.fill();
 
+            const fanRadius = size * 1.5;
             const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
             fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
             fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            
             tCtx.fillStyle = fanGrad;
             tCtx.beginPath(); tCtx.moveTo(cX, cY);
-            tCtx.arc(cX, cY, fanRadius, angle - fanWidth, angle + fanWidth);
+            tCtx.arc(cX, cY, fanRadius, angle - 0.3, angle + 0.3);
             tCtx.closePath(); tCtx.fill();
         }
         ctx.drawImage(tempCanvas, 0, 0);
