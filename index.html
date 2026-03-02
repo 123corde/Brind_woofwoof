@@ -73,7 +73,8 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.351";
+const GAME_VERSION = "7.00";
+const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -449,10 +450,19 @@ function draw() {
     
     // --- 描画レイヤー1: 迷路・アイテム・犬・プレイヤー ---
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
-        let px = oX+x*size, py = oY+y*size;
-        if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
-        else if (map[y][x] === 2) {
+    // --- draw関数内のループ部分を以下に差し替え ---
+for(let y=0; y<ROWS; y++) {
+    for(let x=0; x<COLS; x++) {
+        let px = oX + x * size;
+        let py = oY + y * size;
+        if (map[y][x] === 1) { 
+            if (wallImg.complete && wallImg.naturalWidth !== 0) {
+                ctx.drawImage(wallImg, px, py, size, size);
+            } else {
+                ctx.fillStyle = "#333"; 
+                ctx.fillRect(px, py, size, size);
+            }
+        } else if (map[y][x] === 2) {
             let cs=3, rs=4, cw=size/cs, ch=size/rs;
             for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
         } else if (map[y][x] === 3) {
