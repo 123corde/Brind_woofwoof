@@ -577,7 +577,7 @@ async function startGame() {
     if (hasHeadphone && currentBGM !== null) {
         const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
         const active = (currentBGM === 1) ? m1 : m2;
-        active.volume = 0.3; active.currentTime = 0; active.play().catch(e => {});
+        active.volume = 0.20; active.currentTime = 0; active.play().catch(e => {});
     }
     generateSimpleMaze(); updateUI(); draw(); 
 }
@@ -696,7 +696,7 @@ function draw() {
             // 1. 足元の光（ぼかしの効いた円形）
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
             footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            footGrad.addColorStop(0.7, `rgba(0,0,0,${brightness})`);
+            footGrad.addColorStop(0.6, `rgba(0,0,0,${brightness})`);
             footGrad.addColorStop(1, 'rgba(0,0,0,0)');
             
             tCtx.fillStyle = footGrad;
@@ -707,7 +707,7 @@ function draw() {
             // 2. 前方の光（扇形グラデーション）
             const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.3, cX, cY, fanRadius);
             fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            fanGrad.addColorStop(0.5, `rgba(0,0,0,${brightness * 0.3})`);
+            fanGrad.addColorStop(0.7, `rgba(0,0,0,${brightness * 0.3})`);
             fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
             
             tCtx.fillStyle = fanGrad;
