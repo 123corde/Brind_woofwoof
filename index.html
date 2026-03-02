@@ -96,7 +96,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "15.1.1"; 
+const GAME_VERSION = "16.0.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -438,12 +438,40 @@ function generateSimpleMaze() {
             shortestPath = target.fullPath; coinsCollectedInLevel = 0;
             
             // コイン配置
-            let stepTable = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 };
-            let stepSize = stepTable[currentLevel] || 5;
-            for (let i = 0; i < shortestPath.length; i += stepSize) {
-                let p = shortestPath[i];
-                if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3; 
+            if (currentLevel <= 10) {
+                let stepTable = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 };
+                let stepSize = stepTable[currentLevel] || 5;
+    for (let i = 0; i < shortestPath.length; i += stepSize) {
+        let p = shortestPath[i];
+        if (!(p.x === goalPos.x && p.y === goalPos.y)) {
+            map[p.y][p.x] = 3;
+        }
+    }
+            } else {
+                let walkableTiles = [];
+    for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+            if (
+                map[y][x] === 0 &&
+                !(x === player.x && y === player.y) &&
+                !(x === goalPos.x && y === goalPos.y)
+            ) {
+                walkableTiles.push({ x, y });
             }
+        }
+    }
+    
+    for (let i = walkableTiles.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [walkableTiles[i], walkableTiles[j]] = [walkableTiles[j], walkableTiles[i]];
+    }
+
+    let coinCount = Math.min(currentLevel, walkableTiles.length);
+    for (let i = 0; i < coinCount; i++) {
+        let p = walkableTiles[i];
+        map[p.y][p.x] = 3;
+    }
+}
 
             dogs = [];
             // 1. 安全地帯の定義 (プレイヤーの現在地 + 上下左右)
