@@ -83,7 +83,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "13.1.0"; 
+const GAME_VERSION = "13.1.1"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -689,7 +689,7 @@ function draw() {
 
             // --- 🔦 懐中電灯のスペック設定 ---
             const isHigh = (flashlightBattery >= FLASHLIGHT_BONUS);
-            const footRadius = isHigh ? size * 1.5 : size * 1.2;
+            const footRadius = isHigh ? size * 1.5 : size * 0.7;
             const fanRadius  = isHigh ? size * 4.5 : size * 2.0; 
             const fanWidth   = isHigh ? 0.5 : 0.3; // 照射角も少し広がる
 
