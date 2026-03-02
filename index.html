@@ -45,7 +45,7 @@
         <button id="music-upgrade-btn" class="shop-btn" onclick="upgradeMusic()">🎧 ヘッドフォン (0コイン)</button>
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (0コイン)</button>
         <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()">💥 ショットガン (0コイン)</button>
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運お守り (0コイン)</button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 神社に行く (0コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (0コイン)</button>
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
         <br>
@@ -70,7 +70,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "4.00";
+const GAME_VERSION = "4.01";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -138,6 +138,15 @@ function updateUI() {
         uiContainer.insertBefore(hardModeElem, uiContainer.firstChild);
     }
     hardModeElem.style.display = currentLevel >= 10 ? 'block' : 'none';
+    
+    const startContainer = document.getElementById('start-container');
+    if (currentLevel >= 10) {
+        startContainer.style.border = "5px solid #ff4444";
+        startContainer.style.boxShadow = "0 0 20px #ff0000";
+    } else {
+        startContainer.style.border = "none";
+        startContainer.style.boxShadow = "none";
+    }
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('level-display').innerText = `Level ${currentLevel}`;
