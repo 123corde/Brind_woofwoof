@@ -16,7 +16,12 @@
             color: #fff; 
             padding: 10px; border-radius: 6px;
             font-size: min(14px, 3.5vw);
-            max-width: 40%;
+            max-width: 90%; /* 横長になるため幅を広げました */
+            /* 以下を追加 */
+            display: flex;
+            align-items: center;
+            gap: 8px; 
+            flex-wrap: wrap;
         }
         
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
@@ -61,8 +66,8 @@
         <div id="amulet-display"></div>
         <div id="flashlight-display"></div>
         <div id="mode-text">BLIND MODE</div>
-        <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
-        <div style="font-size: 0.85em; margin-top: 5px; color: #aaa;"></div>
+        <div id="total-coins" style="color: #ffd700; border-left: 1px solid #666; padding-left: 8px;">所持コイン: 0</div>
+        <div id="version-display" style="font-size: 0.8em; color: #aaa; margin-left: 5px;"></div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
@@ -137,8 +142,8 @@ function triggerDebugJump() {
 }
 
 function updateUI() {
-    const verDisplay = document.querySelector('#ui div:last-child');
-    if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}${hasDevGlasses ? " (Debug Mode)" : ""}`;
+    const verDisplay = document.getElementById('version-display');
+    if (verDisplay) verDisplay.innerText = `v${GAME_VERSION}${hasDevGlasses ? " (DB)" : ""}`;
     
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
