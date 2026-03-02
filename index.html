@@ -16,7 +16,7 @@
             color: #fff; 
             padding: 10px; border-radius: 6px;
             font-size: min(14px, 3.5vw);
-            max-width: 40%;
+            min-width: 120px;
         }
         
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
@@ -34,9 +34,8 @@
         .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { color: white; background-color: #d9534f; }
-        #auto-status { color: #fff; font-size: 1.1em; height: 1.4em; font-weight: bold; }
 
-        #level-display { cursor: default; user-select: none; -webkit-user-select: none; }
+        #level-display { cursor: pointer; user-select: none; -webkit-user-select: none; }
     </style>
 </head>
 <body>
@@ -55,14 +54,9 @@
     </div>
 
     <div id="ui">
-        <div id="auto-status"></div>
-        <div id="ammo-display"></div>
-        <div id="amulet-display"></div>
-        <div id="flashlight-display"></div>
-        <div id="mode-text">BLIND MODE</div>
+        <div id="ammo-display"></div> <div id="amulet-display"></div> <div id="mode-text">BLIND MODE</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
-        <div style="font-size: 0.85em; margin-top: 5px; color: #aaa;"></div>
-    </div>
+        <div style="font-size: 0.85em; margin-top: 5px; color: #aaa;"></div> </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
     
@@ -72,7 +66,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "8.00";
+const GAME_VERSION = "8.21";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -101,8 +95,8 @@ const gameOverMessages = [
     "一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
     "ガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
     "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
-    "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。"
-    "画面のどこか「ワンワンワンワン！」すると...?"
+    "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。",
+    "画面のどこか「🐾🐾🐾🐾🐾🐾🐾🐾」すると...?"
 ];
 
 function unlockAudio() {
@@ -131,17 +125,21 @@ function triggerDebugJump() {
     if (debugClickCount >= 15) {
         currentLevel = 11;
         debugClickCount = 0;
-        alert("⚠️ Unlock/Access Hard Mode instantly.");
+        alert("🐾 Get Access to Hard Mode 🐾");
         updateUI();
     }
 }
 
 function updateUI() {
+    // バージョン表示
     const verDisplay = document.querySelector('#ui div:last-child');
     if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}${hasDevGlasses ? " (Debug Mode)" : ""}`;
+    
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
     const isHardMode = currentLevel >= 11;
+
+    // レベル表示設定
     if (isHardMode) {
         levelDisplay.innerText = `Level ${currentLevel} (HARD)`;
         levelDisplay.style.color = "#ff4444";
@@ -157,26 +155,33 @@ function updateUI() {
         document.getElementById('shotgun-btn').style.display = 'none';
         document.getElementById('auto-device-btn').style.display = 'none';
     }
+
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
+
+    // --- 1列目: 消耗品 (ショットガン & 電池) ---
     let row1 = "";
     if (hasShotgun) row1 += (shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : ""); 
     if (hasFlashlight && flashlightBattery > 0) row1 += ` 🔦${Math.ceil(flashlightBattery)}s`;
     document.getElementById('ammo-display').innerText = row1;
+
+    // --- 2列目: 装備品 (左から ⛩️, 🎧, 🎶/🎵, 📡/📍) ---
     let row2 = "";
     if (hasAmulet) row2 += "⛩️";
     if (hasHeadphone) row2 += "🎧";
+    // 音楽アイコン判定 (ヘッドフォンのみでBGMなしの場合は表示しない)
     if (currentBGM === 1) row2 += "🎶";
     else if (currentBGM === 2) row2 += "🎵";
+    
+    // Google Mapアイコン判定
     if (hasAutoDevice) {
         if (autoLoadState === "LOADING") row2 += " 📡";
         else if (autoLoadState === "MOVING") row2 += " 📍";
-        else row2 += " "; 
+        else row2 += ""; 
     }
     document.getElementById('amulet-display').innerText = row2;
-    document.getElementById('flashlight-display').innerText = "";
-    document.getElementById('auto-status').innerText = "";
-    
+
+    // ボタンのテキストと有効化/無効化
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) { sBtn.innerText = "💥 ショットガン (3コイン)"; sBtn.disabled = totalCoins < 3; }
     else { sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (1コイン)`; sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 1); }
@@ -196,7 +201,6 @@ function updateUI() {
     else if (currentBGM === 1) { mBtn.innerText = "🎵 忘れじの光 (0コイン)"; mBtn.disabled = false; }
     else { mBtn.innerText = "🎧 音楽環境・完備"; mBtn.disabled = true; }
 }
-    }
 
 function upgradeMusic() {
     if (!hasHeadphone) hasHeadphone = true;
@@ -265,8 +269,10 @@ function generateSimpleMaze() {
             } else {
                 let walkablePoints = [];
                 for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) walkablePoints.push({x, y});
-                let nextStart = walkablePoints[Math.floor(Math.random() * walkablePoints.length)];
-                rx = nextStart.x; ry = nextStart.y;
+                if (walkablePoints.length > 0) {
+                    let nextStart = walkablePoints[Math.floor(Math.random() * walkablePoints.length)];
+                    rx = nextStart.x; ry = nextStart.y;
+                }
             }
         }
 
@@ -333,217 +339,3 @@ function getNextStepToGoal() {
             let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
             if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) {
                 visited.add(key); q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
-            }
-        }
-    }
-    return null;
-}
-
-function executeAutoStep() {
-    if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
-    let step = getNextStepToGoal();
-    if (step) { movePlayer(step.dx, step.dy, true); autoMoveTimeout = setTimeout(executeAutoStep, calculateInterval()); } 
-    else { stopAutoProcess(); }
-}
-
-function stopAutoProcess() { autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); }
-
-setInterval(() => {
-    if (!gameStarted) return;
-    if (hasFlashlight && flashlightBattery > 0) { flashlightBattery = Math.max(0, flashlightBattery - 0.1); updateUI(); draw(); }
-    if (!hasAutoDevice) return;
-    let idle = Date.now() - lastMoveTime;
-    if (autoLoadState === "NONE" && idle > 2500) { autoLoadState = "LOADING"; updateUI(); }
-    if (autoLoadState === "LOADING" && idle > 6000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
-}, 100);
-
-async function playOscillator(f, t, d) {
-    if (!audioCtx) return;
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
-}
-
-function movePlayer(dx, dy, isAuto = false) {
-    if(!gameStarted) return;
-    if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
-    if (dx === -1) flipX = false; if (dx === 1) flipX = true;
-    lastDir = { dx, dy };
-    const nx = player.x + dx, ny = player.y + dy;
-    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
-        if(!isAuto) playOscillator(150, 'square', 0.1);
-    } else {
-        player.x = nx; player.y = ny;
-        let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
-        if (dogIndex !== -1) {
-            if (shotgunAmmo > 0) { shotgunAmmo--; playSound(dogCrySnd); dogs.splice(dogIndex, 1); updateUI(); } 
-            else {
-                gameStarted = false; playSound(biteSnd);
-                document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
-                let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
-                setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100); return;
-            }
-        }
-        if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
-        if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; gameStarted = false; isBlind = true; stopAutoProcess();
-            document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
-            document.getElementById('start-container').style.display = 'flex'; updateUI();
-        } else if (map[ny][nx] === 3) {
-            playCoinSound(coinsCollectedInLevel); map[ny][nx] = 0; totalCoins += (1 * coinMultiplier);
-            coinsCollectedInLevel++; updateUI();
-        }
-    }
-    draw();
-}
-
-async function startGame() { 
-    unlockAudio(); document.getElementById('start-container').style.display = 'none'; 
-    gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
-    if (hasHeadphone && currentBGM !== null) {
-        const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
-        m1.pause(); m2.pause();
-        const active = (currentBGM === 1) ? m1 : m2;
-        active.volume = 0.3; active.currentTime = 0; active.play().catch(e => {});
-    }
-    generateSimpleMaze(); updateUI(); draw(); 
-}
-
-function resetGame() { 
-    currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
-    hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
-    hasShotgun = false; shotgunAmmo = 0; debugClickCount = 0;
-    hasHeadphone = false; currentBGM = null;
-    document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
-    coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; 
-    stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
-}
-
-function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
-function buyDevGlasses() { if (!hasDevGlasses) { hasDevGlasses = true; updateUI(); } }
-function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; coinMultiplier = 5; updateUI(); } }
-function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 0) { hasAutoDevice = true; updateUI(); } }
-
-function playCoinSound(step) {
-    let f = WHITE_KEYS[step % WHITE_KEYS.length];
-    if (hasAmulet) [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25));
-    else playOscillator(f, 'sine', 0.15);
-}
-async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
-
-function draw() {
-    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
-    
-    // --- 描画レイヤー1: 迷路・アイテム・犬・プレイヤー ---
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    for(let y=0; y<ROWS; y++) {
-        for(let x=0; x<COLS; x++) {
-            let px = oX + x * size;
-            let py = oY + y * size;
-
-            if (map[y][x] === 1) { 
-                // 壁の描画 (blue_wall.png)
-                if (wallImg.complete && wallImg.naturalWidth !== 0) {
-                    // シームレスな隙間を埋めるため +0.5px 補正
-                    ctx.drawImage(wallImg, px, py, size + 0.5, size + 0.5);
-                } else {
-                    ctx.fillStyle = "#333"; 
-                    ctx.fillRect(px, py, size, size);
-                }
-            } else if (map[y][x] === 2) {
-                // ゴール
-                let cs=3, rs=4, cw=size/cs, ch=size/rs;
-                for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { 
-                    ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; 
-                    ctx.fillRect(px+c*cw, py+r*ch, cw, ch); 
-                }
-            } else if (map[y][x] === 3) {
-                // コイン
-                ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
-            }
-        }
-    }
-
-    // 犬の描画
-    dogs.forEach(d => { ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size); });
-    
-    // プレイヤーの描画
-    const pX = oX + player.x * size, pY = oY + player.y * size;
-    ctx.save();
-    if (flipX) { 
-        ctx.translate(pX + size, pY); ctx.scale(-1, 1); 
-        ctx.drawImage(playerImg, 0, 0, size, size); 
-    } else { 
-        ctx.drawImage(playerImg, pX, pY, size, size); 
-    }
-    ctx.restore();
-
-    // --- 描画レイヤー2: 暗闇とライト (BLIND MODE用) ---
-    if (isBlind) {
-        ctx.save();
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
-        const tCtx = tempCanvas.getContext('2d');
-
-        tCtx.fillStyle = "black";
-        tCtx.fillRect(0, 0, canvas.width, canvas.height);
-
-        if (hasFlashlight && flashlightBattery > 0) {
-            const cX = pX + size / 2, cY = pY + size / 2;
-            const angle = Math.atan2(lastDir.dy, lastDir.dx);
-            const brightness = flashlightBattery > 10 ? 1.0 : (flashlightBattery / 10);
-            
-            tCtx.globalCompositeOperation = 'destination-out';
-
-            const footRadius = size * 0.5;
-            const fanRadius  = size * 1.5;
-            const fanWidth   = 0.3;
-
-            // 足元
-            const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
-            footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness})`); 
-            footGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            
-            tCtx.fillStyle = footGrad;
-            tCtx.beginPath();
-            tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2);
-            tCtx.fill();
-
-            // 扇形
-            const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
-            fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            
-            tCtx.fillStyle = fanGrad;
-            tCtx.beginPath();
-            tCtx.moveTo(cX, cY);
-            tCtx.arc(cX, cY, fanRadius, angle - fanWidth, angle + fanWidth);
-            tCtx.closePath();
-            tCtx.fill();
-        }
-
-        ctx.drawImage(tempCanvas, 0, 0);
-        ctx.restore();
-    }
-}
-
-let tsX = null, tsY = null;
-window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
-window.addEventListener('touchend', e => {
-    if (tsX === null || tsY === null) return;
-    const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
-    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
-        if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1);
-    }
-    tsX = null; tsY = null;
-});
-window.onresize = draw; updateUI();
-</script>
-</body>
-</html>
