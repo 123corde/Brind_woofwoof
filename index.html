@@ -281,7 +281,7 @@ function updateUI() {
     let fDisplay = document.getElementById('flashlight-display');
     if (hasFlashlight && flashlightBattery > 0) {
         fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
-        fDisplay.style.color = (flashlightBattery < 20) ? "#ff4444" : "#fff"; // 20s以下で赤字
+        fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
     } else {
         fDisplay.innerText = "";
     }
