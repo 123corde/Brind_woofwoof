@@ -35,12 +35,12 @@
             background: rgba(255,255,255,0.95); display: flex; flex-direction: column; 
             justify-content: center; align-items: center; z-index: 100; text-align: center;
             padding: 20px; box-sizing: border-box;
-            transition: all 0.3s ease;
+            overflow-y: auto;
         }
         
-        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; }
-        .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
-        .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
+        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; flex-shrink: 0; }
+        .shop-btn { padding: 10px; margin: 3px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; flex-shrink: 0; }
+        .shop-btn:disabled { background: #ccc; cursor: not-allowed; color: #777; }
         .dev-btn { color: white; background-color: #d9534f; }
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
 
@@ -52,7 +52,11 @@
     <div id="start-container">
         <div id="level-display" style="font-size: 28px; font-weight: bold;" onclick="triggerDebugJump()">Level 1</div>
         <br>
-        <button id="music-upgrade-btn" class="shop-btn" onclick="upgradeMusic()">🎧 ヘッドフォン (0コイン)</button>
+        <button id="hp-buy-btn" class="shop-btn" onclick="buyHeadphone()">🎧 ヘッドフォン (1コイン)</button>
+        <button id="bgm-none-btn" class="shop-btn" style="display:none;" onclick="changeBGM(null)">🎧 BGMなしに変更 (0コイン)</button>
+        <button id="bgm1-btn" class="shop-btn" style="display:none;" onclick="buyOrSelectBGM(1)">🎵 氷の華 (1コイン)</button>
+        <button id="bgm2-btn" class="shop-btn" style="display:none;" onclick="buyOrSelectBGM(2)">🎵 忘れじの光 (3コイン)</button>
+        
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()"></button>
         <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()" style="display: none;"></button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()" style="display: none;">📍 Google Map (1コイン)</button>
@@ -65,7 +69,13 @@
 
     <div id="ui">
         <div class="item-row">
-            <div id="amulet-display"></div>     <div id="headphone-display"></div>  <div id="music-note-display"></div> <div id="ammo-display"></div>       <div id="auto-status"></div>        <div id="flashlight-display"></div> </div>
+            <div id="amulet-display"></div>
+            <div id="headphone-display"></div>
+            <div id="music-note-display"></div> 
+            <div id="ammo-display"></div>
+            <div id="auto-status"></div>
+            <div id="flashlight-display"></div>
+        </div>
         <div id="mode-text">BLIND MODE</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
         <div id="ver-text" style="font-size: 0.85em; margin-top: 5px; color: #aaa;"></div>
@@ -79,7 +89,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "7.06"; 
+const GAME_VERSION = "7.07"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -91,7 +101,12 @@ let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
-let hasHeadphone = false, currentBGM = null; 
+
+// 🎧 音楽関連の変数
+let hasHeadphone = false;
+let currentBGM = null; 
+let purchasedBGM = { 1: false, 2: false }; // 曲ごとの購入フラグ
+
 let hasShotgun = false, shotgunAmmo = 0; 
 let hasFlashlight = false, flashlightBattery = 0;
 let lastDir = { dx: 0, dy: -1 }; 
@@ -102,7 +117,7 @@ let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, 
 let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 let loadingDots = 0;
-let isAutoDeviceUsedInThisLevel = false; // 今回のレベルで案内を開始したかどうかのフラグ
+let isAutoDeviceUsedInThisLevel = false;
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
@@ -169,7 +184,6 @@ function updateUI() {
     
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
-    
     const isHardMode = currentLevel >= 11;
 
     if (isHardMode) {
@@ -189,34 +203,51 @@ function updateUI() {
     }
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
-    
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     document.getElementById('headphone-display').innerText = hasHeadphone ? "🎧" : "";
-    
-    let noteIcon = "";
-    if (currentBGM === 1) noteIcon = "🎶";
-    else if (currentBGM === 2) noteIcon = "🎵";
-    document.getElementById('music-note-display').innerText = noteIcon;
+    document.getElementById('music-note-display').innerText = (hasHeadphone && currentBGM !== null) ? "🎵" : "";
 
-    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
-    
-    let statusText = "";
-    if (hasAutoDevice) {
-        if (autoLoadState === "NONE") {
-            statusText = "📍";
-        } else if (autoLoadState === "LOADING") {
-            statusText = "📡" + ".".repeat(loadingDots);
-        } else if (autoLoadState === "MOVING") {
-            const remainingSec = getDistanceToGoal();
-            statusText = `📍[案内中](${remainingSec}s)`;
+    // 🎧 音楽関連のボタン表示
+    const hpBuyBtn = document.getElementById('hp-buy-btn');
+    const bgmNoneBtn = document.getElementById('bgm-none-btn');
+    const bgm1Btn = document.getElementById('bgm1-btn');
+    const bgm2Btn = document.getElementById('bgm2-btn');
+
+    if (!hasHeadphone) {
+        hpBuyBtn.style.display = 'block';
+        hpBuyBtn.disabled = totalCoins < 1;
+        bgmNoneBtn.style.display = 'none';
+        bgm1Btn.style.display = 'none';
+        bgm2Btn.style.display = 'none';
+    } else {
+        hpBuyBtn.style.display = 'none';
+        bgmNoneBtn.style.display = 'block';
+        bgm1Btn.style.display = 'block';
+        bgm2Btn.style.display = 'block';
+
+        // BGMなしボタン
+        bgmNoneBtn.disabled = (currentBGM === null);
+
+        // 氷の華 (BGM1)
+        if (!purchasedBGM[1]) {
+            bgm1Btn.innerText = "🎵 氷の華 (1コイン)";
+            bgm1Btn.disabled = totalCoins < 1;
+        } else {
+            bgm1Btn.innerText = "🎵 氷の華に変更 (0コイン)";
+            bgm1Btn.disabled = (currentBGM === 1);
+        }
+
+        // 忘れじの光 (BGM2)
+        if (!purchasedBGM[2]) {
+            bgm2Btn.innerText = "🎵 忘れじの光 (3コイン)";
+            bgm2Btn.disabled = totalCoins < 3;
+        } else {
+            bgm2Btn.innerText = "🎵 忘れじの光に変更 (0コイン)";
+            bgm2Btn.disabled = (currentBGM === 2);
         }
     }
-    document.getElementById('auto-status').innerText = statusText;
 
-    document.getElementById('flashlight-display').innerText = (hasFlashlight && flashlightBattery > 0) ? `🔦${Math.ceil(flashlightBattery)}s` : "";
-
-    document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
-    
+    // その他アイテム
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) {
         sBtn.innerText = "💥 ショットガン (3コイン)";
@@ -239,27 +270,48 @@ function updateUI() {
     aBtn.innerText = "📍 Google Map (1コイン)";
     aBtn.disabled = (hasAutoDevice || totalCoins < 1);
 
-    document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 0);
+    document.getElementById('amulet-btn').disabled = (hasAmulet);
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
+    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
+    document.getElementById('flashlight-display').innerText = (hasFlashlight && flashlightBattery > 0) ? `🔦${Math.ceil(flashlightBattery)}s` : "";
+    document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
 
-    const mBtn = document.getElementById('music-upgrade-btn');
-    if (!hasHeadphone) {
-        mBtn.innerText = "🎧 ヘッドフォン (0コイン)"; mBtn.disabled = false;
-    } else if (currentBGM === null) {
-        mBtn.innerText = "🎶 氷の華 (0コイン)"; mBtn.disabled = false;
-    } else if (currentBGM === 1) {
-        mBtn.innerText = "🎵 忘れじの光 (0コイン)"; mBtn.disabled = false;
-    } else {
-        mBtn.innerText = "🎧 音楽環境・完備"; mBtn.disabled = true;
+    let statusText = "";
+    if (hasAutoDevice) {
+        if (autoLoadState === "NONE") statusText = "📍";
+        else if (autoLoadState === "LOADING") statusText = "📡" + ".".repeat(loadingDots);
+        else if (autoLoadState === "MOVING") statusText = `📍[案内中](${getDistanceToGoal()}s)`;
+    }
+    document.getElementById('auto-status').innerText = statusText;
+}
+
+// 🎧 音楽購入・変更関数
+function buyHeadphone() {
+    if (totalCoins >= 1) {
+        totalCoins -= 1;
+        hasHeadphone = true;
+        currentBGM = null; // 購入時はBGMなし
+        updateUI();
     }
 }
 
-function upgradeMusic() {
-    if (!hasHeadphone) hasHeadphone = true;
-    else if (currentBGM === null) currentBGM = 1;
-    else if (currentBGM === 1) currentBGM = 2;
+function changeBGM(id) {
+    currentBGM = id;
     updateUI();
+}
+
+function buyOrSelectBGM(id) {
+    if (purchasedBGM[id]) {
+        changeBGM(id);
+    } else {
+        let cost = (id === 1) ? 1 : 3;
+        if (totalCoins >= cost) {
+            totalCoins -= cost;
+            purchasedBGM[id] = true;
+            changeBGM(id);
+        }
+    }
 }
 
 function buyShotgun() {
@@ -398,8 +450,6 @@ function getNextStepToGoal() {
 
 function executeAutoStep() {
     if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return;
-    
-    // 案内開始時に「使用済み」フラグを立てる
     isAutoDeviceUsedInThisLevel = true; 
 
     let step = getNextStepToGoal();
@@ -462,13 +512,10 @@ function movePlayer(dx, dy, isAuto = false) {
         if (map[ny][nx] === 2) {
             playGoalSound(); 
             currentLevel++; 
-            
-            // 重要：案内を使用した場合は、ゴール時にアイテムを没収
             if (isAutoDeviceUsedInThisLevel) {
                 hasAutoDevice = false;
             }
-            isAutoDeviceUsedInThisLevel = false; // フラグをリセット
-
+            isAutoDeviceUsedInThisLevel = false;
             gameStarted = false; isBlind = true; stopAutoProcess();
             document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
             document.getElementById('start-container').style.display = 'flex'; updateUI();
@@ -484,7 +531,7 @@ function movePlayer(dx, dy, isAuto = false) {
 async function startGame() { 
     unlockAudio(); document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
-    isAutoDeviceUsedInThisLevel = false; // レベル開始時にリセット
+    isAutoDeviceUsedInThisLevel = false;
 
     if (hasHeadphone && currentBGM !== null) {
         const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
@@ -499,7 +546,7 @@ function resetGame() {
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0; debugClickCount = 0;
-    hasHeadphone = false; currentBGM = null;
+    hasHeadphone = false; currentBGM = null; purchasedBGM = { 1: false, 2: false };
     isAutoDeviceUsedInThisLevel = false;
     document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
     coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; 
