@@ -423,7 +423,7 @@ setInterval(() => {
     if (autoLoadState === "LOADING") {
         loadingDots = Math.floor((idle - 3000) / 500) % 4; 
         updateUI();
-        if (idle > 7000) { 
+        if (idle > 9000) { 
             autoLoadState = "MOVING"; 
             executeAutoStep();
         }
