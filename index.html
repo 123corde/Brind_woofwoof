@@ -73,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.35";
+const GAME_VERSION = "6.36";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -445,67 +445,70 @@ async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTime
 function draw() {
     const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
+    const size = Math.min(canvas.width/COLS, canvas.height/ROWS), offsetX = (canvas.width-size*COLS)/2, offsetY = (canvas.height-size*ROWS)/2;
+
+    // --- 1. まず、迷路全体を描画する ---
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
-        let px = oX+x*size, py = oY+y*size;
-        if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
-        else if (map[y][x] === 2) {
-            let cs=3, rs=4, cw=size/cs, ch=size/rs;
-            for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
-        } else if (map[y][x] === 3) {
-            ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
+    for(let y=0; y<ROWS; y++) {
+        for(let x=0; x<COLS; x++) {
+            let px = offsetX + x*size, py = offsetY + y*size;
+            if (map[y][x] === 1) { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); }
+            else if (map[y][x] === 2) {
+                const cs = 3, rs = 4, cw = size / cs, ch = size / rs;
+                for (let r = 0; r < rs; r++) for (let c = 0; c < cs; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? "#fff" : "#000"; ctx.fillRect(px + c * cw, py + r * ch, cw, ch);
+                }
+            } else if (map[y][x] === 3) {
+                ctx.fillStyle = "#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = "#5d4037"; ctx.font = `bold ${size/2.5}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillText("$", px+size/2, py+size/2);
+            }
+            dogs.forEach(d => { if(d.x === x && d.y === y) ctx.drawImage(dogImg, px, py, size, size); });
         }
-        dogs.forEach(d => { if(d.x===x && d.y===y) ctx.drawImage(dogImg, px, py, size, size); });
     }
-    const pX = oX + player.x * size, pY = oY + player.y * size;
+
+    // --- 2. プレイヤーを描画する ---
+    const pX = offsetX + player.x * size, pY = offsetY + player.y * size;
     ctx.save();
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); }
     else { ctx.drawImage(playerImg, pX, pY, size, size); }
     ctx.restore();
 
+    // --- 3. 最後に「暗闇」を上から被せ、懐中電灯の場所だけ「消しゴム」で消す ---
     if (isBlind) {
         ctx.save();
         const cX = pX + size / 2, cY = pY + size / 2;
-
-        // 1. オフスクリーンキャンバスのような効果をシミュレート
-        // 画面全体を一旦真っ黒に塗りつぶす
-        ctx.fillStyle = "black";
+        
+        // 画面全体を一旦真っ黒にする
+        ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         let visibility = (hasFlashlight && flashlightBattery > 0) ? 1.0 : 0.0;
         if (hasDevGlasses) visibility = 1.0;
 
         if (visibility > 0) {
-            // 2. 「destination-out」を設定（ここから描くものは黒塗りを「消す」）
+            // 消しゴムモード発動
             ctx.globalCompositeOperation = 'destination-out';
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
 
-            // --- A: 足元の円形 (重なっても大丈夫なように一気に描く) ---
-            // グラデーションを作成：中心(1.0=完全に消す)から外側(0.0=消さない)へ
-            const footSize = size * 1.5; 
-            const footGrad = ctx.createRadialGradient(cX, cY, size * 0.5, cX, cY, footSize);
-            footGrad.addColorStop(0, 'rgba(0,0,0,1)');   // 中心はクッキリ消す
-            footGrad.addColorStop(1, 'rgba(0,0,0,0)');   // 外側は消さない
-            
+            // A: 足元の穴（クッキリ）
+            const footSize = size * 1.5;
+            const footGrad = ctx.createRadialGradient(cX, cY, 0, cX, cY, footSize);
+            footGrad.addColorStop(0, 'rgba(0,0,0,1)');
+            footGrad.addColorStop(0.8, 'rgba(0,0,0,1)');
+            footGrad.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = footGrad;
-            ctx.beginPath();
-            ctx.arc(cX, cY, footSize, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(cX, cY, footSize, 0, Math.PI * 2); ctx.fill();
 
-            // --- B: 前方の扇形ライト ---
+            // B: 懐中電灯の穴（扇形）
             const lightRange = size * 5.0;
             const fanGrad = ctx.createRadialGradient(cX, cY, size * 0.5, cX, cY, lightRange);
-            fanGrad.addColorStop(0, 'rgba(0,0,0,1)');   // 手前はクッキリ消す
-            fanGrad.addColorStop(1, 'rgba(0,0,0,0)');   // 先は消さない
-            
+            fanGrad.addColorStop(0, 'rgba(0,0,0,1)');
+            fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
             ctx.fillStyle = fanGrad;
-            ctx.beginPath();
-            ctx.moveTo(cX, cY);
+            ctx.beginPath(); ctx.moveTo(cX, cY);
             ctx.arc(cX, cY, lightRange, angle - 0.4, angle + 0.4);
-            ctx.closePath();
-            ctx.fill();
+            ctx.closePath(); ctx.fill();
         }
         ctx.restore();
     }
