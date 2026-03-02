@@ -83,14 +83,16 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "11.0.1"; 
+const GAME_VERSION = "12.0.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane.wav');
-
+const FLASHLIGHT_MAX = 200; 
+const FLASHLIGHT_BONUS = 180;
+    
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 
@@ -630,29 +632,58 @@ function draw() {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
         const tCtx = tempCanvas.getContext('2d');
-        tCtx.fillStyle = "black"; tCtx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 画面全体を暗闇で塗りつぶす
+        tCtx.fillStyle = "black";
+        tCtx.fillRect(0, 0, canvas.width, canvas.height);
 
         if (hasFlashlight && flashlightBattery > 0) {
             const cX = pX + size / 2, cY = pY + size / 2;
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
-            let brightness = flashlightBattery < 10 ? flashlightBattery / 10 : 1.0;
-            tCtx.globalCompositeOperation = 'destination-out';
             
-            const footRadius = size * 0.5;
+            // --- 💡 光量と点滅の計算 ---
+            let brightness = 1.0;
+            if (flashlightBattery < 10) {
+                // 10秒を切ると徐々に暗くなる
+                brightness = flashlightBattery / 10;
+                // 4秒を切ると、激しく点滅（フリッカー）
+                if (flashlightBattery < 4 && Math.random() > 0.7) {
+                    brightness *= (Math.random() * 0.4); 
+                }
+            }
+            
+            tCtx.globalCompositeOperation = 'destination-out';
+
+            // --- 🔦 懐中電灯のスペック設定 ---
+            const isHigh = (flashlightBattery >= FLASHLIGHT_BONUS);
+            // 180s以上のボーナス時は足元半径1.2倍、照射距離2.3倍
+            const footRadius = isHigh ? size * 1.5 : size * 0.6;
+            const fanRadius  = isHigh ? size * 4.5 : size * 2.0; 
+            const fanWidth   = isHigh ? 0.4 : 0.3; // 照射角も少し広がる
+
+            // 1. 足元の光（ぼかしの効いた円形）
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
             footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
+            footGrad.addColorStop(0.6, `rgba(0,0,0,${brightness * 0.5})`);
             footGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            
             tCtx.fillStyle = footGrad;
-            tCtx.beginPath(); tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2); tCtx.fill();
+            tCtx.beginPath();
+            tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2);
+            tCtx.fill();
 
-            const fanRadius = size * 1.5;
-            const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
+            // 2. 前方の光（扇形グラデーション）
+            const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.3, cX, cY, fanRadius);
             fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
+            fanGrad.addColorStop(0.5, `rgba(0,0,0,${brightness * 0.3})`);
             fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
+            
             tCtx.fillStyle = fanGrad;
-            tCtx.beginPath(); tCtx.moveTo(cX, cY);
-            tCtx.arc(cX, cY, fanRadius, angle - 0.3, angle + 0.3);
-            tCtx.closePath(); tCtx.fill();
+            tCtx.beginPath();
+            tCtx.moveTo(cX, cY);
+            tCtx.arc(cX, cY, fanRadius, angle - fanWidth, angle + fanWidth);
+            tCtx.closePath();
+            tCtx.fill();
         }
         ctx.drawImage(tempCanvas, 0, 0);
         ctx.restore();
