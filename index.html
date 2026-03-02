@@ -177,6 +177,18 @@ function generateSimpleMaze() {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random()*4)];
             if(x+dx > 0 && x+dx < COLS-1 && y+dy > 0 && y+dy < ROWS-1) { x += dx; y += dy; map[y][x] = 0; }
         }
+        let walkable = [];
+        for(let ry=1; ry<ROWS-1; ry++) for(let rx=1; rx<COLS-1; rx++) if(map[ry][rx]===0) walkable.push({x:rx, y:ry});
+        let branchCount = 5 + Math.floor(currentLevel / 2);
+        for(let b=0; b < branchCount; b++) {
+            let startNode = walkable[Math.floor(Math.random()*walkable.length)];
+            let bx = startNode.x, by = startNode.y;
+            let branchLen = 5 + currentLevel;
+            for(let j=0; j < branchLen; j++) {
+                let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random()*4)];
+                if(bx+dx > 0 && bx+dx < COLS-1 && by+dy > 0 && by+dy < ROWS-1) { bx += dx; by += dy; map[by][bx] = 0; }
+            }
+        }
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; dists[sY][sX] = 0;
         let allWalkable = [];
         while(q.length > 0) {
