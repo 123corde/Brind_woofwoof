@@ -69,7 +69,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "2.2";
+const GAME_VERSION = "3.0";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -170,52 +170,60 @@ function upgradeMusic() {
 function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
 
 function generateSimpleMaze() {
-    // 1. サイズ決定 (Level 1: 4x4, Level 10: 16x19, 以降固定)
+    // 1. サイズ決定
     COLS = Math.min(16, 4 + Math.floor((currentLevel - 1) * 1.34));
     ROWS = Math.min(19, Math.floor(COLS * 1.2));
     
+    // 穴掘り法のために必ず奇数サイズにする（外周は壁）
+    if (COLS % 2 === 0) COLS++;
+    if (ROWS % 2 === 0) ROWS++;
+
     let found = false;
     let attempts = 0;
 
-    while (!found && attempts < 100) {
+    while (!found && attempts < 50) {
         attempts++;
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
         
-        let sX = 1 + Math.floor(Math.random() * (COLS - 2));
-        let sY = 1 + Math.floor(Math.random() * (ROWS - 2));
+        // スタート地点（奇数座標）
+        let sX = 1 + Math.floor(Math.random() * ((COLS - 1) / 2)) * 2;
+        let sY = 1 + Math.floor(Math.random() * ((ROWS - 1) / 2)) * 2;
         player = { x: sX, y: sY }; 
-        let x = sX, y = sY; 
-        map[y][x] = 0;
+        map[sY][sX] = 0;
 
-        // 2. メインの道を掘る (ランダムウォーク)
-        let mainFill = ROWS * COLS * 0.3; 
-        for(let i = 0; i < mainFill; i++) {
-            let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random() * 4)];
-            if(x + dx > 0 && x + dx < COLS - 1 && y + dy > 0 && y + dy < ROWS - 1) { 
-                x += dx; y += dy; map[y][x] = 0; 
+        // --- 2. メインルート作成 (ランダムウォーク) ---
+        let rx = sX, ry = sY;
+        let mainPathLen = ROWS * COLS * 0.4;
+        for(let i = 0; i < mainPathLen; i++) {
+            let dirs = [[0,2],[0,-2],[2,0],[-2,0]], [dx, dy] = dirs[Math.floor(Math.random() * 4)];
+            let nx = rx + dx, ny = ry + dy;
+            if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) {
+                map[ry + dy/2][rx + dx/2] = 0; // 中間を掘る
+                map[ny][nx] = 0;
+                rx = nx; ry = ny;
             }
         }
 
-        // 3. 最短経路以外への「枝分かれ」を生成 (迷路を複雑にする)
-        let currentWalkable = [];
-        for(let ry = 1; ry < ROWS - 1; ry++) {
-            for(let rx = 1; rx < COLS - 1; rx++) if(map[ry][rx] === 0) currentWalkable.push({x: rx, y: ry});
-        }
-        let branchCount = 3 + Math.floor(currentLevel / 2);
-        for(let b = 0; b < branchCount; b++) {
-            let startNode = currentWalkable[Math.floor(Math.random() * currentWalkable.length)];
-            if(!startNode) continue;
-            let bx = startNode.x, by = startNode.y;
-            let branchLen = 3 + currentLevel;
-            for(let j = 0; j < branchLen; j++) {
-                let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random() * 4)];
-                if(bx + dx > 0 && bx + dx < COLS - 1 && by + dy > 0 && by + dy < ROWS - 1) { 
-                    bx += dx; by += dy; map[by][bx] = 0; 
+        // --- 3. 袋小路作成 (穴掘り法) ---
+        function dig(x, y) {
+            let dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random() - 0.5);
+            for(let [dx, dy] of dirs) {
+                let nx = x + dx, ny = y + dy;
+                if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && map[ny][nx] === 1) {
+                    map[y + dy/2][x + dx/2] = 0;
+                    map[ny][nx] = 0;
+                    dig(nx, ny);
                 }
             }
         }
+        // マップ上の全ての奇数座標から掘り始める（連結させる）
+        for(let y = 1; y < ROWS; y += 2) {
+            for(let x = 1; x < COLS; x += 2) {
+                if(map[y][x] === 0) dig(x, y);
+            }
+        }
 
-        // 4. 全ルートの距離計算 (スタート地点からの最短歩数)
+        // --- 4. 距離計算 (BFS) ---
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; 
         dists[sY][sX] = 0;
         let allWalkable = [];
@@ -231,38 +239,35 @@ function generateSimpleMaze() {
             }
         }
 
-        // 5. 一番遠い場所をゴールに決定
+        // --- 5. ゴールとアイテム配置 ---
         allWalkable.sort((a, b) => dists[b.y][b.x] - dists[a.y][a.x]);
         let target = allWalkable[0];
 
-        if(target && dists[target.y][target.x] > 1) {
+        if(target && dists[target.y][target.x] > 2) {
             map[target.y][target.x] = 2; 
             goalPos = { x: target.x, y: target.y };
             shortestPath = target.fullPath; 
             coinsCollectedInLevel = 0;
 
-            // 6. コインの配置 (最短経路上)
+            // コイン
             let stepSize = currentLevel <= 9 ? (currentLevel === 1 ? 1 : Math.floor((currentLevel + 1) / 2)) : 5;
             for(let i = stepSize - 1; i < shortestPath.length; i += stepSize) {
                 let p = shortestPath[i]; 
                 if(!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
             }
 
-            // 7. イッヌの配置 (Level 5までは最短経路の周囲も安全にする)
+            // イッヌの配置 (Level 5までは最短経路の周囲も安全)
             dogs = [];
             let pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
             pathSet.add(`${player.x},${player.y}`);
-            
             let safetyZone = new Set();
             if (currentLevel <= 5) {
                 pathSet.forEach(pos => {
                     let [px, py] = pos.split(',').map(Number);
-                    for(let dy = -1; dy <= 1; dy++) {
-                        for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${px + dx},${py + dy}`);
-                    }
+                    for(let dy = -1; dy <= 1; dy++) for(let dx = -1; dx <= 1; dx++) safetyZone.add(`${px + dx},${py + dy}`);
                 });
             } else {
-                safetyZone = pathSet; // Level 6以降は路上のみ禁止
+                safetyZone = pathSet;
             }
             
             let sidePaths = allWalkable.filter(p => !safetyZone.has(`${p.x},${p.y}`));
@@ -276,7 +281,6 @@ function generateSimpleMaze() {
         }
     }
 }
-
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
