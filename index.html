@@ -73,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.31";
+const GAME_VERSION = "6.32";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -477,8 +477,8 @@ function draw() {
             tCtx.globalCompositeOperation = 'destination-out';
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
             for (let i = 0; i < 20; i++) {
-                const opacity = 0.08 * brightness; tCtx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-                const fanRadius = size * (0.7 + i * 0.02), footRadius = size * (0.3 + i * 0.015);
+                const opacity = 0.06 * brightness; tCtx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+                const fanRadius = size * (1.5 + i * 0.02), footRadius = size * (0.8 + i * 0.015);
                 tCtx.beginPath(); tCtx.moveTo(cX, cY); tCtx.arc(cX, cY, fanRadius, angle - 0.35, angle + 0.35); tCtx.closePath(); tCtx.fill();
                 tCtx.beginPath(); tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2); tCtx.fill();
             }
