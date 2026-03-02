@@ -83,7 +83,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "13.1.5"; 
+const GAME_VERSION = "14.0.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -750,6 +750,23 @@ window.addEventListener('touchend', e => {
     tsX = null; tsY = null;
 });
 window.onresize = draw; updateUI(); draw();
+    // --- 📱 ここから追加：iOSのズーム・ピンチ強制無効化 ---
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    // 300ミリ秒以内の連続タップを検知
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault(); // ブラウザのダブルタップズームを阻止
+    }
+    lastTouchEnd = now;
+}, { passive: false });
+
+// 指2本でのピンチズームも無効化
+document.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) {
+        e.preventDefault();
+    }
+}, { passive: false });
 </script>
 </body>
 </html>
