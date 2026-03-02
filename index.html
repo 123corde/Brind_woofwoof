@@ -85,7 +85,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "9.0.0"; 
+const GAME_VERSION = "9.0.1"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -591,9 +591,24 @@ function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; co
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 1) { totalCoins -= 1; hasAutoDevice = true; updateUI(); } }
 
 function playCoinSound(step) {
-    let f = WHITE_KEYS[step % WHITE_KEYS.length];
-    if (hasAmulet) [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25));
-    else playOscillator(f, 'sine', 0.15);
+    const playOriginalSound = () => {
+        let f = WHITE_KEYS[step % WHITE_KEYS.length];
+        if (hasAmulet) {
+            [1, 1.25, 1.5].forEach((r, i) => {
+                setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25);
+            });
+        } else {
+            playOscillator(f, 'sine', 0.15);
+        }
+    };
+
+    if (currentLevel >= 11) {
+        [0, 200, 400].forEach(delay => {
+            setTimeout(playOriginalSound, delay);
+        });
+    } else {
+        playOriginalSound();
+    }
 }
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
 
