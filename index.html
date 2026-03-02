@@ -73,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.35";
+const GAME_VERSION = "6.351";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -490,7 +490,7 @@ function draw() {
             // ==========================================
             // 数値設定（カスタマイズ済み）
             // ==========================================
-            const footRadius = size * 1.2;     // 足元の円の半径
+            const footRadius = size * 0.5;     // 足元の円の半径
             const fanRadius  = size * 1.5;     // 扇形の長さ（以前の1/3程度に短縮）
             const fanWidth   = 0.3;            // 扇形の広さ（0.3に固定）
             // ==========================================
