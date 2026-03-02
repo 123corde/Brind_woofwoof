@@ -86,7 +86,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "7.11"; 
+const GAME_VERSION = "8.00"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -97,6 +97,7 @@ const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_wo
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
+totalCoins = 100000; // デバッグ用：常に10万コイン所持
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 
 // 🎹 音楽関連
@@ -238,7 +239,7 @@ function updateUI() {
             }
         } else {
             // 全曲購入済み
-            let nextName = "BGMなし";
+            let nextName = "🔕 BGMなし";
             if (currentBGM === null) nextName = "❄️ 氷の華";
             else if (currentBGM === 1) nextName = "🏝️ 最果ての島";
             cycleBtn.innerText = `🎹${nextName} (0コイン)`;
