@@ -165,8 +165,8 @@ function upgradeMusic() {
 function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
 
 function generateSimpleMaze() {
-    COLS = Math.min(16, 6 + currentLevel);
-    ROWS = Math.min(24, Math.floor(COLS * 1.2));
+    COLS = Math.min(16, 4 + Math.floor((currentLevel - 1) * 1.34));
+    ROWS = Math.min(19, Math.floor(COLS * 1.2));
     let found = false;
     while (!found) {
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
