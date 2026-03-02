@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち - Ver 8.15</title>
+    <title>イッヌと寝落ち - Ver 8.16</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -611,11 +611,11 @@ function draw() {
             const cX = pX + size / 2, cY = pY + size / 2;
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
             
-            // 明るさ計算: 20s以下で減衰、5s以下で時々点滅
+            // 明るさ計算: 10s以下で減衰、4s以下で時々点滅
             let brightness = 1.0;
-            if (flashlightBattery < 20) {
-                brightness = flashlightBattery / 20;
-                if (flashlightBattery < 5 && Math.random() > 0.8) brightness *= 0.3;
+            if (flashlightBattery < 10) {
+                brightness = flashlightBattery / 10;
+                if (flashlightBattery < 4 && Math.random() > 0.8) brightness *= 0.3;
             }
             
             tCtx.globalCompositeOperation = 'destination-out';
