@@ -86,7 +86,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "8.01"; 
+const GAME_VERSION = "8.02"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -619,51 +619,51 @@ function draw() {
     }
     ctx.restore();
 
-    if (isBlind) {
-        ctx.save();
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
-        const tCtx = tempCanvas.getContext('2d');
+    if (isBlind && gameStarted) { 
+    ctx.save();
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
+    const tCtx = tempCanvas.getContext('2d');
 
-        tCtx.fillStyle = "black";
-        tCtx.fillRect(0, 0, canvas.width, canvas.height);
+    tCtx.fillStyle = "black";
+    tCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (hasFlashlight && flashlightBattery > 0) {
-            const cX = pX + size / 2, cY = pY + size / 2;
-            const angle = Math.atan2(lastDir.dy, lastDir.dx);
-            const brightness = flashlightBattery > 10 ? 1.0 : (flashlightBattery / 10);
-            
-            tCtx.globalCompositeOperation = 'destination-out';
+    if (hasFlashlight && flashlightBattery > 0) {
+        const cX = pX + size / 2, cY = pY + size / 2;
+        const angle = Math.atan2(lastDir.dy, lastDir.dx);
+        const brightness = flashlightBattery > 10 ? 1.0 : (flashlightBattery / 10);
+        
+        tCtx.globalCompositeOperation = 'destination-out';
 
-            const footRadius = size * 0.5;
-            const fanRadius  = size * 1.5;
-            const fanWidth   = 0.3;
+        const footRadius = size * 0.5;
+        const fanRadius  = size * 1.5;
+        const fanWidth   = 0.3;
 
-            const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
-            footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness})`); 
-            footGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            
-            tCtx.fillStyle = footGrad;
-            tCtx.beginPath();
-            tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2);
-            tCtx.fill();
+        const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
+        footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
+        footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness})`); 
+        footGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        
+        tCtx.fillStyle = footGrad;
+        tCtx.beginPath();
+        tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2);
+        tCtx.fill();
 
-            const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
-            fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            
-            tCtx.fillStyle = fanGrad;
-            tCtx.beginPath();
-            tCtx.moveTo(cX, cY);
-            tCtx.arc(cX, cY, fanRadius, angle - fanWidth, angle + fanWidth);
-            tCtx.closePath();
-            tCtx.fill();
-        }
-
-        ctx.drawImage(tempCanvas, 0, 0);
-        ctx.restore();
+        const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
+        fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
+        fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
+        
+        tCtx.fillStyle = fanGrad;
+        tCtx.beginPath();
+        tCtx.moveTo(cX, cY);
+        tCtx.arc(cX, cY, fanRadius, angle - fanWidth, angle + fanWidth);
+        tCtx.closePath();
+        tCtx.fill();
     }
+
+    ctx.drawImage(tempCanvas, 0, 0);
+    ctx.restore();
+}
 }
 
 let tsX = null, tsY = null;
