@@ -19,13 +19,12 @@
             max-width: 80%;
         }
         
-        /* アイテムだけを横に並べるための設定 */
         .item-row {
             display: flex;
             gap: 10px;
             align-items: center;
             margin-bottom: 5px;
-            height: 1.5em; /* アイコンがない時も高さを確保 */
+            height: 1.5em;
         }
         
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
@@ -80,7 +79,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "7.02";
+const GAME_VERSION = "7.04";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -143,6 +142,25 @@ function triggerDebugJump() {
     }
 }
 
+// ゴールまでの最短歩数を計算する専用関数
+function getDistanceToGoal() {
+    let q = [{x: player.x, y: player.y, d: 0}], visited = new Set();
+    visited.add(`${player.x},${player.y}`);
+    const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
+    
+    while(q.length > 0) {
+        let curr = q.shift();
+        if(map[curr.y][curr.x] === 2) return curr.d;
+        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
+            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) {
+                visited.add(key); q.push({x: nx, y: ny, d: curr.d + 1});
+            }
+        }
+    }
+    return 0;
+}
+
 function updateUI() {
     const verDisplay = document.getElementById('ver-text');
     if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}${hasDevGlasses ? " (Debug Mode)" : ""}`;
@@ -170,7 +188,6 @@ function updateUI() {
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     
-    // アイテム表示の更新 (指定の順番)
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     document.getElementById('headphone-display').innerText = hasHeadphone ? "🎧" : "";
     
@@ -183,7 +200,10 @@ function updateUI() {
     
     let statusText = "";
     if (autoLoadState === "LOADING") statusText = "📡";
-    else if (autoLoadState === "MOVING") statusText = `📍(${(calculateInterval()/1000).toFixed(2)}s)`;
+    else if (autoLoadState === "MOVING") {
+        const remainingSec = getDistanceToGoal();
+        statusText = `📍(${remainingSec}s)`;
+    }
     document.getElementById('auto-status').innerText = statusText;
 
     document.getElementById('flashlight-display').innerText = (hasFlashlight && flashlightBattery > 0) ? `🔦${Math.ceil(flashlightBattery)}s` : "";
@@ -250,7 +270,7 @@ function buyFlashlight() {
     updateUI();
 }
 
-function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
+function calculateInterval() { return 1000; }
 
 function generateSimpleMaze() {
     COLS = Math.min(17, 5 + Math.floor((currentLevel - 1) * 1.34));
@@ -421,6 +441,7 @@ function movePlayer(dx, dy, isAuto = false) {
             playCoinSound(coinsCollectedInLevel); map[ny][nx] = 0; totalCoins += (1 * coinMultiplier);
             coinsCollectedInLevel++; updateUI();
         }
+        if (isAuto) updateUI();
     }
     draw();
 }
