@@ -41,7 +41,6 @@
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; flex-shrink: 0; }
         .shop-btn { padding: 10px; margin: 3px; background: #ffc107; color: #000; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; flex-shrink: 0; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; color: #777; }
-        .dev-btn { color: white; background-color: #d9534f; }
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
 
         #level-display { cursor: default; user-select: none; -webkit-user-select: none; }
@@ -60,7 +59,7 @@
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()" style="display: none;">📍 Google Map (1コイン)</button>
         
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運アップお守り (0コイン)</button>
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (1000コイン)</button>
+        <button id="dev-glass-btn" class="shop-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (1000コイン)</button>
         <br>
         <button id="start-btn" onclick="startGame()">START</button>
     </div>
@@ -86,7 +85,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "8.16"; 
+const GAME_VERSION = "8.17"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
