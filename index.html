@@ -46,10 +46,9 @@
         <br>
         <button id="music-upgrade-btn" class="shop-btn" onclick="upgradeMusic()">🎧 ヘッドフォン (0コイン)</button>
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()"></button>
+        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 神社に行く (0コイン)</button>
         <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()" style="display: none;"></button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()" style="display: none;">📍 Google Map (0コイン)</button>
-        
-        <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 神社に行く (0コイン)</button>
         <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
         <br>
         <button id="start-btn" onclick="startGame()">START</button>
@@ -73,7 +72,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "7.01";
+const GAME_VERSION = "8.00";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -99,10 +98,11 @@ let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
 const gameOverMessages = [
-        "一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
-        "ガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
-        "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
-        "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。" 
+    "一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
+    "ガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
+    "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
+    "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。"
+    "画面のどこか「ワンワンワンワン！」すると...?"
 ];
 
 function unlockAudio() {
@@ -139,19 +139,14 @@ function triggerDebugJump() {
 function updateUI() {
     const verDisplay = document.querySelector('#ui div:last-child');
     if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}${hasDevGlasses ? " (Debug Mode)" : ""}`;
-    
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
-    
-    // HARD MODEの判定
     const isHardMode = currentLevel >= 11;
-
     if (isHardMode) {
         levelDisplay.innerText = `Level ${currentLevel} (HARD)`;
         levelDisplay.style.color = "#ff4444";
         startContainer.style.border = "6px solid #ff4444";
         startContainer.style.boxShadow = "0 0 25px #ff0000";
-        // HARD MODEのみ隠しアイテムを表示
         document.getElementById('shotgun-btn').style.display = 'block';
         document.getElementById('auto-device-btn').style.display = 'block';
     } else {
@@ -162,35 +157,33 @@ function updateUI() {
         document.getElementById('shotgun-btn').style.display = 'none';
         document.getElementById('auto-device-btn').style.display = 'none';
     }
-    
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
-    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
-    document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
-    document.getElementById('flashlight-display').innerText = (hasFlashlight && flashlightBattery > 0) ? `🔦${Math.ceil(flashlightBattery)}s` : "";
     document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
-    
-    let statusText = "";
-    if (autoLoadState === "LOADING") statusText = "  📡";
-    else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
-    document.getElementById('auto-status').innerText = statusText;
+    let row1 = "";
+    if (hasShotgun) row1 += (shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : ""); 
+    if (hasFlashlight && flashlightBattery > 0) row1 += ` 🔦${Math.ceil(flashlightBattery)}s`;
+    document.getElementById('ammo-display').innerText = row1;
+    let row2 = "";
+    if (hasAmulet) row2 += "⛩️";
+    if (hasHeadphone) row2 += "🎧";
+    if (currentBGM === 1) row2 += "🎶";
+    else if (currentBGM === 2) row2 += "🎵";
+    if (hasAutoDevice) {
+        if (autoLoadState === "LOADING") row2 += " 📡";
+        else if (autoLoadState === "MOVING") row2 += " 📍";
+        else row2 += " "; 
+    }
+    document.getElementById('amulet-display').innerText = row2;
+    document.getElementById('flashlight-display').innerText = "";
+    document.getElementById('auto-status').innerText = "";
     
     const sBtn = document.getElementById('shotgun-btn');
-    if (!hasShotgun) {
-        sBtn.innerText = "💥 ショットガン (3コイン)";
-        sBtn.disabled = totalCoins < 3;
-    } else {
-        sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (1コイン)`;
-        sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 1);
-    }
+    if (!hasShotgun) { sBtn.innerText = "💥 ショットガン (3コイン)"; sBtn.disabled = totalCoins < 3; }
+    else { sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (1コイン)`; sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 1); }
 
     const fBtn = document.getElementById('flashlight-btn');
-    if (!hasFlashlight) {
-        fBtn.innerText = "🔦 懐中電灯 (3コイン)";
-        fBtn.disabled = totalCoins < 3;
-    } else {
-        fBtn.innerText = `🔦 懐中電灯の電池 [${Math.ceil(flashlightBattery)}/300s] (1コイン)`;
-        fBtn.disabled = (flashlightBattery >= 300 || totalCoins < 1);
-    }
+    if (!hasFlashlight) { fBtn.innerText = "🔦 懐中電灯 (3コイン)"; fBtn.disabled = totalCoins < 3; }
+    else { fBtn.innerText = `🔦 懐中電灯の電池 [${Math.ceil(flashlightBattery)}/300s] (1コイン)`; fBtn.disabled = (flashlightBattery >= 300 || totalCoins < 1); }
 
     document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 0);
     document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 0);
@@ -198,15 +191,10 @@ function updateUI() {
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 
     const mBtn = document.getElementById('music-upgrade-btn');
-    if (!hasHeadphone) {
-        mBtn.innerText = "🎧 ヘッドフォン (0コイン)"; mBtn.disabled = false;
-    } else if (currentBGM === null) {
-        mBtn.innerText = "🎶 氷の華 (0コイン)"; mBtn.disabled = false;
-    } else if (currentBGM === 1) {
-        mBtn.innerText = "🎵 忘れじの光 (0コイン)"; mBtn.disabled = false;
-    } else {
-        mBtn.innerText = "🎧 音楽環境・完備"; mBtn.disabled = true;
-    }
+    if (!hasHeadphone) { mBtn.innerText = "🎧 ヘッドフォン (0コイン)"; mBtn.disabled = false; }
+    else if (currentBGM === null) { mBtn.innerText = "🎶 氷の華 (0コイン)"; mBtn.disabled = false; }
+    else if (currentBGM === 1) { mBtn.innerText = "🎵 忘れじの光 (0コイン)"; mBtn.disabled = false; }
+    else { mBtn.innerText = "🎧 音楽環境・完備"; mBtn.disabled = true; }
 }
 
 function upgradeMusic() {
@@ -433,7 +421,7 @@ function resetGame() {
 
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
 function buyDevGlasses() { if (!hasDevGlasses) { hasDevGlasses = true; updateUI(); } }
-function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; coinMultiplier = 3; updateUI(); } }
+function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; coinMultiplier = 5; updateUI(); } }
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 0) { hasAutoDevice = true; updateUI(); } }
 
 function playCoinSound(step) {
