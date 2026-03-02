@@ -35,15 +35,18 @@
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { color: white; background-color: #d9534f; }
         #auto-status { color: #fff; font-size: 1.1em; height: 1.4em; font-weight: bold; }
+
+        /* タップできることがバレないようにカーソルはデフォルトのまま */
+        #level-display { cursor: default; user-select: none; -webkit-user-select: none; }
     </style>
 </head>
 <body>
 
     <div id="start-container">
-        <div id="level-display" style="font-size: 28px; font-weight: bold;">Level 1</div>
+        <div id="level-display" style="font-size: 28px; font-weight: bold;" onclick="triggerDebugJump()">Level 1</div>
         <br>
         <button id="music-upgrade-btn" class="shop-btn" onclick="upgradeMusic()">🎧 ヘッドフォン (0コイン)</button>
-        <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()">🔦 懐中電灯 (0コイン)</button>
+        <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()"></button>
         <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()"></button>
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 神社に行く (0コイン)</button>
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()">📍 Google Map (0コイン)</button>
@@ -70,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "6.00";
+const GAME_VERSION = "7.00";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -80,11 +83,15 @@ const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_wo
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
-let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false, hasFlashlight = false;
+let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false, currentBGM = null; 
 let hasShotgun = false, shotgunAmmo = 0; 
+let hasFlashlight = false, flashlightBattery = 0;
 let lastDir = { dx: 0, dy: -1 }; 
 let flipX = false; 
+
+// デバッグ用カウンター
+let debugClickCount = 0;
 
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = [], coinsCollectedInLevel = 0;
@@ -123,6 +130,18 @@ function playSound(audio) {
     audio.play().catch(e => {});
 }
 
+// 隠しコマンド関数
+function triggerDebugJump() {
+    if (gameStarted) return;
+    debugClickCount++;
+    if (debugClickCount >= 10) {
+        currentLevel = 11;
+        debugClickCount = 0;
+        alert("⚠️ DEBUG: LEVEL 11 (HARD) にジャンプします");
+        updateUI();
+    }
+}
+
 function updateUI() {
     const verDisplay = document.querySelector('#ui div:last-child');
     if (verDisplay) {
@@ -147,7 +166,7 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
-    document.getElementById('flashlight-display').innerText = hasFlashlight ? "🔦" : "";
+    document.getElementById('flashlight-display').innerText = (hasFlashlight && flashlightBattery > 0) ? `🔦${Math.ceil(flashlightBattery)}s` : "";
     document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
     
     let statusText = "";
@@ -155,7 +174,6 @@ function updateUI() {
     else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
     
-    // ショットガンボタンの更新
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) {
         sBtn.innerText = "💥 ショットガン (3コイン)";
@@ -165,9 +183,17 @@ function updateUI() {
         sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 1);
     }
 
+    const fBtn = document.getElementById('flashlight-btn');
+    if (!hasFlashlight) {
+        fBtn.innerText = "🔦 懐中電灯 (3コイン)";
+        fBtn.disabled = totalCoins < 3;
+    } else {
+        fBtn.innerText = `🔦 懐中電灯の電池 [${Math.ceil(flashlightBattery)}/300s] (1コイン)`;
+        fBtn.disabled = (flashlightBattery >= 300 || totalCoins < 1);
+    }
+
     document.getElementById('amulet-btn').disabled = (hasAmulet || totalCoins < 0);
     document.getElementById('auto-device-btn').disabled = (hasAutoDevice || totalCoins < 0);
-    document.getElementById('flashlight-btn').disabled = (hasFlashlight || totalCoins < 0);
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 
@@ -205,6 +231,22 @@ function buyShotgun() {
         if (totalCoins >= 1 && shotgunAmmo < 2) {
             totalCoins -= 1;
             shotgunAmmo += 1;
+        }
+    }
+    updateUI();
+}
+
+function buyFlashlight() {
+    if (!hasFlashlight) {
+        if (totalCoins >= 3) {
+            totalCoins -= 3;
+            hasFlashlight = true;
+            flashlightBattery = 300;
+        }
+    } else {
+        if (totalCoins >= 1 && flashlightBattery < 300) {
+            totalCoins -= 1;
+            flashlightBattery = Math.min(300, flashlightBattery + 10);
         }
     }
     updateUI();
@@ -351,11 +393,17 @@ function executeAutoStep() {
 function stopAutoProcess() { autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); }
 
 setInterval(() => {
-    if (!gameStarted || !hasAutoDevice) return;
+    if (!gameStarted) return;
+    if (hasFlashlight && flashlightBattery > 0) {
+        flashlightBattery = Math.max(0, flashlightBattery - 0.1);
+        updateUI();
+        draw();
+    }
+    if (!hasAutoDevice) return;
     let idle = Date.now() - lastMoveTime;
     if (autoLoadState === "NONE" && idle > 2500) { autoLoadState = "LOADING"; updateUI(); }
     if (autoLoadState === "LOADING" && idle > 6000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
-}, 200);
+}, 100);
 
 async function playOscillator(f, t, d) {
     if (!audioCtx) return;
@@ -404,6 +452,7 @@ async function startGame() {
     unlockAudio(); 
     document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); 
+    debugClickCount = 0; // 開始時にカウンターリセット
     if (hasHeadphone && currentBGM !== null) {
         const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
         m1.pause(); m2.pause();
@@ -416,7 +465,8 @@ async function startGame() {
 
 function resetGame() { 
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
-    hasDevGlasses = false; hasFlashlight = false; hasShotgun = false; shotgunAmmo = 0; 
+    hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
+    hasShotgun = false; shotgunAmmo = 0; debugClickCount = 0;
     hasHeadphone = false; currentBGM = null;
     document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
     coinMultiplier = 1; flipX = false; gameStarted = false; isBlind = true; 
@@ -427,7 +477,6 @@ function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAuto
 function buyDevGlasses() { if (!hasDevGlasses) { hasDevGlasses = true; updateUI(); } }
 function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; coinMultiplier = 3; updateUI(); } }
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 0) { hasAutoDevice = true; updateUI(); } }
-function buyFlashlight() { if (!hasFlashlight && totalCoins >= 0) { hasFlashlight = true; updateUI(); } }
 
 function playCoinSound(step) {
     let f = WHITE_KEYS[step % WHITE_KEYS.length];
@@ -458,9 +507,11 @@ function draw() {
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); }
     else { ctx.drawImage(playerImg, pX, pY, size, size); }
     ctx.restore();
+
     if (isBlind) {
         ctx.save();
-        if (hasFlashlight) {
+        if (hasFlashlight && flashlightBattery > 0) {
+            let brightness = flashlightBattery > 10 ? 1.0 : (flashlightBattery / 10);
             const cX = pX + size / 2, cY = pY + size / 2;
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
@@ -469,13 +520,16 @@ function draw() {
             tCtx.globalCompositeOperation = 'destination-out';
             const angle = Math.atan2(lastDir.dy, lastDir.dx);
             for (let i = 0; i < 20; i++) {
-                const opacity = 0.08; tCtx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+                const opacity = 0.08 * brightness; 
+                tCtx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
                 const fanRadius = size * (0.7 + i * 0.02), footRadius = size * (0.3 + i * 0.015);
                 tCtx.beginPath(); tCtx.moveTo(cX, cY); tCtx.arc(cX, cY, fanRadius, angle - 0.35, angle + 0.35); tCtx.closePath(); tCtx.fill();
                 tCtx.beginPath(); tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2); tCtx.fill();
             }
             ctx.drawImage(tempCanvas, 0, 0);
-        } else { ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+        } else { 
+            ctx.fillStyle = "black"; ctx.fillRect(0, 0, canvas.width, canvas.height); 
+        }
         ctx.restore();
     }
 }
