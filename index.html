@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち - Ver 8.17</title>
+    <title>イッヌと寝落ち - Ver 8.20</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -60,7 +60,7 @@
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()" style="display: none;">📍 Google Map (1コイン)</button>
         
         <button id="amulet-btn" class="shop-btn" onclick="buyAmulet()">⛩️ 金運アップお守り (0コイン)</button>
-        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (0コイン)</button>
+        <button id="dev-glass-btn" class="shop-btn dev-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (1000コイン)</button>
         <br>
         <button id="start-btn" onclick="startGame()">START</button>
     </div>
@@ -271,6 +271,10 @@ function updateUI() {
     const aBtn = document.getElementById('auto-device-btn');
     aBtn.innerText = "📍 Google Map (1コイン)";
     aBtn.disabled = (hasAutoDevice || totalCoins < 1);
+
+    const devBtn = document.getElementById('dev-glass-btn');
+    devBtn.innerText = "👁️購入👁️しては👁️いけない👁️ (1000コイン)";
+    devBtn.disabled = (hasDevGlasses || totalCoins < 1000);
 
     document.getElementById('amulet-btn').disabled = (hasAmulet);
     document.getElementById('dev-glass-btn').disabled = hasDevGlasses;    
@@ -555,7 +559,13 @@ function resetGame() {
 }
 
 function toggleBlind() { isBlind = !isBlind; lastMoveTime = Date.now(); stopAutoProcess(); updateUI(); draw(); }
-function buyDevGlasses() { if (!hasDevGlasses) { hasDevGlasses = true; updateUI(); } }
+function buyDevGlasses() { 
+    if (!hasDevGlasses && totalCoins >= 1000) { 
+        totalCoins -= 1000;
+        hasDevGlasses = true; 
+        updateUI(); 
+    } 
+}
 function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; coinMultiplier = 3; updateUI(); } }
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 1) { totalCoins -= 1; hasAutoDevice = true; updateUI(); } }
 
