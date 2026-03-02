@@ -38,8 +38,17 @@
             overflow-y: auto;background: rgba(255,255,255,0.35); /* 最初の透過率 */
     transition: background-color 2.0s ease-in-out; /* 2秒かけて変化させる */
 }
+        #start-container > * {
+    opacity: 0;
+    transition: opacity 2.0s ease-in-out; /* 2秒かけて浮き出る */
+    pointer-events: none; /* 消えている間はクリックできないようにする */
+}
 #start-container.opaque {
     background: rgba(255,255,255,1.0) !important;
+}
+        #start-container.opaque > * {
+    opacity: 1;
+    pointer-events: auto; /* 表示されたらクリック可能にする */
 }
         
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; flex-shrink: 0; }
@@ -87,7 +96,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "15.0.0"; 
+const GAME_VERSION = "15.1.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -594,16 +603,17 @@ function movePlayer(dx, dy, isAuto = false) {
             // BGM停止
             document.getElementById('bgm-koori').pause(); 
             document.getElementById('bgm-hikari').pause();
+            
             const container = document.getElementById('start-container');
-            container.classList.remove('opaque');
-            container.style.display = 'flex'; 
-            setTimeout(() => {
-                if (!gameStarted) { 
-                    container.classList.add('opaque');
-                }
-            }, 3000); 
-            updateUI();
-        } 
+container.classList.remove('opaque');
+    container.style.display = 'flex'; 
+    setTimeout(() => {
+        if (!gameStarted) { 
+            container.classList.add('opaque');
+        }
+    }, 3000); 
+    updateUI();
+}
         else if (map[ny][nx] === 3) {
             playCoinSound(coinsCollectedInLevel); 
             map[ny][nx] = 0; 
