@@ -83,7 +83,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "13.0.0"; 
+const GAME_VERSION = "13.1.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -689,15 +689,14 @@ function draw() {
 
             // --- 🔦 懐中電灯のスペック設定 ---
             const isHigh = (flashlightBattery >= FLASHLIGHT_BONUS);
-            // 180s以上のボーナス時は足元半径1.2倍、照射距離2.3倍
-            const footRadius = isHigh ? size * 1.5 : size * 0.6;
+            const footRadius = isHigh ? size * 1.5 : size * 1.2;
             const fanRadius  = isHigh ? size * 4.5 : size * 2.0; 
-            const fanWidth   = isHigh ? 0.4 : 0.3; // 照射角も少し広がる
+            const fanWidth   = isHigh ? 0.5 : 0.3; // 照射角も少し広がる
 
             // 1. 足元の光（ぼかしの効いた円形）
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
             footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            footGrad.addColorStop(0.6, `rgba(0,0,0,${brightness * 0.5})`);
+            footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness * 0.5})`);
             footGrad.addColorStop(1, 'rgba(0,0,0,0)');
             
             tCtx.fillStyle = footGrad;
