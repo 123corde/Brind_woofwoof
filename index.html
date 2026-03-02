@@ -696,7 +696,7 @@ function draw() {
             // 1. 足元の光（ぼかしの効いた円形）
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
             footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
-            footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness})`);
+            footGrad.addColorStop(0.7, `rgba(0,0,0,${brightness})`);
             footGrad.addColorStop(1, 'rgba(0,0,0,0)');
             
             tCtx.fillStyle = footGrad;
