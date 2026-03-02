@@ -73,7 +73,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "7.00";
+const GAME_VERSION = "7.01";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -450,43 +450,57 @@ function draw() {
     
     // --- 描画レイヤー1: 迷路・アイテム・犬・プレイヤー ---
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // --- draw関数内のループ部分を以下に差し替え ---
-for(let y=0; y<ROWS; y++) {
-    for(let x=0; x<COLS; x++) {
-        let px = oX + x * size;
-        let py = oY + y * size;
-        if (map[y][x] === 1) { 
-            if (wallImg.complete && wallImg.naturalWidth !== 0) {
-                ctx.drawImage(wallImg, px, py, size, size);
-            } else {
-                ctx.fillStyle = "#333"; 
-                ctx.fillRect(px, py, size, size);
+
+    for(let y=0; y<ROWS; y++) {
+        for(let x=0; x<COLS; x++) {
+            let px = oX + x * size;
+            let py = oY + y * size;
+
+            if (map[y][x] === 1) { 
+                // 壁の描画 (blue_wall.png)
+                if (wallImg.complete && wallImg.naturalWidth !== 0) {
+                    // シームレスな隙間を埋めるため +0.5px 補正
+                    ctx.drawImage(wallImg, px, py, size + 0.5, size + 0.5);
+                } else {
+                    ctx.fillStyle = "#333"; 
+                    ctx.fillRect(px, py, size, size);
+                }
+            } else if (map[y][x] === 2) {
+                // ゴール
+                let cs=3, rs=4, cw=size/cs, ch=size/rs;
+                for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { 
+                    ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; 
+                    ctx.fillRect(px+c*cw, py+r*ch, cw, ch); 
+                }
+            } else if (map[y][x] === 3) {
+                // コイン
+                ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
             }
-        } else if (map[y][x] === 2) {
-            let cs=3, rs=4, cw=size/cs, ch=size/rs;
-            for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
-        } else if (map[y][x] === 3) {
-            ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
         }
     }
+
+    // 犬の描画
     dogs.forEach(d => { ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size); });
     
+    // プレイヤーの描画
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
-    if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); }
-    else { ctx.drawImage(playerImg, pX, pY, size, size); }
+    if (flipX) { 
+        ctx.translate(pX + size, pY); ctx.scale(-1, 1); 
+        ctx.drawImage(playerImg, 0, 0, size, size); 
+    } else { 
+        ctx.drawImage(playerImg, pX, pY, size, size); 
+    }
     ctx.restore();
 
     // --- 描画レイヤー2: 暗闇とライト (BLIND MODE用) ---
-    // メガネ(DevGlasses)を持っていても isBlind が true なら暗闇を描画するように修正
     if (isBlind) {
         ctx.save();
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
         const tCtx = tempCanvas.getContext('2d');
 
-        // 背景を真っ暗に塗る
         tCtx.fillStyle = "black";
         tCtx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -497,17 +511,12 @@ for(let y=0; y<ROWS; y++) {
             
             tCtx.globalCompositeOperation = 'destination-out';
 
-            // ==========================================
-            // 数値設定（カスタマイズ済み）
-            // ==========================================
-            const footRadius = size * 0.5;     // 足元の円の半径
-            const fanRadius  = size * 1.5;     // 扇形の長さ（以前の1/3程度に短縮）
-            const fanWidth   = 0.3;            // 扇形の広さ（0.3に固定）
-            // ==========================================
+            const footRadius = size * 0.5;
+            const fanRadius  = size * 1.5;
+            const fanWidth   = 0.3;
 
-            // 1. 足元の視界 (指定のグラデーション設定)
+            // 足元
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
-            // 0〜0.8まではしっかり見える（透明）、0.8〜1.0で黒くフェード
             footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
             footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness})`); 
             footGrad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -517,7 +526,7 @@ for(let y=0; y<ROWS; y++) {
             tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2);
             tCtx.fill();
 
-            // 2. 前方の視界 (扇形)
+            // 扇形
             const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
             fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
             fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
