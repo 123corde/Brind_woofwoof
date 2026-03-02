@@ -34,6 +34,7 @@
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { color: white; background-color: #d9534f; }
         #auto-status { color: #fff; font-size: 1.1em; height: 1.4em; font-weight: bold; }
+        #hard-mode-text { color: #ff4444; font-weight: bold; margin-top: 5px; display: none; }
     </style>
 </head>
 <body>
@@ -69,7 +70,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "3.10";
+const GAME_VERSION = "4.00";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -131,12 +132,20 @@ function updateUI() {
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     document.getElementById('flashlight-display').innerText = hasFlashlight ? "🔦" : "";
     document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
-
+    
+    let hardModeElem = document.getElementById('hard-mode-text');
+    if (!hardModeElem) {
+        hardModeElem = document.createElement('div');
+        hardModeElem.id = 'hard-mode-text';
+        hardModeElem.innerText = 'HARD MODE';
+        document.getElementById('ui').appendChild(hardModeElem);
+    }
+    hardModeElem.style.display = currentLevel >= 10 ? 'block' : 'none';
+    
     let statusText = "";
     if (autoLoadState === "LOADING") statusText = "  📡";
     else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
-
     document.getElementById('amulet-btn').disabled = hasAmulet;
     document.getElementById('shotgun-btn').disabled = shotgunAmmo > 0;
     document.getElementById('auto-device-btn').disabled = hasAutoDevice;
