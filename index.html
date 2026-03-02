@@ -103,9 +103,14 @@ function unlockAudio() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const silentPlay = (audio) => { 
+        audio.muted = true;
         audio.play().then(() => { 
-            setTimeout(() => { audio.pause(); audio.currentTime = 0; }, 1); 
-        }).catch(e => {}); 
+            audio.pause(); 
+            audio.currentTime = 0; 
+            audio.muted = false;
+        }).catch(e => {
+            console.log("Audio unlock failed:", e);
+        }); 
     };
     [growlSnd, biteSnd, dogCrySnd].forEach(silentPlay);
     soundReady = true;
