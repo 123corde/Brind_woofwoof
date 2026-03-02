@@ -16,12 +16,16 @@
             color: #fff; 
             padding: 10px; border-radius: 6px;
             font-size: min(14px, 3.5vw);
-            max-width: 90%; /* 横長になるため幅を広げました */
-            /* 以下を追加 */
+            max-width: 80%;
+        }
+        
+        /* アイテムだけを横に並べるための設定 */
+        .item-row {
             display: flex;
+            gap: 10px;
             align-items: center;
-            gap: 8px; 
-            flex-wrap: wrap;
+            margin-bottom: 5px;
+            height: 1.5em; /* アイコンがない時も高さを確保 */
         }
         
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
@@ -39,7 +43,7 @@
         .shop-btn { padding: 10px; margin: 5px; background: #ffc107; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; }
         .dev-btn { color: white; background-color: #d9534f; }
-        #auto-status { color: #fff; font-size: 1.1em; height: 1.4em; font-weight: bold; }
+        #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
 
         #level-display { cursor: default; user-select: none; -webkit-user-select: none; }
     </style>
@@ -61,13 +65,11 @@
     </div>
 
     <div id="ui">
-        <div id="auto-status"></div>
-        <div id="ammo-display"></div>
-        <div id="amulet-display"></div>
-        <div id="flashlight-display"></div>
+        <div class="item-row">
+            <div id="amulet-display"></div>     <div id="headphone-display"></div>  <div id="music-note-display"></div> <div id="ammo-display"></div>       <div id="auto-status"></div>        <div id="flashlight-display"></div> </div>
         <div id="mode-text">BLIND MODE</div>
-        <div id="total-coins" style="color: #ffd700; border-left: 1px solid #666; padding-left: 8px;">所持コイン: 0</div>
-        <div id="version-display" style="font-size: 0.8em; color: #aaa; margin-left: 5px;"></div>
+        <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
+        <div id="ver-text" style="font-size: 0.85em; margin-top: 5px; color: #aaa;"></div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
@@ -78,7 +80,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "7.01";
+const GAME_VERSION = "7.02";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -142,13 +144,12 @@ function triggerDebugJump() {
 }
 
 function updateUI() {
-    const verDisplay = document.getElementById('version-display');
-    if (verDisplay) verDisplay.innerText = `v${GAME_VERSION}${hasDevGlasses ? " (DB)" : ""}`;
+    const verDisplay = document.getElementById('ver-text');
+    if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}${hasDevGlasses ? " (Debug Mode)" : ""}`;
     
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
     
-    // HARD MODEの判定
     const isHardMode = currentLevel >= 11;
 
     if (isHardMode) {
@@ -156,7 +157,6 @@ function updateUI() {
         levelDisplay.style.color = "#ff4444";
         startContainer.style.border = "6px solid #ff4444";
         startContainer.style.boxShadow = "0 0 25px #ff0000";
-        // HARD MODEのみ隠しアイテムを表示
         document.getElementById('shotgun-btn').style.display = 'block';
         document.getElementById('auto-device-btn').style.display = 'block';
     } else {
@@ -169,15 +169,26 @@ function updateUI() {
     }
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
-    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
+    
+    // アイテム表示の更新 (指定の順番)
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
-    document.getElementById('flashlight-display').innerText = (hasFlashlight && flashlightBattery > 0) ? `🔦${Math.ceil(flashlightBattery)}s` : "";
-    document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
+    document.getElementById('headphone-display').innerText = hasHeadphone ? "🎧" : "";
+    
+    let noteIcon = "";
+    if (currentBGM === 1) noteIcon = "🎶";
+    else if (currentBGM === 2) noteIcon = "🎵";
+    document.getElementById('music-note-display').innerText = noteIcon;
+
+    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
     
     let statusText = "";
-    if (autoLoadState === "LOADING") statusText = "  📡";
-    else if (autoLoadState === "MOVING") statusText = `  📍(${(calculateInterval()/1000).toFixed(2)}s)`;
+    if (autoLoadState === "LOADING") statusText = "📡";
+    else if (autoLoadState === "MOVING") statusText = `📍(${(calculateInterval()/1000).toFixed(2)}s)`;
     document.getElementById('auto-status').innerText = statusText;
+
+    document.getElementById('flashlight-display').innerText = (hasFlashlight && flashlightBattery > 0) ? `🔦${Math.ceil(flashlightBattery)}s` : "";
+
+    document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
     
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) {
@@ -453,7 +464,6 @@ function draw() {
     canvas.width = window.innerWidth; canvas.height = window.innerHeight;
     const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
     
-    // --- 描画レイヤー1: 迷路・アイテム・犬・プレイヤー ---
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for(let y=0; y<ROWS; y++) {
@@ -462,33 +472,27 @@ function draw() {
             let py = oY + y * size;
 
             if (map[y][x] === 1) { 
-                // 壁の描画 (blue_wall.png)
                 if (wallImg.complete && wallImg.naturalWidth !== 0) {
-                    // シームレスな隙間を埋めるため +0.5px 補正
                     ctx.drawImage(wallImg, px, py, size + 0.5, size + 0.5);
                 } else {
                     ctx.fillStyle = "#333"; 
                     ctx.fillRect(px, py, size, size);
                 }
             } else if (map[y][x] === 2) {
-                // ゴール
                 let cs=3, rs=4, cw=size/cs, ch=size/rs;
                 for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { 
                     ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; 
                     ctx.fillRect(px+c*cw, py+r*ch, cw, ch); 
                 }
             } else if (map[y][x] === 3) {
-                // コイン
                 ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
                 ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
             }
         }
     }
 
-    // 犬の描画
     dogs.forEach(d => { ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size); });
     
-    // プレイヤーの描画
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
     if (flipX) { 
@@ -499,7 +503,6 @@ function draw() {
     }
     ctx.restore();
 
-    // --- 描画レイヤー2: 暗闇とライト (BLIND MODE用) ---
     if (isBlind) {
         ctx.save();
         const tempCanvas = document.createElement('canvas');
@@ -520,7 +523,6 @@ function draw() {
             const fanRadius  = size * 1.5;
             const fanWidth   = 0.3;
 
-            // 足元
             const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius);
             footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
             footGrad.addColorStop(0.8, `rgba(0,0,0,${brightness})`); 
@@ -531,7 +533,6 @@ function draw() {
             tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2);
             tCtx.fill();
 
-            // 扇形
             const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.5, cX, cY, fanRadius);
             fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`);
             fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
