@@ -122,7 +122,7 @@ function updateUI() {
     // アイテムボタン状態
     const sBtn = document.getElementById('shotgun-btn');
     sBtn.disabled = shotgunAmmo >= 2;
-    sBtn.innerText = '💥 ショットガン (0コイン) [${shotgunAmmo}/2]';
+    sBtn.innerText = `💥 ショットガン (0コイン) [${shotgunAmmo}/2]`;
     
     document.getElementById('flashlight-btn').disabled = hasFlashlight;
     document.getElementById('amulet-btn').disabled = hasAmulet;
