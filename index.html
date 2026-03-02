@@ -69,7 +69,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "2.11";
+const GAME_VERSION = "2.2";
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
@@ -165,7 +165,8 @@ function upgradeMusic() {
 function calculateInterval() { return Math.max(100, 3000 * Math.pow(0.975, Math.pow(totalCoins, 1.15))); }
 
 function generateSimpleMaze() {
-    ROWS = COLS = 6 + (currentLevel * 2);
+    COLS = Math.min(16, 6 + currentLevel);
+    ROWS = Math.min(24, Math.floor(COLS * 1.2));
     let found = false;
     while (!found) {
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
