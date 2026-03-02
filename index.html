@@ -61,7 +61,7 @@
 </head>
 <body>
 
-    <div id="start-container">
+    <div id="start-container" class="opaque">
         <div id="level-display" style="font-size: 28px; font-weight: bold;" onclick="triggerDebugJump()">Level 1</div>
         <br><br>
         <button id="hp-buy-btn" class="shop-btn" onclick="buyHeadphone()">🎹 キーボード (5コイン)</button>
@@ -96,7 +96,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "15.1.0"; 
+const GAME_VERSION = "15.1.1"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
