@@ -79,7 +79,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "7.04";
+const GAME_VERSION = "7.05";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -101,14 +101,16 @@ let debugClickCount = 0;
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
+let loadingDots = 0; // ドットアニメーション用の追加変数
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
 const gameOverMessages = [
-        "一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
-        "ガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
-        "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
-        "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。" 
+    "一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
+    "ガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
+    "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
+    "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。",
+    "画面🐾🐾🐾🐾🐾示の部分を🐾🐾🐾🐾🐾🐾すると...？" 
 ];
 
 function unlockAudio() {
@@ -142,7 +144,6 @@ function triggerDebugJump() {
     }
 }
 
-// ゴールまでの最短歩数を計算する専用関数
 function getDistanceToGoal() {
     let q = [{x: player.x, y: player.y, d: 0}], visited = new Set();
     visited.add(`${player.x},${player.y}`);
@@ -198,11 +199,17 @@ function updateUI() {
 
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
     
+    // Google Map ステータス表示の変更部分
     let statusText = "";
-    if (autoLoadState === "LOADING") statusText = "📡";
-    else if (autoLoadState === "MOVING") {
-        const remainingSec = getDistanceToGoal();
-        statusText = `📍(${remainingSec}s)`;
+    if (hasAutoDevice) {
+        if (autoLoadState === "NONE") {
+            statusText = "📍";
+        } else if (autoLoadState === "LOADING") {
+            statusText = "📡" + ".".repeat(loadingDots);
+        } else if (autoLoadState === "MOVING") {
+            const remainingSec = getDistanceToGoal();
+            statusText = `📍[案内中](${remainingSec}s)`;
+        }
     }
     document.getElementById('auto-status').innerText = statusText;
 
@@ -399,9 +406,22 @@ setInterval(() => {
     if (!gameStarted) return;
     if (hasFlashlight && flashlightBattery > 0) { flashlightBattery = Math.max(0, flashlightBattery - 0.1); updateUI(); draw(); }
     if (!hasAutoDevice) return;
+    
     let idle = Date.now() - lastMoveTime;
-    if (autoLoadState === "NONE" && idle > 2500) { autoLoadState = "LOADING"; updateUI(); }
-    if (autoLoadState === "LOADING" && idle > 6000) { autoLoadState = "MOVING"; updateUI(); executeAutoStep(); }
+    
+    // ロジック修正: 3秒放置で📡開始、さらに4秒(計7秒)で案内中
+    if (autoLoadState === "NONE" && idle > 3000) { 
+        autoLoadState = "LOADING"; 
+    }
+    
+    if (autoLoadState === "LOADING") {
+        loadingDots = Math.floor((idle - 3000) / 500) % 4; // 0.5秒ごとにドット更新
+        updateUI();
+        if (idle > 7000) { // 3s + 4s = 7s
+            autoLoadState = "MOVING"; 
+            executeAutoStep();
+        }
+    }
 }, 100);
 
 async function playOscillator(f, t, d) {
