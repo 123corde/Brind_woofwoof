@@ -86,7 +86,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "7.10"; 
+const GAME_VERSION = "7.11"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -201,7 +201,17 @@ function updateUI() {
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
-    document.getElementById('headphone-display').innerText = hasHeadphone ? "🎹" : "";
+    
+    // --- 🎹 アイコンの横に状態を表示する修正 ---
+    const hpDisplay = document.getElementById('headphone-display');
+    if (hasHeadphone) {
+        let bgmStatusIcon = "🔕"; // 消音中
+        if (currentBGM === 1) bgmStatusIcon = "❄️"; // 氷の華
+        else if (currentBGM === 2) bgmStatusIcon = "🏝️"; // 最果ての島
+        hpDisplay.innerText = `🎹${bgmStatusIcon}`;
+    } else {
+        hpDisplay.innerText = "";
+    }
 
     // --- BGM制御ボタンの表示更新 ---
     const hpBuyBtn = document.getElementById('hp-buy-btn');
