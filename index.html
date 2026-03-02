@@ -35,8 +35,12 @@
             background: rgba(255,255,255,0.35); display: flex; flex-direction: column; 
             justify-content: center; align-items: center; z-index: 100; text-align: center;
             padding: 20px; box-sizing: border-box;
-            overflow-y: auto;
-        }
+            overflow-y: auto;background: rgba(255,255,255,0.35); /* 最初の透過率 */
+    transition: background-color 2.0s ease-in-out; /* 2秒かけて変化させる */
+}
+#start-container.opaque {
+    background: rgba(255,255,255,1.0) !important;
+}
         
         #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; flex-shrink: 0; }
         .shop-btn { padding: 10px; margin: 3px; background: #ffd54f; color: #333; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; flex-shrink: 0; }
@@ -83,7 +87,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "14.0.2"; 
+const GAME_VERSION = "15.0.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -531,33 +535,76 @@ async function playOscillator(f, t, d) {
 
 function movePlayer(dx, dy, isAuto = false) {
     if(!gameStarted) return;
-    if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
-    if (dx === -1) flipX = false; if (dx === 1) flipX = true;
+    
+    // オート操作でない場合は、手動操作としてタイマーをリセット
+    if (!isAuto) { 
+        lastMoveTime = Date.now(); 
+        stopAutoProcess(); 
+    }
+    
+    // 向きと画像の反転
+    if (dx === -1) flipX = false; 
+    if (dx === 1) flipX = true;
     lastDir = { dx, dy };
+    
     const nx = player.x + dx, ny = player.y + dy;
+
+    // 壁判定
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) {
-        if(!isAuto) playOscillator(150, 'square', 0.1);
+        if(!isAuto) playOscillator(150, 'square', 0.1); // 壁にぶつかった音
     } else {
-        player.x = nx; player.y = ny;
+        player.x = nx; 
+        player.y = ny;
+
+        // イッヌとの接触判定
         let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
         if (dogIndex !== -1) {
-            if (shotgunAmmo > 0) { shotgunAmmo--; playSound(dogCrySnd); dogs.splice(dogIndex, 1); updateUI(); } 
-            else {
-                gameStarted = false; playSound(biteSnd);
-                document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
+            if (shotgunAmmo > 0) { 
+                shotgunAmmo--; 
+                playSound(dogCrySnd); 
+                dogs.splice(dogIndex, 1); 
+                updateUI(); 
+            } else {
+                gameStarted = false; 
+                playSound(biteSnd);
+                document.getElementById('bgm-koori').pause(); 
+                document.getElementById('bgm-hikari').pause();
                 let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
-                setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100); return;
+                setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100); 
+                return;
             }
         }
+
+        // 周囲に犬がいるかチェック（唸り声）
         if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
+
+        // 🏁 ゴール到達判定
         if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; 
+            playGoalSound(); 
+            currentLevel++; 
+
+            // Google Mapの使用フラグ管理
             if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
             isAutoDeviceUsedInThisLevel = false;
-            gameStarted = false; isBlind = true; stopAutoProcess();
-            document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
-            document.getElementById('start-container').style.display = 'flex'; updateUI();
-        } else if (map[ny][nx] === 3) {
+
+            gameStarted = false; 
+            isBlind = true; 
+            stopAutoProcess();
+
+            // BGM停止
+            document.getElementById('bgm-koori').pause(); 
+            document.getElementById('bgm-hikari').pause();
+            const container = document.getElementById('start-container');
+            container.classList.remove('opaque');
+            container.style.display = 'flex'; 
+            setTimeout(() => {
+                if (!gameStarted) { 
+                    container.classList.add('opaque');
+                }
+            }, 3000); 
+            updateUI();
+        } 
+        else if (map[ny][nx] === 3) {
             playCoinSound(coinsCollectedInLevel); 
             map[ny][nx] = 0; 
             let baseCoinValue = (currentLevel >= 11) ? 10 : 1;
@@ -569,7 +616,7 @@ function movePlayer(dx, dy, isAuto = false) {
     }
     draw();
 }
-
+    
 async function startGame() { 
     unlockAudio(); document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
