@@ -157,7 +157,7 @@ function playSound(audio) {
 function triggerDebugJump() {
     if (gameStarted) return;
     debugClickCount++;
-    if (debugClickCount >= 15) {
+    if (debugClickCount >= 10) {
         currentLevel = 11;
         debugClickCount = 0;
         alert("⚠️ Unlock/Access Hard Mode instantly.");
