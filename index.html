@@ -85,7 +85,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "9.0.2"; 
+const GAME_VERSION = "9.0.3"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -591,27 +591,23 @@ function buyAmulet() { if (!hasAmulet && totalCoins >= 0) { hasAmulet = true; co
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 1) { totalCoins -= 1; hasAutoDevice = true; updateUI(); } }
 
 function playCoinSound(step) {
-    // 音を1回鳴らすための共通処理を定義
     const triggerTone = () => {
         let f = WHITE_KEYS[step % WHITE_KEYS.length];
         if (hasAmulet) {
-            // お守りがある場合は和音
             [1, 1.25, 1.5].forEach((r, i) => {
                 setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25);
             });
         } else {
-            // 通常の音
             playOscillator(f, 'sine', 0.15);
         }
     };
-
     if (currentLevel >= 11) {
-        // Level 11以降は時間差で3回鳴らす
         setTimeout(triggerTone, 0);
+        setTimeout(triggerTone, 100);
         setTimeout(triggerTone, 200);
+        setTimeout(triggerTone, 300);
         setTimeout(triggerTone, 400);
     } else {
-        // Level 10までは1回だけ
         triggerTone();
     }
 }
