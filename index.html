@@ -216,22 +216,22 @@ function updateUI() {
         cycleBtn.style.display = 'block';
 
         if (!purchasedBGM[1]) {
-            cycleBtn.innerText = `🎹 氷の華を購入 (1コイン)`;
+            cycleBtn.innerText = `🎹❄️ 氷の華 (1コイン)`;
             cycleBtn.disabled = totalCoins < 1;
         } else if (!purchasedBGM[2]) {
             if (currentBGM === 1) {
-                cycleBtn.innerText = `🎹 忘れじの光を購入 (3コイン)`;
+                cycleBtn.innerText = `🎹🏝️ 最果ての島 (3コイン)`;
                 cycleBtn.disabled = totalCoins < 3;
             } else {
-                cycleBtn.innerText = `🎵 氷の華に変更 (0コイン)`;
+                cycleBtn.innerText = `🎹❄️ 氷の華 (0コイン)`;
                 cycleBtn.disabled = false;
             }
         } else {
             // 全曲購入済み
             let nextName = "BGMなし";
-            if (currentBGM === null) nextName = "氷の華";
-            else if (currentBGM === 1) nextName = "忘れじの光";
-            cycleBtn.innerText = `🎵 ${nextName}に変更 (0コイン)`;
+            if (currentBGM === null) nextName = "❄️ 氷の華";
+            else if (currentBGM === 1) nextName = "🏝️ 最果ての島";
+            cycleBtn.innerText = `🎹${nextName} (0コイン)`;
             cycleBtn.disabled = false;
         }
     }
