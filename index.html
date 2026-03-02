@@ -96,7 +96,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "16.0.1"; 
+const GAME_VERSION = "16.0.2"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -111,7 +111,7 @@ let isBlind = true, gameStarted = false;
 
 
 //💰💰💰💰所持金デバッグ変更用    
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 
 // 🎹 音楽関連
@@ -639,7 +639,7 @@ container.classList.remove('opaque');
         if (!gameStarted) { 
             container.classList.add('opaque');
         }
-    }, 3000); 
+    }, 1750); 
     updateUI();
 }
         else if (map[ny][nx] === 3) {
