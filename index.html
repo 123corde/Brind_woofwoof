@@ -53,9 +53,9 @@
         <div id="level-display" style="font-size: 28px; font-weight: bold;" onclick="triggerDebugJump()">Level 1</div>
         <br>
         <button id="hp-buy-btn" class="shop-btn" onclick="buyHeadphone()">🎧 ヘッドフォン (1コイン)</button>
-        <button id="bgm-none-btn" class="shop-btn" style="display:none;" onclick="changeBGM(null)">🎧 BGMなしに変更 (0コイン)</button>
-        <button id="bgm1-btn" class="shop-btn" style="display:none;" onclick="buyOrSelectBGM(1)">🎵 氷の華 (1コイン)</button>
-        <button id="bgm2-btn" class="shop-btn" style="display:none;" onclick="buyOrSelectBGM(2)">🎵 忘れじの光 (3コイン)</button>
+        <button id="bgm-none-btn" class="shop-btn" style="display:none;" onclick="changeBGM(null)">🎵 BGMなしに変更 (0コイン)</button>
+        <button id="bgm1-btn" class="shop-btn" style="display:none;" onclick="buyOrSelectBGM(1)">🎵 氷の華に変更 (1コイン)</button>
+        <button id="bgm2-btn" class="shop-btn" style="display:none;" onclick="buyOrSelectBGM(2)">🎵 忘れじの光に変更 (3コイン)</button>
         
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()"></button>
         <button id="shotgun-btn" class="shop-btn" onclick="buyShotgun()" style="display: none;"></button>
@@ -230,7 +230,7 @@ function updateUI() {
 
         // 氷の華 (BGM1)
         if (!purchasedBGM[1]) {
-            bgm1Btn.innerText = "🎵 氷の華 (1コイン)";
+            bgm1Btn.innerText = "🎵 氷の華にを購入 (1コイン)";
             bgm1Btn.disabled = totalCoins < 1;
         } else {
             bgm1Btn.innerText = "🎵 氷の華に変更 (0コイン)";
@@ -239,7 +239,7 @@ function updateUI() {
 
         // 忘れじの光 (BGM2)
         if (!purchasedBGM[2]) {
-            bgm2Btn.innerText = "🎵 忘れじの光 (3コイン)";
+            bgm2Btn.innerText = "🎵 忘れじの光を購入 (3コイン)";
             bgm2Btn.disabled = totalCoins < 3;
         } else {
             bgm2Btn.innerText = "🎵 忘れじの光に変更 (0コイン)";
