@@ -90,13 +90,16 @@
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
     
+    <!-- 🎵 BGMファイル群 -->
     <audio id="bgm-koori" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/koorinohana.mp3" loop></audio>
     <audio id="bgm-hikari" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/wasurezinohikari.mp3" loop></audio>
+    <audio id="bgm-suzumusi" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Suzumusi.mp3" loop></audio>
+    <audio id="bgm-brown" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Brown_Noise.mp3" loop></audio>
     
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "18.0.0"; 
+const GAME_VERSION = "16.4.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -107,15 +110,14 @@ const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_wo
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 
-// 🆕 オートスタート制御用
 let autoStartTimeout = null;
 let countdownInterval = null;
 
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
-let currentBGM = null; 
-let purchasedBGM = { 1: false, 2: false };
+let currentBGM = null; // null: OFF, 1: 氷の華, 2: 最果ての島, 3: 鈴虫, 4: ブラウンノイズ
+
 let hasShotgun = false, shotgunAmmo = 0; 
 let hasFlashlight = false, flashlightBattery = 0;
 const FLASHLIGHT_MAX = 200; 
@@ -141,15 +143,14 @@ const gameOverMessages = [
     "懐中電🐾🐾🐾🐾離が短い？ケチらずフ🐾🐾🐾しよう"
 ];
 
+// --- ユーティリティ ---
 function unlockAudio() {
     if (soundReady) return;
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
     const silentPlay = (audio) => { 
         audio.muted = true;
-        audio.play().then(() => { 
-            audio.pause(); audio.currentTime = 0; audio.muted = false;
-        }).catch(e => { console.log("Audio unlock failed:", e); }); 
+        audio.play().then(() => { audio.pause(); audio.currentTime = 0; audio.muted = false; }).catch(e => {}); 
     };
     [growlSnd, biteSnd, dogCrySnd].forEach(silentPlay);
     soundReady = true;
@@ -161,45 +162,28 @@ function playSound(audio) {
     audio.play().catch(e => {});
 }
 
-function triggerDebugJump() {
-    if (gameStarted) return;
-    debugClickCount++;
-    if (debugClickCount >= 10) {
-        currentLevel = 11;
-        debugClickCount = 0;
-        updateUI();
-        resetAutoStartTimer(); // レベル変更時もリセット
-    }
+function stopAllBGM() {
+    ['bgm-koori', 'bgm-hikari', 'bgm-suzumusi', 'bgm-brown'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.pause();
+    });
 }
 
-// 🆕 オートスタートカウントダウン開始
 function startAutoStartCountdown() {
     if (currentLevel < 2 || gameStarted) return;
-
     let remaining = 12;
     const startBtn = document.getElementById('start-btn');
-
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-
     startBtn.innerText = `START (${remaining}s)`;
-
     countdownInterval = setInterval(() => {
         remaining--;
-        if (remaining <= 0) {
-            clearInterval(countdownInterval);
-            startBtn.innerText = "START";
-        } else {
-            startBtn.innerText = `START (${remaining}s)`;
-        }
+        if (remaining <= 0) { clearInterval(countdownInterval); startBtn.innerText = "START"; } 
+        else { startBtn.innerText = `START (${remaining}s)`; }
     }, 1000);
-
-    autoStartTimeout = setTimeout(() => {
-        if (!gameStarted) startGame();
-    }, 12000);
+    autoStartTimeout = setTimeout(() => { if (!gameStarted) startGame(); }, 12000);
 }
 
-// 🆕 何かアクションがあったらタイマーを12秒に戻す
 function resetAutoStartTimer() {
     if (gameStarted || currentLevel < 2) return;
     startAutoStartCountdown();
@@ -232,34 +216,25 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     
+    // 🎹 BGM関連UI
     const hpBuyBtn = document.getElementById('hp-buy-btn');
     const cycleBtn = document.getElementById('bgm-cycle-btn');
     const hpDisplay = document.getElementById('headphone-display');
 
     if (hasHeadphone) {
         let bgmStatusIcon = "🔕";
-        if (currentBGM === 1) bgmStatusIcon = "❄️";
-        else if (currentBGM === 2) bgmStatusIcon = "🏝️";
+        let nextSongName = "❄️ 氷の華";
+
+        if (currentBGM === 1) { bgmStatusIcon = "❄️"; nextSongName = "🏝️ 最果ての島"; }
+        else if (currentBGM === 2) { bgmStatusIcon = "🏝️"; nextSongName = "🌙 夜の音"; }
+        else if (currentBGM === 3) { bgmStatusIcon = "🌙"; nextSongName = "🎵 ブラウンノイズ"; }
+        else if (currentBGM === 4) { bgmStatusIcon = "🎵"; nextSongName = "🔕 BGMなし"; }
+        else { bgmStatusIcon = "🔕"; nextSongName = "❄️ 氷の華"; }
+
         hpDisplay.innerText = `🎹${bgmStatusIcon}`;
         hpBuyBtn.style.display = 'none';
         cycleBtn.style.display = 'block';
-
-        if (!purchasedBGM[1]) {
-            cycleBtn.innerText = `🎹❄️ 氷の華 (5コイン)`;
-            cycleBtn.disabled = totalCoins < 5;
-        } else if (!purchasedBGM[2]) {
-            if (currentBGM === 1) {
-                cycleBtn.innerText = `🎹🏝️ 最果ての島 (20コイン)`;
-                cycleBtn.disabled = totalCoins < 20;
-            } else {
-                cycleBtn.innerText = `🎹❄️ 氷の華 (0コイン)`;
-                cycleBtn.disabled = false;
-            }
-        } else {
-            let nextName = (currentBGM === null) ? "❄️ 氷の華" : (currentBGM === 1 ? "🏝️ 最果ての島" : "🔕 BGMなし");
-            cycleBtn.innerText = `🎹${nextName} (0コイン)`;
-            cycleBtn.disabled = false;
-        }
+        cycleBtn.innerText = `🎹${nextSongName} に変更 (0コイン)`;
     } else {
         hpDisplay.innerText = "";
         hpBuyBtn.style.display = 'block';
@@ -268,30 +243,18 @@ function updateUI() {
     }
 
     const sBtn = document.getElementById('shotgun-btn');
-    if (!hasShotgun) {
-        sBtn.innerText = "💥 ショットガン (50コイン)";
-        sBtn.disabled = totalCoins < 50;
-    } else {
-        sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`;
-        sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30);
-    }
+    if (!hasShotgun) { sBtn.innerText = "💥 ショットガン (50コイン)"; sBtn.disabled = totalCoins < 50; } 
+    else { sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`; sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30); }
 
     const fBtn = document.getElementById('flashlight-btn');
-    if (!hasFlashlight) {
-        fBtn.innerText = "🔦 懐中電灯 (15コイン)";
-        fBtn.disabled = totalCoins < 15;
-    } else {
-        fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`;
-        fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5);
-    }
+    if (!hasFlashlight) { fBtn.innerText = "🔦 懐中電灯 (15コイン)"; fBtn.disabled = totalCoins < 15; } 
+    else { fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`; fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5); }
 
     const aBtn = document.getElementById('auto-device-btn');
-    aBtn.innerText = "📍 Google Map (200コイン)";
-    aBtn.disabled = (hasAutoDevice || totalCoins < 200);
+    aBtn.innerText = "📍 Google Map (200コイン)"; aBtn.disabled = (hasAutoDevice || totalCoins < 200);
 
     const amuletBtn = document.getElementById('amulet-btn');
-    amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`;
-    amuletBtn.disabled = (hasAmulet || totalCoins < 25);
+    amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
 
     document.getElementById('dev-glass-btn').disabled = (hasDevGlasses || totalCoins < 1000);
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
@@ -301,9 +264,7 @@ function updateUI() {
     if (hasFlashlight && flashlightBattery > 0) {
         fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
         fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
-    } else {
-        fDisplay.innerText = "";
-    }
+    } else { fDisplay.innerText = ""; }
 
     document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
 
@@ -316,20 +277,14 @@ function updateUI() {
     document.getElementById('auto-status').innerText = statusText;
 }
 
-// --- 購入アクション (全てにタイマーリセットを追加) ---
-function buyHeadphone() {
-    if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; currentBGM = null; updateUI(); resetAutoStartTimer(); }
-}
+// --- ショップアクション ---
+function buyHeadphone() { if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; currentBGM = null; updateUI(); resetAutoStartTimer(); } }
 function cycleBGM() {
-    if (!purchasedBGM[1]) {
-        if (totalCoins >= 5) { totalCoins -= 5; purchasedBGM[1] = true; currentBGM = 1; }
-    } else if (!purchasedBGM[2]) {
-        if (currentBGM === 1) {
-            if (totalCoins >= 20) { totalCoins -= 20; purchasedBGM[2] = true; currentBGM = 2; }
-        } else { currentBGM = 1; }
-    } else {
-        if (currentBGM === null) currentBGM = 1; else if (currentBGM === 1) currentBGM = 2; else currentBGM = null;
-    }
+    if (currentBGM === null) currentBGM = 1;
+    else if (currentBGM === 1) currentBGM = 2;
+    else if (currentBGM === 2) currentBGM = 3;
+    else if (currentBGM === 3) currentBGM = 4;
+    else currentBGM = null;
     updateUI(); resetAutoStartTimer();
 }
 function buyShotgun() {
@@ -346,7 +301,13 @@ function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; h
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); resetAutoStartTimer(); } }
 function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); resetAutoStartTimer(); } }
 
-// --- ゲームコアロジック ---
+function triggerDebugJump() {
+    if (gameStarted) return;
+    debugClickCount++;
+    if (debugClickCount >= 10) { currentLevel = 11; debugClickCount = 0; updateUI(); resetAutoStartTimer(); }
+}
+
+// --- ゲームロジック ---
 function generateSimpleMaze() {
     COLS = Math.min(17, 5 + Math.floor((currentLevel - 1) * 1.34));
     ROWS = Math.min(21, Math.floor(COLS * 1.2));
@@ -513,8 +474,7 @@ function movePlayer(dx, dy, isAuto = false) {
         if (dogIndex !== -1) {
             if (shotgunAmmo > 0) { shotgunAmmo--; playSound(dogCrySnd); dogs.splice(dogIndex, 1); updateUI(); } 
             else {
-                gameStarted = false; playSound(biteSnd);
-                document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
+                gameStarted = false; playSound(biteSnd); stopAllBGM();
                 let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
                 setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100); return;
             }
@@ -524,15 +484,11 @@ function movePlayer(dx, dy, isAuto = false) {
             playGoalSound(); currentLevel++; 
             if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
             isAutoDeviceUsedInThisLevel = false;
-            gameStarted = false; isBlind = true; stopAutoProcess();
-            document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
+            gameStarted = false; isBlind = true; stopAutoProcess(); stopAllBGM();
             const container = document.getElementById('start-container');
             container.classList.remove('opaque'); container.style.display = 'flex'; 
             setTimeout(() => {
-                if (!gameStarted) { 
-                    container.classList.add('opaque');
-                    startAutoStartCountdown(); // ゴール後の待機画面でオートスタート開始
-                }
+                if (!gameStarted) { container.classList.add('opaque'); startAutoStartCountdown(); }
             }, 1750); 
             updateUI();
         } else if (map[ny][nx] === 3) {
@@ -546,7 +502,6 @@ function movePlayer(dx, dy, isAuto = false) {
 }
 
 async function startGame() { 
-    // カウントダウン停止
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
     document.getElementById('start-btn').innerText = "START";
@@ -554,10 +509,21 @@ async function startGame() {
     unlockAudio(); document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
     isAutoDeviceUsedInThisLevel = false;
+
     if (hasHeadphone && currentBGM !== null) {
-        const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
-        const active = (currentBGM === 1) ? m1 : m2;
-        active.volume = 0.20; active.currentTime = 0; active.play().catch(e => {});
+        const bgmMap = {
+            1: document.getElementById('bgm-koori'),
+            2: document.getElementById('bgm-hikari'),
+            3: document.getElementById('bgm-suzumusi'),
+            4: document.getElementById('bgm-brown')
+        };
+        const active = bgmMap[currentBGM];
+        if (active) {
+            //4)? ブラウンノイズ : 他BGM
+            active.volume = (currentBGM === 4) ? 0.04 : 0.05;
+            active.currentTime = 0;
+            active.play().catch(e => {});
+        }
     }
     generateSimpleMaze(); updateUI(); draw(); 
 }
@@ -570,7 +536,7 @@ function resetGame() {
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0;
-    hasHeadphone = false; currentBGM = null; purchasedBGM = { 1: false, 2: false };
+    hasHeadphone = false; currentBGM = null;
     coinMultiplier = 1; gameStarted = false; isBlind = true; 
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
@@ -651,7 +617,6 @@ window.addEventListener('touchend', e => {
     tsX = null; tsY = null;
 });
 
-// 🆕 購入画面全体へのタッチ/クリックイベント (タイマーリセット用)
 const startContainer = document.getElementById('start-container');
 startContainer.addEventListener('mousedown', resetAutoStartTimer);
 startContainer.addEventListener('touchstart', resetAutoStartTimer, {passive: true});
