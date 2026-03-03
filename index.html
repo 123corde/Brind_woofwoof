@@ -99,7 +99,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "16.4.0"; 
+const GAME_VERSION = "16.5.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -113,7 +113,7 @@ let isBlind = true, gameStarted = false;
 let autoStartTimeout = null;
 let countdownInterval = null;
 
-let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; // null: OFF, 1: 氷の華, 2: 最果ての島, 3: 鈴虫, 4: ブラウンノイズ
@@ -139,8 +139,9 @@ const gameOverMessages = [
     "ガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
     "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
     "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。",
-    "画面🐾🐾🐾🐾🐾示の部分を🐾🐾🐾🐾🐾🐾すると...？",
-    "懐中電🐾🐾🐾🐾離が短い？ケチらずフ🐾🐾🐾しよう"
+    "画面の🐾🐾🐾の部分を🐾🐾🐾🐾プすると...？",
+    "懐中電灯の光が弱い？ケチらずフル充🐾🐾🐾う。",
+    "🐾ードモードでは、獲得コインが10倍に🐾るよ。"
 ];
 
 // --- ユーティリティ ---
@@ -226,8 +227,8 @@ function updateUI() {
         let nextSongName = "❄️ 氷の華";
 
         if (currentBGM === 1) { bgmStatusIcon = "❄️"; nextSongName = "🏝️ 最果ての島"; }
-        else if (currentBGM === 2) { bgmStatusIcon = "🏝️"; nextSongName = "🌙 夜の音"; }
-        else if (currentBGM === 3) { bgmStatusIcon = "🌙"; nextSongName = "🎵 ブラウンノイズ"; }
+        else if (currentBGM === 2) { bgmStatusIcon = "🏝️"; nextSongName = "🌌 夜の音"; }
+        else if (currentBGM === 3) { bgmStatusIcon = "🌌"; nextSongName = "🎵 ブラウンノイズ"; }
         else if (currentBGM === 4) { bgmStatusIcon = "🎵"; nextSongName = "🔕 BGMなし"; }
         else { bgmStatusIcon = "🔕"; nextSongName = "❄️ 氷の華"; }
 
