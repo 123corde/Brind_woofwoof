@@ -96,7 +96,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "16.2.0"; 
+const GAME_VERSION = "16.2.2"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -111,27 +111,17 @@ let isBlind = true, gameStarted = false;
 
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
-
-// 🎹 音楽関連
-let hasHeadphone = false;
-let currentBGM = null; 
+let hasHeadphone = false, currentBGM = null; 
 let purchasedBGM = { 1: false, 2: false };
-
 let hasShotgun = false, shotgunAmmo = 0; 
-
-// 🔦 懐中電灯関連
 let hasFlashlight = false, flashlightBattery = 0;
 const FLASHLIGHT_MAX = 200; 
 const FLASHLIGHT_BONUS = 180;
 
-let lastDir = { dx: 0, dy: -1 }; 
-let flipX = false; 
-let debugClickCount = 0;
-
+let lastDir = { dx: 0, dy: -1 }, flipX = false, debugClickCount = 0;
 let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = [], coinsCollectedInLevel = 0;
-let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
-let loadingDots = 0;
+let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE", loadingDots = 0;
 let isAutoDeviceUsedInThisLevel = false;
 
 // オートスタートタイマー
@@ -148,10 +138,11 @@ const gameOverMessages = [
     "懐中電🐾🐾🐾🐾離が短い？ケチらずフ🐾🐾🐾しよう"
 ];
 
-// オートスタートタイマーのリセット関数
+// オートスタートタイマーのリセット
 function resetAutoStartTimer() {
     clearTimeout(autoStartTimer);
-    if (gameStarted || currentLevel === 1) return; // Level 1は自動開始しない
+    // Level 1の時は絶対にオートスタートさせない
+    if (gameStarted || currentLevel === 1) return; 
     autoStartTimer = setTimeout(() => {
         if (!gameStarted) startGame();
     }, 5000);
@@ -184,25 +175,8 @@ function triggerDebugJump() {
         currentLevel = 11;
         debugClickCount = 0;
         updateUI();
-        resetAutoStartTimer();
+        resetAutoStartTimer(); // HARDモード(Level11)ならオート開始を有効化
     }
-}
-
-function getDistanceToGoal() {
-    let q = [{x: player.x, y: player.y, d: 0}], visited = new Set();
-    visited.add(`${player.x},${player.y}`);
-    const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
-    while(q.length > 0) {
-        let curr = q.shift();
-        if(map[curr.y][curr.x] === 2) return curr.d;
-        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-            let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
-            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) {
-                visited.add(key); q.push({x: nx, y: ny, d: curr.d + 1});
-            }
-        }
-    }
-    return 0;
 }
 
 function updateUI() {
@@ -262,35 +236,21 @@ function updateUI() {
         cycleBtn.style.display = 'none';
     }
     const sBtn = document.getElementById('shotgun-btn');
-    if (!hasShotgun) {
-        sBtn.innerText = "💥 ショットガン (50コイン)";
-        sBtn.disabled = totalCoins < 50;
-    } else {
-        sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`;
-        sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30);
-    }
+    if (!hasShotgun) { sBtn.innerText = "💥 ショットガン (50コイン)"; sBtn.disabled = totalCoins < 50; } 
+    else { sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`; sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30); }
     const fBtn = document.getElementById('flashlight-btn');
-    if (!hasFlashlight) {
-        fBtn.innerText = "🔦 懐中電灯 (15コイン)";
-        fBtn.disabled = totalCoins < 15;
-    } else {
-        fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`;
-        fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5);
-    }
+    if (!hasFlashlight) { fBtn.innerText = "🔦 懐中電灯 (15コイン)"; fBtn.disabled = totalCoins < 15; } 
+    else { fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`; fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5); }
     const aBtn = document.getElementById('auto-device-btn');
-    aBtn.innerText = "📍 Google Map (200コイン)";
-    aBtn.disabled = (hasAutoDevice || totalCoins < 200);
+    aBtn.innerText = "📍 Google Map (200コイン)"; aBtn.disabled = (hasAutoDevice || totalCoins < 200);
     const amuletBtn = document.getElementById('amulet-btn');
-    amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`;
-    amuletBtn.disabled = (hasAmulet || totalCoins < 25);
+    amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
     document.getElementById('dev-glass-btn').disabled = (hasDevGlasses || totalCoins < 1000);
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
     document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
     let fDisplay = document.getElementById('flashlight-display');
-    if (hasFlashlight && flashlightBattery > 0) {
-        fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
-        fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
-    } else { fDisplay.innerText = ""; }
+    if (hasFlashlight && flashlightBattery > 0) { fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`; fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff"; } 
+    else { fDisplay.innerText = ""; }
     document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
     let statusText = "";
     if (hasAutoDevice) {
@@ -317,149 +277,23 @@ function buyFlashlight() {
 function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; hasAmulet = true; coinMultiplier = 3; updateUI(); resetAutoStartTimer(); } }
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); resetAutoStartTimer(); } }
 
-function generateSimpleMaze() {
-    COLS = Math.min(17, 5 + Math.floor((currentLevel - 1) * 1.34));
-    ROWS = Math.min(21, Math.floor(COLS * 1.2));
-    if (COLS % 2 === 0) COLS++; if (ROWS % 2 === 0) ROWS++;
-    let found = false, attempts = 0;
-    while (!found && attempts < 50) {
-        attempts++;
-        map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-        let sX = 1 + Math.floor(Math.random() * ((COLS - 1) / 2)) * 2;
-        let sY = 1 + Math.floor(Math.random() * ((ROWS - 1) / 2)) * 2;
-        player = { x: sX, y: sY }; map[sY][sX] = 0;
-        let walkTarget = Math.floor(ROWS * COLS * 0.35), walked = 1, rx = sX, ry = sY;
-        for (let i = 0; i < 2000 && walked < walkTarget; i++) {
-            let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random() * 4)];
-            let nx = rx + dx, ny = ry + dy;
-            if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) { if(map[ny][nx] === 1) { map[ny][nx] = 0; walked++; } rx = nx; ry = ny; }
-        }
-        const dig = (x, y) => {
-            let dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random() - 0.5);
-            for(let [dx, dy] of dirs) {
-                let nx = x + dx, ny = y + dy;
-                if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && map[ny][nx] === 1) { map[y + dy/2][x + dx/2] = 0; map[ny][nx] = 0; dig(nx, ny); }
-            }
-        };
-        for(let y = 1; y < ROWS; y += 2) for(let x = 1; x < COLS; x += 2) if(map[y][x] === 0) dig(x, y);
-        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; 
-        dists[sY][sX] = 0; let allWalkable = [];
-        while(q.length > 0) {
-            let curr = q.shift(); allWalkable.push(curr);
-            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                let nx = curr.x + dx, ny = curr.y + dy;
-                if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] !== 1 && dists[ny][nx] === -1) { dists[ny][nx] = curr.d + 1; q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]}); }
-            }
-        }
-        allWalkable.sort((a, b) => dists[b.y][b.x] - dists[a.y][a.x]);
-        let target = allWalkable[0];
-        if(target && dists[target.y][target.x] > 2) {
-            map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
-            shortestPath = target.fullPath; coinsCollectedInLevel = 0;
-            if (currentLevel <= 10) {
-                let stepTable = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 };
-                let stepSize = stepTable[currentLevel] || 5;
-                for (let i = 0; i < shortestPath.length; i += stepSize) { let p = shortestPath[i]; if (!(p.x === goalPos.x && p.y === goalPos.y)) { map[p.y][p.x] = 3; } }
-            } else {
-                let walkableTiles = [];
-                for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === 0 && !(x === player.x && y === player.y) && !(x === goalPos.x && y === goalPos.y)) walkableTiles.push({ x, y });
-                for (let i = walkableTiles.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); [walkableTiles[i], walkableTiles[j]] = [walkableTiles[j], walkableTiles[i]]; }
-                let coinCount = Math.min(currentLevel, walkableTiles.length);
-                for (let i = 0; i < coinCount; i++) { let p = walkableTiles[i]; map[p.y][p.x] = 3; }
-            }
-            dogs = [];
-            let safetyZone = new Set(); safetyZone.add(`${player.x},${player.y}`);
-            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => safetyZone.add(`${player.x + dx},${player.y + dy}`));
-            let pathSet = new Set(), pathSurroundSet = new Set();
-            shortestPath.forEach(p => { pathSet.add(`${p.x},${p.y}`); [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => pathSurroundSet.add(`${p.x + dx},${p.y + dy}`)); });
-            let spawnCandidates = allWalkable.filter(p => { const posKey = `${p.x},${p.y}`; if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false; if (currentLevel <= 10) return !pathSet.has(posKey) && !pathSurroundSet.has(posKey); return !pathSet.has(posKey); });
-            let dogNum = Math.min(15, currentLevel - 1);
-            for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) { let idx = Math.floor(Math.random() * spawnCandidates.length); dogs.push(spawnCandidates[idx]); spawnCandidates.splice(idx, 1); }
-            found = true;
-        }
-    }
-}
-
-function getNextStepToGoal() {
-    let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
-    const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
-    while(q.length > 0) {
-        let curr = q.shift(); if(map[curr.y][curr.x] === 2) return curr.path[0];
-        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) { let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`; if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) { visited.add(key); q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]}); } }
-    }
-    return null;
-}
-
-function executeAutoStep() { if (autoLoadState !== "MOVING" || !gameStarted || !hasAutoDevice) return; isAutoDeviceUsedInThisLevel = true; let step = getNextStepToGoal(); if (step) { movePlayer(step.dx, step.dy, true); autoMoveTimeout = setTimeout(executeAutoStep, 1000); } else { stopAutoProcess(); } }
-function stopAutoProcess() { autoLoadState = "NONE"; if (autoMoveTimeout) { clearTimeout(autoMoveTimeout); autoMoveTimeout = null; } updateUI(); }
-
-setInterval(() => {
-    if (!gameStarted) return;
-    if (hasFlashlight && flashlightBattery > 0) { flashlightBattery = Math.max(0, flashlightBattery - 0.1); if (Math.ceil(flashlightBattery * 10) % 10 === 0) updateUI(); draw(); }
-    if (!hasAutoDevice) return;
-    let idle = Date.now() - lastMoveTime;
-    if (autoLoadState === "NONE" && idle > 3000) autoLoadState = "LOADING"; 
-    if (autoLoadState === "LOADING") { loadingDots = Math.floor((idle - 3000) / 500) % 4; updateUI(); if (idle > 9000) { autoLoadState = "MOVING"; executeAutoStep(); } }
-}, 100);
-
-async function playOscillator(f, t, d) {
-    if (!audioCtx) return;
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
-    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
-}
-
-function movePlayer(dx, dy, isAuto = false) {
-    if(!gameStarted) return;
-    if (!isAuto) { lastMoveTime = Date.now(); stopAutoProcess(); }
-    if (dx === -1) flipX = false; if (dx === 1) flipX = true;
-    lastDir = { dx, dy };
-    const nx = player.x + dx, ny = player.y + dy;
-    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { if(!isAuto) playOscillator(150, 'square', 0.1); } else {
-        player.x = nx; player.y = ny;
-        let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
-        if (dogIndex !== -1) {
-            if (shotgunAmmo > 0) { shotgunAmmo--; playSound(dogCrySnd); dogs.splice(dogIndex, 1); updateUI(); } else {
-                gameStarted = false; playSound(biteSnd);
-                document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
-                let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
-                setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100); return;
-            }
-        }
-        if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
-        if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; 
-            if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
-            isAutoDeviceUsedInThisLevel = false;
-            gameStarted = false; isBlind = true; stopAutoProcess();
-            document.getElementById('bgm-koori').pause(); document.getElementById('bgm-hikari').pause();
-            const container = document.getElementById('start-container');
-            container.classList.remove('opaque'); container.style.display = 'flex'; 
-            setTimeout(() => { if (!gameStarted) { container.classList.add('opaque'); resetAutoStartTimer(); } }, 1750); 
-            updateUI();
-        } else if (map[ny][nx] === 3) {
-            playCoinSound(coinsCollectedInLevel); map[ny][nx] = 0; 
-            let baseCoinValue = (currentLevel >= 11) ? 10 : 1;
-            totalCoins += (baseCoinValue * coinMultiplier); coinsCollectedInLevel++; updateUI();
-        }
-        if (isAuto) updateUI();
-    }
-    draw();
-}
-    
 async function startGame() { 
     clearTimeout(autoStartTimer);
     unlockAudio();
-    playSound(entrySnd); // 指定された足音SE再生
+    playSound(entrySnd); // Level 1でも手動START時に再生される
     document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
     isAutoDeviceUsedInThisLevel = false;
-    if (hasHeadphone && currentBGM !== null) {
-        const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
-        const active = (currentBGM === 1) ? m1 : m2;
-        active.volume = 0.20; active.currentTime = 0; active.play().catch(e => {});
-    }
+    
+    // 足音を聞かせたいのでBGM再生を少し遅らせる演出
+    setTimeout(() => {
+        if (hasHeadphone && currentBGM !== null && gameStarted) {
+            const m1 = document.getElementById('bgm-koori'), m2 = document.getElementById('bgm-hikari');
+            const active = (currentBGM === 1) ? m1 : m2;
+            active.volume = 0.20; active.currentTime = 0; active.play().catch(e => {});
+        }
+    }, 500);
+
     generateSimpleMaze(); updateUI(); draw(); 
 }
 
@@ -470,68 +304,11 @@ function resetGame() {
     hasHeadphone = false; currentBGM = null; purchasedBGM = { 1: false, 2: false };
     coinMultiplier = 1; gameStarted = false; isBlind = true; 
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
-    // リセット時はLevel 1なのでオートスタートは走らない
+    // Level 1なのでオートスタートは走らない
 }
 
-function toggleBlind() { isBlind = !isBlind; draw(); }
-function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); resetAutoStartTimer(); } }
-function playCoinSound(step) {
-    const triggerTone = () => {
-        let f = WHITE_KEYS[step % WHITE_KEYS.length];
-        if (hasAmulet) { [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25)); } else { playOscillator(f, 'sine', 0.15); }
-    };
-    if (currentLevel >= 11) { for (let i = 0; i < 5; i++) setTimeout(triggerTone, i * 100); } else { triggerTone(); }
-}
-async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
-
-function draw() {
-    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-    const size = Math.min(canvas.width/COLS, canvas.height/ROWS), oX = (canvas.width-size*COLS)/2, oY = (canvas.height-size*ROWS)/2;
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    for(let y=0; y<ROWS; y++) {
-        for(let x=0; x<COLS; x++) {
-            let px = oX + x * size, py = oY + y * size;
-            if (map[y][x] === 1) { if (wallImg.complete && wallImg.naturalWidth !== 0) ctx.drawImage(wallImg, px, py, size + 0.5, size + 0.5); else { ctx.fillStyle = "#333"; ctx.fillRect(px, py, size, size); } }
-            else if (map[y][x] === 2) { let cs=3, rs=4, cw=size/cs, ch=size/rs; for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); } }
-            else if (map[y][x] === 3) { ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2); }
-        }
-    }
-    dogs.forEach(d => { ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size); });
-    const pX = oX + player.x * size, pY = oY + player.y * size;
-    ctx.save();
-    if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); } else { ctx.drawImage(playerImg, pX, pY, size, size); }
-    ctx.restore();
-    if (isBlind && gameStarted) { 
-        ctx.save(); const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height; const tCtx = tempCanvas.getContext('2d');
-        tCtx.fillStyle = "black"; tCtx.fillRect(0, 0, canvas.width, canvas.height);
-        if (hasFlashlight && flashlightBattery > 0) {
-            const cX = pX + size / 2, cY = pY + size / 2, angle = Math.atan2(lastDir.dy, lastDir.dx);
-            let brightness = 1.0; if (flashlightBattery < 10) { brightness = flashlightBattery / 10; if (flashlightBattery < 4 && Math.random() > 0.7) brightness *= (Math.random() * 0.4); }
-            tCtx.globalCompositeOperation = 'destination-out';
-            let fanRadius, footRadius, fanWidth;
-            if (flashlightBattery >= FLASHLIGHT_BONUS) { footRadius = size * 1.5; fanRadius = size * 4.5; fanWidth = 0.5; }
-            else if (flashlightBattery >= FLASHLIGHT_BONUS - 10) { let ratio = (flashlightBattery - (FLASHLIGHT_BONUS - 10)) / 10; footRadius = (size * 1.5) * ratio + (size * 0.6) * (1 - ratio); fanRadius = (size * 4.5) * ratio + (size * 1.8) * (1 - ratio); fanWidth = (0.5) * ratio + (0.3) * (1 - ratio); }
-            else { footRadius = size * 0.6; fanRadius = size * 1.8; fanWidth = 0.3; }
-            const footGrad = tCtx.createRadialGradient(cX, cY, 0, cX, cY, footRadius); footGrad.addColorStop(0, `rgba(0,0,0,${brightness})`); footGrad.addColorStop(0.75, `rgba(0,0,0,${brightness})`); footGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            tCtx.fillStyle = footGrad; tCtx.beginPath(); tCtx.arc(cX, cY, footRadius, 0, Math.PI * 2); tCtx.fill();
-            const fanGrad = tCtx.createRadialGradient(cX, cY, size * 0.3, cX, cY, fanRadius); fanGrad.addColorStop(0, `rgba(0,0,0,${brightness})`); fanGrad.addColorStop(0.65, `rgba(0,0,0,${brightness * 0.3})`); fanGrad.addColorStop(1, 'rgba(0,0,0,0)');
-            tCtx.fillStyle = fanGrad; tCtx.beginPath(); tCtx.moveTo(cX, cY); tCtx.arc(cX, cY, fanRadius, angle - fanWidth, angle + fanWidth); tCtx.closePath(); tCtx.fill();
-        }
-        ctx.drawImage(tempCanvas, 0, 0); ctx.restore();
-    }
-}
-
-let tsX = null, tsY = null;
-window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
-window.addEventListener('touchend', e => {
-    if (tsX === null || tsY === null) return;
-    const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
-    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) { if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1); }
-    tsX = null; tsY = null;
-});
-window.onresize = draw; updateUI(); draw();
-// 初期ロード時はLevel 1のため、あえてresetAutoStartTimer()を呼ばない
-</script>
-</body>
-</html>
+// ---------------------------
+// Maze & Move & Audio Utils (以下は大きな変更なし)
+// ---------------------------
+function getDistanceToGoal() { let q = [{x: player.x, y: player.y, d: 0}], visited = new Set(); visited.add(`${player.x},${player.y}`); const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`)); while(q.length > 0) { let curr = q.shift(); if(map[curr.y][curr.x] === 2) return curr.d; for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) { let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`; if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) { visited.add(key); q.push({x: nx, y: ny, d: curr.d + 1}); } } } return 0; }
+function generateSimpleMaze() { COLS = Math.min(17, 5 + Math.floor((currentLevel - 1) * 1.34)); ROWS = Math.min(21, Math.floor(COLS * 1.2)); if (COLS % 2 === 0) COLS++; if (ROWS % 2 === 0) ROWS++; let found = false, attempts = 0; while (!found && attempts < 50) { attempts++; map = Array.from({ length: ROWS }, () => Array(COLS).fill(1)); let sX = 1 + Math.floor(Math.random() * ((COLS - 1) / 2)) * 2; let sY = 1 + Math.floor(Math.random() * ((ROWS - 1) / 2)) * 2; player = { x: sX, y: sY }; map[sY][sX] = 0; let walkTarget = Math.floor(ROWS * COLS * 0.35), walked = 1, rx = sX, ry = sY; for (let i = 0; i < 2000 && walked < walkTarget; i++) { let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random() * 4)]; let nx = rx + dx, ny = ry + dy; if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) { if(map[ny][nx] === 1) { map[ny][nx] = 0; walked++; } rx = nx; ry = ny; } } const dig = (x, y) => { let dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random() - 0.5); for(let [dx, dy] of dirs) { let nx = x + dx, ny = y + dy; if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && map[ny][nx] === 1) { map[y + dy/2][x + dx/2] = 0; map[ny][nx] = 0; dig(nx, ny); } } }; for(let y = 1; y < ROWS; y += 2) for(let x = 1; x < COLS; x += 2) if(map[y][x] === 0) dig(x, y); let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; dists[sY][sX] = 0; let allWalkable = []; while(q.length > 0) { let curr = q.shift(); allWalkable.push(curr); for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) { let nx = curr.x + dx, ny = curr.y + dy; if(ny >= 0 && ny < ROWS && nx >= 0 && nx
