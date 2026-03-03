@@ -35,7 +35,7 @@
             background: rgba(255,255,255,0.35); display: flex; flex-direction: column; 
             justify-content: center; align-items: center; z-index: 100; text-align: center;
             padding: 20px; box-sizing: border-box;
-            overflow-y: auto;background: rgba(255,255,255,0.35);
+            overflow-y: auto; background: rgba(255,255,255,0.35);
             transition: background-color 2.0s ease-in-out;
         }
         #start-container > * {
@@ -96,18 +96,19 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "17.0.0"; 
+const GAME_VERSION = "16.2.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
+
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane.wav');
+const entrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/entry.mp3');
 
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 
-// 所持金関連
 let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 
@@ -149,11 +150,8 @@ const gameOverMessages = [
 
 // オートスタートタイマーのリセット関数
 function resetAutoStartTimer() {
-    if (gameStarted) {
-        clearTimeout(autoStartTimer);
-        return;
-    }
     clearTimeout(autoStartTimer);
+    if (gameStarted || currentLevel === 1) return; // Level 1は自動開始しない
     autoStartTimer = setTimeout(() => {
         if (!gameStarted) startGame();
     }, 5000);
@@ -169,7 +167,7 @@ function unlockAudio() {
             audio.pause(); audio.currentTime = 0; audio.muted = false;
         }).catch(e => { console.log("Audio unlock failed:", e); }); 
     };
-    [growlSnd, biteSnd, dogCrySnd].forEach(silentPlay);
+    [growlSnd, biteSnd, dogCrySnd, entrySnd].forEach(silentPlay);
     soundReady = true;
 }
 
@@ -177,18 +175,6 @@ function playSound(audio) {
     if (!audio) return;
     audio.pause(); audio.currentTime = 0;
     audio.play().catch(e => {});
-}
-
-// 足音SEの再生
-function playFootstepSE() {
-    const steps = 4;
-    for (let i = 0; i < steps; i++) {
-        setTimeout(() => {
-            // ザッという低い音をエミュレート
-            playOscillator(80 - (i * 10), 'triangle', 0.2);
-            playOscillator(60, 'sine', 0.1);
-        }, i * 350);
-    }
 }
 
 function triggerDebugJump() {
@@ -465,7 +451,7 @@ function movePlayer(dx, dy, isAuto = false) {
 async function startGame() { 
     clearTimeout(autoStartTimer);
     unlockAudio();
-    playFootstepSE(); // 足音再生
+    playSound(entrySnd); // 指定された足音SE再生
     document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
     isAutoDeviceUsedInThisLevel = false;
@@ -484,7 +470,7 @@ function resetGame() {
     hasHeadphone = false; currentBGM = null; purchasedBGM = { 1: false, 2: false };
     coinMultiplier = 1; gameStarted = false; isBlind = true; 
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
-    resetAutoStartTimer();
+    // リセット時はLevel 1なのでオートスタートは走らない
 }
 
 function toggleBlind() { isBlind = !isBlind; draw(); }
@@ -545,7 +531,7 @@ window.addEventListener('touchend', e => {
     tsX = null; tsY = null;
 });
 window.onresize = draw; updateUI(); draw();
-resetAutoStartTimer(); // 初期ロード時タイマー開始
+// 初期ロード時はLevel 1のため、あえてresetAutoStartTimer()を呼ばない
 </script>
 </body>
 </html>
