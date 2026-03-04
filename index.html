@@ -40,7 +40,7 @@
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 26px; }
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         
-        /* JSで--toggle-colorを動的に変更 */
+        /* トグルON時の色をJSで制御 (--toggle-color) */
         input:checked + .slider { background-color: var(--toggle-color, #28a745); }
         input:checked + .slider:before { transform: translateX(24px); }
 
@@ -109,7 +109,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "19.1.0"; 
+const GAME_VERSION = "19.2.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -124,7 +124,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-// 💰 デバッグ用所持金
+// 💰 デバッグ中：所持金を維持
 let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
@@ -229,36 +229,35 @@ function updateUI() {
     
     toggleContainer.style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
 
-    let modeColor = "#28a745"; // Default Normal (Green)
-    let modeName = "NORMAL MODE";
+    // モード判定
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
 
-    // シャドウの全削除
+    // シャドウなしにリセット
     startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
 
     if (isExtreme) {
-        modeColor = "#dc3545"; // Red
-        modeName = "EXTREME MODE";
+        // EXTREME: 文字赤(震), ボタン赤, トグル赤, 枠赤二重
+        const modeColor = "#dc3545";
+        startBtn.style.backgroundColor = modeColor;
+        slider.style.setProperty('--toggle-color', modeColor);
         startContainer.style.border = `10px double ${modeColor}`;
-        startBtn.style.backgroundColor = modeColor;
-        slider.style.setProperty('--toggle-color', modeColor);
-        levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><br><span class="extreme-shake" style="font-size: 18px; color:${modeColor};">${modeName}</span>`;
+        levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><br><span class="extreme-shake" style="font-size: 18px; color:${modeColor};">EXTREME MODE</span>`;
     } else if (isHard) {
-        modeColor = "#007bff"; // Blue
-        modeName = "HARD MODE";
-        startContainer.style.border = `6px solid #000`; // 枠線黒1本
+        // HARD: 文字黒, ボタン青, トグル青, 枠黒1本
+        const modeColor = "#007bff";
         startBtn.style.backgroundColor = modeColor;
         slider.style.setProperty('--toggle-color', modeColor);
-        levelDisplay.innerHTML = `<span style="color:${modeColor};">Level ${currentLevel}</span><br><span style="font-size: 18px; color:${modeColor};">${modeName}</span>`;
+        startContainer.style.border = `6px solid #000`;
+        levelDisplay.innerHTML = `<span style="color:#000;">Level ${currentLevel}</span><br><span style="font-size: 18px; color:#000;">HARD MODE</span>`;
     } else {
-        modeColor = "#28a745"; // Green
-        modeName = "NORMAL MODE";
-        startContainer.style.border = "none";
+        // NORMAL: 文字黒, ボタン緑, トグル緑, 枠なし
+        const modeColor = "#28a745";
         startBtn.style.backgroundColor = modeColor;
         slider.style.setProperty('--toggle-color', modeColor);
-        levelDisplay.innerHTML = `<span style="color:${modeColor};">Level ${currentLevel}</span><br><span style="font-size: 18px; color:${modeColor};">${modeName}</span>`;
+        startContainer.style.border = "none";
+        levelDisplay.innerHTML = `<span style="color:#000;">Level ${currentLevel}</span><br><span style="font-size: 18px; color:#000;">NORMAL MODE</span>`;
     }
 
     if (currentLevel >= 11) {
@@ -311,6 +310,8 @@ function updateUI() {
     const amuletBtn = document.getElementById('amulet-btn');
     amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
 
+    document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
+
     let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
     document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${diffTag}`;
 
@@ -344,7 +345,7 @@ function buyFlashlight() {
 }
 function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; hasAmulet = true; coinMultiplier = 3; updateUI(); resetAutoStartTimer(); } }
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); resetAutoStartTimer(); } }
-function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); resetAutoStartTimer(); } }
+function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); } }
 
 function triggerDebugJump() {
     if (gameStarted) return;
@@ -464,7 +465,6 @@ setInterval(() => {
     }
 }, 100);
 
-// playOscillator
 async function playOscillator(f, t, d, vol = 0.06) {
     if (!audioCtx) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -480,6 +480,7 @@ function movePlayer(dx, dy, isAuto = false) {
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
+        // 壁衝突音: 55Hz, Sine, 0.15s, Vol 0.5
         if(!isAuto) playOscillator(55, 'sine', 0.15, 0.5); 
     } 
     else {
@@ -502,6 +503,7 @@ function movePlayer(dx, dy, isAuto = false) {
             isAutoDeviceUsedInThisLevel = false;
             gameStarted = false; 
             
+            // 🆕 Devモード修正: メガネを所持している場合は視界(isBlind)を維持。持っていない時だけ暗くする
             if (!hasDevGlasses) isBlind = true; 
             
             stopAutoProcess(); stopAllBGM();
