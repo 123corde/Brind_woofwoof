@@ -56,7 +56,7 @@
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; color: #777; }
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
 
-        #level-display { cursor: default; user-select: none; -webkit-user-select: none; }
+        #level-display { cursor: default; user-select: none; -webkit-user-select: none; line-height: 1.2; }
     </style>
 </head>
 <body>
@@ -83,7 +83,7 @@
             <div id="auto-status"></div>
             <div id="flashlight-display"></div>
         </div>
-        <div id="mode-text">BLIND MODE</div>
+        <div id="level-text-ui" style="font-size: 1.1em; color: #fff; margin-bottom: 2px;">Level 1</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
         <div id="ver-text" style="font-size: 0.85em; margin-top: 5px; color: #aaa;"></div>
     </div>
@@ -99,7 +99,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "16.6.1"; 
+const GAME_VERSION = "17.0.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -198,8 +198,9 @@ function updateUI() {
     const startContainer = document.getElementById('start-container');
     const isHardMode = currentLevel >= 11;
 
+    // スタート画面のレベル表示（HARDは下の行へ）
     if (isHardMode) {
-        levelDisplay.innerText = `Level ${currentLevel} (HARD)`;
+        levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: #ff4444; margin-top: 4px;">HARD MODE</div>`;
         levelDisplay.style.color = "#ff4444";
         startContainer.style.border = "6px solid #ff4444";
         startContainer.style.boxShadow = "0 0 25px #ff0000";
@@ -217,6 +218,7 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     
+    // 🎹 BGM関連UI
     const hpBuyBtn = document.getElementById('hp-buy-btn');
     const cycleBtn = document.getElementById('bgm-cycle-btn');
     const hpDisplay = document.getElementById('headphone-display');
@@ -264,7 +266,8 @@ function updateUI() {
         fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
     } else { fDisplay.innerText = ""; }
 
-    document.getElementById('mode-text').innerText = isBlind ? "BLIND MODE" : "DEBUG MODE";
+    // 左下のUI：レベルを表示
+    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}${isHardMode ? " (HARD)" : ""}`;
 
     let statusText = "";
     if (hasAutoDevice) {
@@ -459,7 +462,7 @@ function movePlayer(dx, dy, isAuto = false) {
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
-        if(!isAuto) playOscillator(70, 'sine', 0.2); 
+        if(!isAuto) playOscillator(70, 'sine', 0.4); 
     } 
     else {
         player.x = nx; player.y = ny;
