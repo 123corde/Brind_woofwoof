@@ -10,19 +10,12 @@
 
         #ui { 
             position: absolute; bottom: 15px; left: 15px; pointer-events: none; 
-            z-index: 200; 
-            font-weight: bold; 
-            background: rgba(0,0,0,0.6);
-            color: #fff; 
-            padding: 10px; border-radius: 6px;
-            font-size: min(14px, 3.5vw);
-            max-width: 80%;
+            z-index: 200; font-weight: bold; background: rgba(0,0,0,0.6);
+            color: #fff; padding: 10px; border-radius: 6px;
+            font-size: min(14px, 3.5vw); max-width: 80%;
         }
         
-        .item-row {
-            display: flex; gap: 10px; align-items: center;
-            margin-bottom: 5px; height: 1.5em;
-        }
+        .item-row { display: flex; gap: 10px; align-items: center; margin-bottom: 5px; height: 1.5em; }
         
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
@@ -31,32 +24,28 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(255,255,255,0.35); display: flex; flex-direction: column; 
             justify-content: center; align-items: center; z-index: 100; text-align: center;
-            padding: 20px; box-sizing: border-box;
-            overflow-y: auto;
+            padding: 20px; box-sizing: border-box; overflow-y: auto;
             transition: background-color 2.0s ease-in-out; 
         }
-        #start-container > * {
-            opacity: 0; transition: opacity 2.0s ease-in-out; pointer-events: none; 
-        }
+        #start-container > * { opacity: 0; transition: opacity 2.0s ease-in-out; pointer-events: none; }
         #start-container.opaque { background: rgba(255,255,255,1.0) !important; }
         #start-container.opaque > * { opacity: 1; pointer-events: auto; }
         
-        /* スタートボタンエリアのレイアウト */
-        .start-action-row { display: flex; align-items: center; gap: 15px; margin: 10px 0; flex-wrap: wrap; justify-content: center; }
+        .start-action-row { display: flex; align-items: center; gap: 20px; margin: 10px 0; justify-content: center; }
         #start-btn { padding: 15px 40px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; min-width: 240px; }
         
-        .mode-selector {
-            background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px;
-            text-align: left; font-size: 13px; color: #444; font-weight: bold;
-            border: 1px solid #ccc;
-        }
-        .mode-selector input { cursor: pointer; vertical-align: middle; }
-        .mode-selector label { cursor: pointer; vertical-align: middle; margin-left: 3px; }
+        /* 🆕 トグルスイッチのスタイル */
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 26px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #666; }
+        input:checked + .slider:before { transform: translateX(24px); }
+        .switch-label { font-size: 10px; font-weight: bold; color: #666; margin-top: 4px; }
 
         .shop-btn { padding: 10px; margin: 3px; background: #ffd54f; color: #333; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; flex-shrink: 0; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; color: #777; }
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
-
         #level-display { cursor: default; user-select: none; -webkit-user-select: none; line-height: 1.2; }
     </style>
 </head>
@@ -76,15 +65,12 @@
         
         <div class="start-action-row">
             <button id="start-btn" onclick="startGame()">START</button>
-            <div class="mode-selector">
-                <div>
-                    <input type="radio" id="mode-auto" name="startmode" value="auto" checked onchange="toggleStartMode(false)">
-                    <label for="mode-auto">Auto Start</label>
-                </div>
-                <div style="margin-top: 5px;">
-                    <input type="radio" id="mode-manual" name="startmode" value="manual" onchange="toggleStartMode(true)">
-                    <label for="mode-manual">Manual Start</label>
-                </div>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <label class="switch">
+                    <input type="checkbox" id="mode-toggle" onchange="toggleStartMode(this.checked)">
+                    <span class="slider"></span>
+                </label>
+                <span id="mode-label" class="switch-label">AUTO START</span>
             </div>
         </div>
     </div>
@@ -112,7 +98,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "18.1.0"; 
+const GAME_VERSION = "18.2.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -123,12 +109,11 @@ const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_wo
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 
-// オートスタート制御
 let autoStartTimeout = null;
 let countdownInterval = null;
-let isManualMode = false; // ラジオボタンで切り替え。初期値はAuto。
+let isManualMode = false;
 
-let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -185,16 +170,15 @@ function stopAllBGM() {
     });
 }
 
-// 🆕 モード切り替え（ラジオボタン用）
 function toggleStartMode(manual) {
     isManualMode = manual;
+    const label = document.getElementById('mode-label');
+    label.innerText = manual ? "MANUAL START" : "AUTO START";
     if (manual) {
-        // Manualに切り替えたらタイマー停止
         if (autoStartTimeout) clearTimeout(autoStartTimeout);
         if (countdownInterval) clearInterval(countdownInterval);
         document.getElementById('start-btn').innerText = "Manual Start";
     } else {
-        // Autoに切り替えたらタイマー開始（レベル2以降）
         if (currentLevel >= 2) startAutoStartCountdown();
     }
 }
@@ -202,39 +186,20 @@ function toggleStartMode(manual) {
 function startAutoStartCountdown() {
     if (gameStarted) return;
     const startBtn = document.getElementById('start-btn');
-    
-    // 既存タイマークリア
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
 
-    // Manualモードならカウントダウンしない
-    if (isManualMode) {
-        startBtn.innerText = "Manual Start";
-        return;
-    }
-
-    // レベル1はオートなし
-    if (currentLevel < 2) {
-        startBtn.innerText = "START";
-        return;
-    }
+    if (isManualMode) { startBtn.innerText = "Manual Start"; return; }
+    if (currentLevel < 2) { startBtn.innerText = "START"; return; }
 
     let remaining = 12;
     startBtn.innerText = `Auto Start (${remaining}s)`;
-
     countdownInterval = setInterval(() => {
         remaining--;
-        if (remaining <= 0) {
-            clearInterval(countdownInterval);
-            startBtn.innerText = "START";
-        } else {
-            startBtn.innerText = `Auto Start (${remaining}s)`;
-        }
+        if (remaining <= 0) { clearInterval(countdownInterval); startBtn.innerText = "START"; }
+        else { startBtn.innerText = `Auto Start (${remaining}s)`; }
     }, 1000);
-
-    autoStartTimeout = setTimeout(() => {
-        if (!gameStarted && !isManualMode) startGame();
-    }, 12000);
+    autoStartTimeout = setTimeout(() => { if (!gameStarted && !isManualMode) startGame(); }, 12000);
 }
 
 function resetAutoStartTimer() {
@@ -250,25 +215,18 @@ function updateUI() {
     const startContainer = document.getElementById('start-container');
     const startBtn = document.getElementById('start-btn');
     
-    // モード判定と配色
-    let modeColor = "#28a745"; // Normal: Green
-    let modeText = "";
+    let modeColor = "#28a745"; // Normal
+    let modeName = "";
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
 
-    if (isExtreme) {
-        modeColor = "#dc3545"; // Red
-        modeText = "EXTREME MODE";
-    } else if (isHard) {
-        modeColor = "#007bff"; // Blue
-        modeText = "HARD MODE";
-    }
+    if (isExtreme) { modeColor = "#dc3545"; modeName = "EXTREME MODE"; }
+    else if (isHard) { modeColor = "#007bff"; modeName = "HARD MODE"; }
 
     startBtn.style.backgroundColor = modeColor;
     
-    // 購入画面表示
     if (isHard || isExtreme) {
-        levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: ${modeColor}; margin-top: 4px;">${modeText}</div>`;
+        levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: ${modeColor}; margin-top: 4px;">${modeName}</div>`;
         levelDisplay.style.color = modeColor;
         startContainer.style.border = `6px solid ${modeColor}`;
         startContainer.style.boxShadow = `0 0 25px ${modeColor}`;
@@ -283,17 +241,12 @@ function updateUI() {
         document.getElementById('auto-device-btn').style.display = 'none';
     }
 
-    // ボタンテキストの即時反映
-    if (currentLevel === 1) {
-        startBtn.innerText = "START";
-    } else if (isManualMode) {
-        startBtn.innerText = "Manual Start";
-    }
+    if (currentLevel === 1) startBtn.innerText = "START";
+    else if (isManualMode) startBtn.innerText = "Manual Start";
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     
-    // BGM関連
     const hpBuyBtn = document.getElementById('hp-buy-btn');
     const cycleBtn = document.getElementById('bgm-cycle-btn');
     const hpDisplay = document.getElementById('headphone-display');
@@ -341,9 +294,8 @@ function updateUI() {
         fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
     } else { fDisplay.innerText = ""; }
 
-    // 左下レベル表示
-    let difficultyTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
-    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${difficultyTag}`;
+    let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
+    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${diffTag}`;
 
     let statusText = "";
     if (hasAutoDevice) {
@@ -380,22 +332,14 @@ function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoin
 function triggerDebugJump() {
     if (gameStarted) return;
     debugClickCount++;
-    if (debugClickCount === 10) {
-        currentLevel = 11;
-        updateUI();
-        resetAutoStartTimer();
-    } else if (debugClickCount === 20) {
-        currentLevel = 16;
-        updateUI();
-        resetAutoStartTimer();
-    }
+    if (debugClickCount === 10) { currentLevel = 11; updateUI(); resetAutoStartTimer(); } 
+    else if (debugClickCount === 20) { currentLevel = 16; updateUI(); resetAutoStartTimer(); }
 }
 
 function generateSimpleMaze() {
     COLS = Math.min(17, 5 + Math.floor((currentLevel - 1) * 1.34));
     ROWS = Math.min(21, Math.floor(COLS * 1.2));
     if (COLS % 2 === 0) COLS++; if (ROWS % 2 === 0) ROWS++;
-
     let found = false, attempts = 0;
     while (!found && attempts < 50) {
         attempts++;
@@ -403,36 +347,27 @@ function generateSimpleMaze() {
         let sX = 1 + Math.floor(Math.random() * ((COLS - 1) / 2)) * 2;
         let sY = 1 + Math.floor(Math.random() * ((ROWS - 1) / 2)) * 2;
         player = { x: sX, y: sY }; map[sY][sX] = 0;
-
         let walkTarget = Math.floor(ROWS * COLS * 0.35), walked = 1, rx = sX, ry = sY;
         for (let i = 0; i < 2000 && walked < walkTarget; i++) {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random() * 4)];
             let nx = rx + dx, ny = ry + dy;
-            if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) {
-                if(map[ny][nx] === 1) { map[ny][nx] = 0; walked++; }
-                rx = nx; ry = ny;
-            }
+            if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) { if(map[ny][nx] === 1) { map[ny][nx] = 0; walked++; } rx = nx; ry = ny; }
         }
         const dig = (x, y) => {
             let dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random() - 0.5);
             for(let [dx, dy] of dirs) {
                 let nx = x + dx, ny = y + dy;
-                if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && map[ny][nx] === 1) {
-                    map[y + dy/2][x + dx/2] = 0; map[ny][nx] = 0; dig(nx, ny);
-                }
+                if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && map[ny][nx] === 1) { map[y + dy/2][x + dx/2] = 0; map[ny][nx] = 0; dig(nx, ny); }
             }
         };
         for(let y = 1; y < ROWS; y += 2) for(let x = 1; x < COLS; x += 2) if(map[y][x] === 0) dig(x, y);
-
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; 
         dists[sY][sX] = 0; let allWalkable = [];
         while(q.length > 0) {
             let curr = q.shift(); allWalkable.push(curr);
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = curr.x + dx, ny = curr.y + dy;
-                if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] !== 1 && dists[ny][nx] === -1) {
-                    dists[ny][nx] = curr.d + 1; q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]});
-                }
+                if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] !== 1 && dists[ny][nx] === -1) { dists[ny][nx] = curr.d + 1; q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]}); }
             }
         }
         allWalkable.sort((a, b) => dists[b.y][b.x] - dists[a.y][a.x]);
@@ -441,12 +376,8 @@ function generateSimpleMaze() {
             map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
             shortestPath = target.fullPath; coinsCollectedInLevel = 0;
             if (currentLevel <= 10) {
-                let stepTable = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 };
-                let stepSize = stepTable[currentLevel] || 5;
-                for (let i = 0; i < shortestPath.length; i += stepSize) {
-                    let p = shortestPath[i];
-                    if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3;
-                }
+                let stepSize = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 }[currentLevel] || 5;
+                for (let i = 0; i < shortestPath.length; i += stepSize) { let p = shortestPath[i]; if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3; }
             } else {
                 let walkableTiles = [];
                 for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === 0 && !(x === player.x && y === player.y) && !(x === goalPos.x && y === goalPos.y)) walkableTiles.push({ x, y });
@@ -455,39 +386,26 @@ function generateSimpleMaze() {
                 for (let i = 0; i < coinCount; i++) map[walkableTiles[i].y][walkableTiles[i].x] = 3;
             }
             dogs = [];
-            let safetyZone = new Set();
-            safetyZone.add(`${player.x},${player.y}`);
+            let safetyZone = new Set(); safetyZone.add(`${player.x},${player.y}`);
             [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => safetyZone.add(`${player.x + dx},${player.y + dy}`));
             let pathSet = new Set(), pathSurroundSet = new Set();
-            shortestPath.forEach(p => {
-                pathSet.add(`${p.x},${p.y}`);
-                [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => pathSurroundSet.add(`${p.x + dx},${p.y + dy}`));
-            });
-            let spawnCandidates = allWalkable.filter(p => {
-                const posKey = `${p.x},${p.y}`;
-                if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false;
-                return (currentLevel <= 10) ? (!pathSet.has(posKey) && !pathSurroundSet.has(posKey)) : !pathSet.has(posKey);
-            });
+            shortestPath.forEach(p => { pathSet.add(`${p.x},${p.y}`); [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => pathSurroundSet.add(`${p.x + dx},${p.y + dy}`)); });
+            let spawnCandidates = allWalkable.filter(p => { const posKey = `${p.x},${p.y}`; if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false; return (currentLevel <= 10) ? (!pathSet.has(posKey) && !pathSurroundSet.has(posKey)) : !pathSet.has(posKey); });
             let dogNum = Math.min(15, currentLevel - 1);
-            for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) {
-                let idx = Math.floor(Math.random() * spawnCandidates.length);
-                dogs.push(spawnCandidates[idx]); spawnCandidates.splice(idx, 1);
-            }
+            for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) { let idx = Math.floor(Math.random() * spawnCandidates.length); dogs.push(spawnCandidates[idx]); spawnCandidates.splice(idx, 1); }
             found = true;
         }
     }
 }
 
 function getDistanceToGoal() {
-    let q = [{x: player.x, y: player.y, d: 0}], visited = new Set();
-    visited.add(`${player.x},${player.y}`); const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
+    let q = [{x: player.x, y: player.y, d: 0}], visited = new Set(); visited.add(`${player.x},${player.y}`);
+    const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
     while(q.length > 0) {
         let curr = q.shift(); if(map[curr.y][curr.x] === 2) return curr.d;
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
             let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
-            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) {
-                visited.add(key); q.push({x: nx, y: ny, d: curr.d + 1});
-            }
+            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) { visited.add(key); q.push({x: nx, y: ny, d: curr.d + 1}); }
         }
     }
     return 0;
@@ -500,9 +418,7 @@ function getNextStepToGoal() {
         let curr = q.shift(); if(map[curr.y][curr.x] === 2) return curr.path[0];
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
             let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
-            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) {
-                visited.add(key); q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
-            }
+            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) { visited.add(key); q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]}); }
         }
     }
     return null;
@@ -531,11 +447,12 @@ setInterval(() => {
     }
 }, 100);
 
-async function playOscillator(f, t, d) {
+// 🆕 playOscillator に音量引数を追加
+async function playOscillator(f, t, d, vol = 0.06) {
     if (!audioCtx) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type = t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
-    g.gain.setValueAtTime(0.06, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
+    g.gain.setValueAtTime(vol, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.005, audioCtx.currentTime + d);
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
 
@@ -546,7 +463,7 @@ function movePlayer(dx, dy, isAuto = false) {
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
-        if(!isAuto) playOscillator(70, 'sine', 0.4); 
+        if(!isAuto) playOscillator(70, 'sine', 0.4, 0.15); // 🆕 壁音量を強化
     } 
     else {
         player.x = nx; player.y = ny;
@@ -560,24 +477,21 @@ function movePlayer(dx, dy, isAuto = false) {
             }
         }
         if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
-        
         if (map[ny][nx] === 2) {
             playGoalSound();
-            if (currentLevel === 20) {
-                gameStarted = false; stopAllBGM();
-                setTimeout(() => { alert("Congratulations \n全ステージクリア！"); resetGame(); }, 100);
-                return;
-            }
+            if (currentLevel === 20) { gameStarted = false; stopAllBGM(); setTimeout(() => { alert("Congratulations \n全ステージクリア！"); resetGame(); }, 100); return; }
             currentLevel++; 
             if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
             isAutoDeviceUsedInThisLevel = false;
-            gameStarted = false; isBlind = true; stopAutoProcess(); stopAllBGM();
+            gameStarted = false; 
             
+            // 🆕 Devモードなら視界設定を維持
+            if (!hasDevGlasses) isBlind = true; 
+            
+            stopAutoProcess(); stopAllBGM();
             const container = document.getElementById('start-container');
             container.classList.remove('opaque'); container.style.display = 'flex'; 
-            setTimeout(() => {
-                if (!gameStarted) { container.classList.add('opaque'); startAutoStartCountdown(); }
-            }, 1750); 
+            setTimeout(() => { if (!gameStarted) { container.classList.add('opaque'); startAutoStartCountdown(); } }, 1750); 
             updateUI();
         } else if (map[ny][nx] === 3) {
             playCoinSound(coinsCollectedInLevel); map[ny][nx] = 0; 
@@ -592,8 +506,6 @@ function movePlayer(dx, dy, isAuto = false) {
 async function startGame() { 
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-    
-    // STARTした時にボタンテキストをリセット
     document.getElementById('start-btn').innerText = isManualMode ? "Manual Start" : "Auto Start (12s)";
     if (currentLevel === 1) document.getElementById('start-btn').innerText = "START";
 
@@ -611,13 +523,10 @@ async function startGame() {
 function resetGame() { 
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-    
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
-    hasShotgun = false; shotgunAmmo = 0;
-    hasHeadphone = false; currentBGM = null;
-    coinMultiplier = 1; gameStarted = false; isBlind = true; 
-    debugClickCount = 0;
+    hasShotgun = false; shotgunAmmo = 0; hasHeadphone = false; currentBGM = null;
+    coinMultiplier = 1; gameStarted = false; isBlind = true; debugClickCount = 0;
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
 
