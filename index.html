@@ -120,14 +120,14 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-// 💰 totalCoinsは維持
+// 💰 totalCoins維持
 let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
 
 let hasShotgun = false, shotgunAmmo = 0; 
-let shotgunRevealActive = false; // ショットガン発動時のマップ表示用
+let shotgunRevealActive = false; 
 let hasFlashlight = false, flashlightBattery = 0;
 const FLASHLIGHT_MAX = 200; 
 const FLASHLIGHT_BONUS = 180;
@@ -502,10 +502,15 @@ function movePlayer(dx, dy, isAuto = false) {
                 shotgunAmmo--; 
                 playSound(dogCrySnd); 
                 dogs.splice(dogIndex, 1); 
-                // 💥 ショットガン発動: 0.5秒マップを表示
-                shotgunRevealActive = true;
-                draw();
-                setTimeout(() => { shotgunRevealActive = false; draw(); }, 500);
+                // 💥 ショットガン発動: 0.5s待ってから0.25s表示
+                setTimeout(() => {
+                    shotgunRevealActive = true;
+                    draw();
+                    setTimeout(() => {
+                        shotgunRevealActive = false;
+                        draw();
+                    }, 400);
+                }, 500);
                 updateUI(); 
             } 
             else {
@@ -514,7 +519,6 @@ function movePlayer(dx, dy, isAuto = false) {
                 setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100); return;
             }
         }
-        // 📍 Google Map案内中(isAuto)は唸り声を再生しない
         if (!isAuto && dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
         
         if (map[ny][nx] === 2) {
@@ -603,7 +607,6 @@ function draw() {
     else { ctx.drawImage(playerImg, pX, pY, size, size); }
     ctx.restore();
     
-    // ショットガン発動中(shotgunRevealActive)はブラインドを描画しない
     if (isBlind && gameStarted && !shotgunRevealActive) { 
         ctx.save();
         const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
