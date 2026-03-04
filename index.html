@@ -105,7 +105,11 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.7.0"; 
+const GAME_VERSION = "21.9.0"; 
+
+// ★ハンターが最短経路を避ける「プレイヤーからの実歩数」
+const HUNTER_AVOID_DIST = 6; 
+
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/25fcfc444f24c7c3523c3defdb2c3182e2421220/Watchdog.png';
@@ -172,10 +176,19 @@ function unlockAudio() {
     soundReady = true;
 }
 
+// 既存音声を止めて再生（ショットガン用など）
 function playSound(audio) {
     if (!audio) return;
     audio.pause(); audio.currentTime = 0;
     audio.play().catch(e => {});
+}
+
+// 音声を複製して重ねて再生（吠え声用）
+function playOverlap(audio) {
+    if (!audio) return;
+    const clone = audio.cloneNode();
+    clone.volume = audio.volume;
+    clone.play().catch(e => {});
 }
 
 function stopAllBGM() {
@@ -532,7 +545,7 @@ function moveHunters() {
             if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1) {
                 let distToPlayer = walkDistGrid[ny][nx];
                 let isOnPath = pathSet.has(`${nx},${ny}`);
-                if (isOnPath && distToPlayer <= 3 && !(nx === player.x && ny === player.y)) continue; 
+                if (isOnPath && distToPlayer <= HUNTER_AVOID_DIST && !(nx === player.x && ny === player.y)) continue; 
 
                 if (distToPlayer < minWalkDist) { minWalkDist = distToPlayer; bestMove = {x: nx, y: ny}; }
             }
@@ -543,7 +556,7 @@ function moveHunters() {
             if (dog.x === player.x && dog.y === player.y) {
                 if (shotgunAmmo > 0) {
                     shotgunAmmo--;
-                    playSound(hunterDefeatSnd); // ハンター撃退音
+                    playOverlap(hunterDefeatSnd); // ハンター撃退音
                     dogs.splice(i, 1); 
                     triggerShotgunEffect();
                     updateUI();
@@ -590,8 +603,7 @@ function movePlayer(dx, dy, isAuto = false) {
             const collidedDog = dogs[dogIndex];
             if (collidedDog && shotgunAmmo > 0) { 
                 shotgunAmmo--; 
-                // ハンターかウォッチドッグかで音を鳴らし分ける
-                playSound(collidedDog.isHunter ? hunterDefeatSnd : watchdogDefeatSnd);
+                playOverlap(collidedDog.isHunter ? hunterDefeatSnd : watchdogDefeatSnd);
                 dogs.splice(dogIndex, 1); 
                 triggerShotgunEffect(); updateUI(); 
             } else { triggerGameOver(); return; }
@@ -600,11 +612,11 @@ function movePlayer(dx, dy, isAuto = false) {
         // 隣接マスの警告音（woof）
         if (!isAuto) {
             const adjacentDogs = dogs.filter(d => Math.abs(d.x - player.x) + Math.abs(d.y - player.y) === 1);
-            if (adjacentDogs.length > 0) {
-                // ハンターがいればハンターの声を優先、いなければウォッチドッグの声
-                if (adjacentDogs.some(d => d.isHunter)) playSound(hunterWoofSnd);
-                else playSound(watchdogWoofSnd);
-            }
+            // 隣接している全ての犬に対して音を鳴らす（重なり再生）
+            adjacentDogs.forEach(d => {
+                if (d.isHunter) playOverlap(hunterWoofSnd);
+                else playOverlap(watchdogWoofSnd);
+            });
         }
         
         if (map[ny][nx] === 2) {
