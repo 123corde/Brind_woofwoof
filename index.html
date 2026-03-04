@@ -20,11 +20,8 @@
         }
         
         .item-row {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            margin-bottom: 5px;
-            height: 1.5em;
+            display: flex; gap: 10px; align-items: center;
+            margin-bottom: 5px; height: 1.5em;
         }
         
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
@@ -39,21 +36,23 @@
             transition: background-color 2.0s ease-in-out; 
         }
         #start-container > * {
-            opacity: 0;
-            transition: opacity 2.0s ease-in-out; 
-            pointer-events: none; 
+            opacity: 0; transition: opacity 2.0s ease-in-out; pointer-events: none; 
         }
-        #start-container.opaque {
-            background: rgba(255,255,255,1.0) !important;
-        }
-        #start-container.opaque > * {
-            opacity: 1;
-            pointer-events: auto; 
-        }
+        #start-container.opaque { background: rgba(255,255,255,1.0) !important; }
+        #start-container.opaque > * { opacity: 1; pointer-events: auto; }
         
-        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; flex-shrink: 0; min-width: 220px; }
-        #stop-btn { padding: 8px 30px; font-size: 14px; font-weight: bold; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 5px; flex-shrink: 0; display: none; }
+        /* スタートボタンエリアのレイアウト */
+        .start-action-row { display: flex; align-items: center; gap: 15px; margin: 10px 0; flex-wrap: wrap; justify-content: center; }
+        #start-btn { padding: 15px 40px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; min-width: 240px; }
         
+        .mode-selector {
+            background: rgba(0,0,0,0.05); padding: 10px; border-radius: 8px;
+            text-align: left; font-size: 13px; color: #444; font-weight: bold;
+            border: 1px solid #ccc;
+        }
+        .mode-selector input { cursor: pointer; vertical-align: middle; }
+        .mode-selector label { cursor: pointer; vertical-align: middle; margin-left: 3px; }
+
         .shop-btn { padding: 10px; margin: 3px; background: #ffd54f; color: #333; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; flex-shrink: 0; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; color: #777; }
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
@@ -74,8 +73,20 @@
         <button id="auto-device-btn" class="shop-btn" onclick="buyAutoDevice()" style="display: none;">📍 Google Map (200コイン)</button>
         <button id="dev-glass-btn" class="shop-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (1000コイン)</button>
         <br>
-        <button id="start-btn" onclick="startGame()">START</button>
-        <button id="stop-btn" onclick="stopAutoStart()">STOP</button>
+        
+        <div class="start-action-row">
+            <button id="start-btn" onclick="startGame()">START</button>
+            <div class="mode-selector">
+                <div>
+                    <input type="radio" id="mode-auto" name="startmode" value="auto" checked onchange="toggleStartMode(false)">
+                    <label for="mode-auto">Auto Start</label>
+                </div>
+                <div style="margin-top: 5px;">
+                    <input type="radio" id="mode-manual" name="startmode" value="manual" onchange="toggleStartMode(true)">
+                    <label for="mode-manual">Manual Start</label>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="ui">
@@ -101,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "18.0.0"; 
+const GAME_VERSION = "18.1.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -112,10 +123,12 @@ const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_wo
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
 
+// オートスタート制御
 let autoStartTimeout = null;
 let countdownInterval = null;
+let isManualMode = false; // ラジオボタンで切り替え。初期値はAuto。
 
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -172,17 +185,42 @@ function stopAllBGM() {
     });
 }
 
+// 🆕 モード切り替え（ラジオボタン用）
+function toggleStartMode(manual) {
+    isManualMode = manual;
+    if (manual) {
+        // Manualに切り替えたらタイマー停止
+        if (autoStartTimeout) clearTimeout(autoStartTimeout);
+        if (countdownInterval) clearInterval(countdownInterval);
+        document.getElementById('start-btn').innerText = "Manual Start";
+    } else {
+        // Autoに切り替えたらタイマー開始（レベル2以降）
+        if (currentLevel >= 2) startAutoStartCountdown();
+    }
+}
+
 function startAutoStartCountdown() {
-    if (currentLevel < 2 || gameStarted) return;
-    let remaining = 12;
+    if (gameStarted) return;
     const startBtn = document.getElementById('start-btn');
-    const stopBtn = document.getElementById('stop-btn');
     
+    // 既存タイマークリア
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-    
-    startBtn.innerText = `START (${remaining}s)`;
-    stopBtn.style.display = 'inline-block'; // STOPボタンを表示
+
+    // Manualモードならカウントダウンしない
+    if (isManualMode) {
+        startBtn.innerText = "Manual Start";
+        return;
+    }
+
+    // レベル1はオートなし
+    if (currentLevel < 2) {
+        startBtn.innerText = "START";
+        return;
+    }
+
+    let remaining = 12;
+    startBtn.innerText = `Auto Start (${remaining}s)`;
 
     countdownInterval = setInterval(() => {
         remaining--;
@@ -190,25 +228,17 @@ function startAutoStartCountdown() {
             clearInterval(countdownInterval);
             startBtn.innerText = "START";
         } else {
-            startBtn.innerText = `START (${remaining}s)`;
+            startBtn.innerText = `Auto Start (${remaining}s)`;
         }
     }, 1000);
 
     autoStartTimeout = setTimeout(() => {
-        if (!gameStarted) startGame();
+        if (!gameStarted && !isManualMode) startGame();
     }, 12000);
 }
 
-// 🆕 STOPボタン用関数
-function stopAutoStart() {
-    if (autoStartTimeout) clearTimeout(autoStartTimeout);
-    if (countdownInterval) clearInterval(countdownInterval);
-    document.getElementById('start-btn').innerText = "START";
-    document.getElementById('stop-btn').style.display = 'none'; // STOPボタンを隠す
-}
-
 function resetAutoStartTimer() {
-    if (gameStarted || currentLevel < 2) return;
+    if (gameStarted || currentLevel < 2 || isManualMode) return;
     startAutoStartCountdown();
 }
 
@@ -219,9 +249,8 @@ function updateUI() {
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
     const startBtn = document.getElementById('start-btn');
-    const stopBtn = document.getElementById('stop-btn');
     
-    // モード判定
+    // モード判定と配色
     let modeColor = "#28a745"; // Normal: Green
     let modeText = "";
     const isHard = currentLevel >= 11 && currentLevel <= 15;
@@ -235,10 +264,9 @@ function updateUI() {
         modeText = "HARD MODE";
     }
 
-    // 購入画面のスタイル更新
     startBtn.style.backgroundColor = modeColor;
-    stopBtn.style.backgroundColor = modeColor;
     
+    // 購入画面表示
     if (isHard || isExtreme) {
         levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: ${modeColor}; margin-top: 4px;">${modeText}</div>`;
         levelDisplay.style.color = modeColor;
@@ -254,11 +282,18 @@ function updateUI() {
         document.getElementById('shotgun-btn').style.display = 'none';
         document.getElementById('auto-device-btn').style.display = 'none';
     }
+
+    // ボタンテキストの即時反映
+    if (currentLevel === 1) {
+        startBtn.innerText = "START";
+    } else if (isManualMode) {
+        startBtn.innerText = "Manual Start";
+    }
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     
-    // 🎹 BGM関連UI
+    // BGM関連
     const hpBuyBtn = document.getElementById('hp-buy-btn');
     const cycleBtn = document.getElementById('bgm-cycle-btn');
     const hpDisplay = document.getElementById('headphone-display');
@@ -306,8 +341,9 @@ function updateUI() {
         fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
     } else { fDisplay.innerText = ""; }
 
-    // 左下のUI
-    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "")}`;
+    // 左下レベル表示
+    let difficultyTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
+    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${difficultyTag}`;
 
     let statusText = "";
     if (hasAutoDevice) {
@@ -525,21 +561,13 @@ function movePlayer(dx, dy, isAuto = false) {
         }
         if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
         
-        // --- 🏁 ゴール到達判定 ---
         if (map[ny][nx] === 2) {
             playGoalSound();
-            
-            // 🆕 全20ステージクリア判定
             if (currentLevel === 20) {
-                gameStarted = false;
-                stopAllBGM();
-                setTimeout(() => {
-                    alert("Congratulations \n全ステージクリア！");
-                    resetGame();
-                }, 100);
+                gameStarted = false; stopAllBGM();
+                setTimeout(() => { alert("Congratulations \n全ステージクリア！"); resetGame(); }, 100);
                 return;
             }
-
             currentLevel++; 
             if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
             isAutoDeviceUsedInThisLevel = false;
@@ -564,8 +592,10 @@ function movePlayer(dx, dy, isAuto = false) {
 async function startGame() { 
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-    document.getElementById('start-btn').innerText = "START";
-    document.getElementById('stop-btn').style.display = 'none';
+    
+    // STARTした時にボタンテキストをリセット
+    document.getElementById('start-btn').innerText = isManualMode ? "Manual Start" : "Auto Start (12s)";
+    if (currentLevel === 1) document.getElementById('start-btn').innerText = "START";
 
     unlockAudio(); document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
@@ -581,9 +611,7 @@ async function startGame() {
 function resetGame() { 
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-    document.getElementById('start-btn').innerText = "START";
-    document.getElementById('stop-btn').style.display = 'none';
-
+    
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0;
@@ -648,10 +676,10 @@ function draw() {
             } else { ftr=size*0.6; fr=size*1.8; fw=0.3; }
             const footG = tCtx.createRadialGradient(cX, cY, 0, cX, cY, ftr);
             footG.addColorStop(0, `rgba(0,0,0,${b})`); footG.addColorStop(0.75, `rgba(0,0,0,${b})`); footG.addColorStop(1, 'rgba(0,0,0,0)');
-            tCtx.fillStyle = footG; tCtx.beginPath(); tCtx.arc(cX, cY, ftr, 0, Math.PI*2); tCtx.fill();
-            const fanG = tCtx.createRadialGradient(cX, cY, size*0.3, cX, cY, fr);
-            fanG.addColorStop(0, `rgba(0,0,0,${b})`); fanG.addColorStop(0.65, `rgba(0,0,0,${b*0.3})`); fanG.addColorStop(1, 'rgba(0,0,0,0)');
-            tCtx.fillStyle = fanG; tCtx.beginPath(); tCtx.moveTo(cX, cY); tCtx.arc(cX, cY, fr, angle-fw, angle+fw); tCtx.closePath(); tCtx.fill();
+            tCtx.fillStyle = footG; tCtx.beginPath(); tCtx.arc(cX, cY, ftr, 0, Math.PI * 2); tCtx.fill();
+            const fanG = tCtx.createRadialGradient(cX, cY, size * 0.3, cX, cY, fr);
+            fanG.addColorStop(0, `rgba(0,0,0,${b})`); fanG.addColorStop(0.65, `rgba(0,0,0,${b * 0.3})`); fanG.addColorStop(1, 'rgba(0,0,0,0)');
+            tCtx.fillStyle = fanG; tCtx.beginPath(); tCtx.moveTo(cX, cY); tCtx.arc(cX, cY, fr, angle - fw, angle + fw); tCtx.closePath(); tCtx.fill();
         }
         ctx.drawImage(tempCanvas, 0, 0); ctx.restore();
     }
