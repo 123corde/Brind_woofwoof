@@ -99,13 +99,14 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "16.5.0"; 
+const GAME_VERSION = "16.6.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogwoof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane.wav');
+const bumpSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/bump.mp3');
 
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
@@ -113,10 +114,10 @@ let isBlind = true, gameStarted = false;
 let autoStartTimeout = null;
 let countdownInterval = null;
 
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
-let currentBGM = null; // null: OFF, 1: 氷の華, 2: 最果ての島, 3: 鈴虫, 4: ブラウンノイズ
+let currentBGM = null; // null: OFF, 1: 氷の華, 2: 最果ての島, 3: 夜の音, 4: ブラウンノイズ
 
 let hasShotgun = false, shotgunAmmo = 0; 
 let hasFlashlight = false, flashlightBattery = 0;
@@ -140,7 +141,7 @@ const gameOverMessages = [
     "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
     "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。",
     "画面の🐾🐾🐾の部分を🐾🐾🐾🐾プすると...？",
-    "懐中電灯の光が弱いですか？ケチらずフル充🐾🐾🐾しょう。",
+    "懐中電灯の光が弱いですか？ケチらずフル充🐾🐾🐾しよう。",
     "🐾ードモードでは、獲得コインが10倍に🐾🐾ます。",
     "画面を閉じてもBGMは続きます。今日はここまで、もう寝る時間です。"
 ];
@@ -154,7 +155,7 @@ function unlockAudio() {
         audio.muted = true;
         audio.play().then(() => { audio.pause(); audio.currentTime = 0; audio.muted = false; }).catch(e => {}); 
     };
-    [growlSnd, biteSnd, dogCrySnd].forEach(silentPlay);
+    [growlSnd, biteSnd, dogCrySnd, bumpSnd].forEach(silentPlay);
     soundReady = true;
 }
 
@@ -402,21 +403,6 @@ function generateSimpleMaze() {
     }
 }
 
-function getDistanceToGoal() {
-    let q = [{x: player.x, y: player.y, d: 0}], visited = new Set();
-    visited.add(`${player.x},${player.y}`); const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
-    while(q.length > 0) {
-        let curr = q.shift(); if(map[curr.y][curr.x] === 2) return curr.d;
-        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-            let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
-            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) {
-                visited.add(key); q.push({x: nx, y: ny, d: curr.d + 1});
-            }
-        }
-    }
-    return 0;
-}
-
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
     const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
@@ -469,7 +455,9 @@ function movePlayer(dx, dy, isAuto = false) {
     if (dx === -1) flipX = false; if (dx === 1) flipX = true;
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
-    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { if(!isAuto) playOscillator(150, 'square', 0.1); } 
+    if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
+        if(!isAuto) playSound(bumpSnd); 
+    } 
     else {
         player.x = nx; player.y = ny;
         let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
@@ -521,7 +509,6 @@ async function startGame() {
         };
         const active = bgmMap[currentBGM];
         if (active) {
-            //4)? ブラウンノイズ : 他BGM
             active.volume = (currentBGM === 4) ? 0.04 : 0.05;
             active.currentTime = 0;
             active.play().catch(e => {});
