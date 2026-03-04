@@ -105,7 +105,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.1.0"; 
+const GAME_VERSION = "21.2.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/25fcfc444f24c7c3523c3defdb2c3182e2421220/Watchdog.png';
@@ -317,34 +317,34 @@ function updateUI() {
     document.getElementById('auto-status').innerText = statusText;
 }
 
-function buyHeadphone() { if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; currentBGM = null; updateUI(); resetAutoStartCountdown(); } }
+function buyHeadphone() { if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; currentBGM = null; updateUI(); resetAutoStartTimer(); } }
 function cycleBGM() {
     if (currentBGM === null) currentBGM = 1;
     else if (currentBGM === 1) currentBGM = 2;
     else if (currentBGM === 2) currentBGM = 3;
     else if (currentBGM === 3) currentBGM = 4;
     else currentBGM = null;
-    updateUI(); resetAutoStartCountdown();
+    updateUI(); resetAutoStartTimer();
 }
 function buyShotgun() {
     if (!hasShotgun) { if (totalCoins >= 50) { totalCoins -= 50; hasShotgun = true; shotgunAmmo = 2; } } 
     else { if (totalCoins >= 30 && shotgunAmmo < 2) { totalCoins -= 30; shotgunAmmo += 1; } }
-    updateUI(); resetAutoStartCountdown();
+    updateUI(); resetAutoStartTimer();
 }
 function buyFlashlight() {
     if (!hasFlashlight) { if (totalCoins >= 15) { totalCoins -= 15; hasFlashlight = true; flashlightBattery = 60; } } 
     else { if (totalCoins >= 5 && flashlightBattery < FLASHLIGHT_MAX) { totalCoins -= 5; flashlightBattery = Math.min(FLASHLIGHT_MAX, flashlightBattery + 10); } }
-    updateUI(); resetAutoStartCountdown();
+    updateUI(); resetAutoStartTimer();
 }
-function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; hasAmulet = true; coinMultiplier = 3; updateUI(); resetAutoStartCountdown(); } }
-function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); resetAutoStartCountdown(); } }
-function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); resetAutoStartCountdown(); } }
+function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; hasAmulet = true; coinMultiplier = 3; updateUI(); resetAutoStartTimer(); } }
+function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); resetAutoStartTimer(); } }
+function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); resetAutoStartTimer(); } }
 
 function triggerDebugJump() {
     if (gameStarted) return;
     debugClickCount++;
-    if (debugClickCount === 10) { currentLevel = 11; updateUI(); resetAutoStartCountdown(); } 
-    else if (debugClickCount === 20) { currentLevel = 16; updateUI(); resetAutoStartCountdown(); }
+    if (debugClickCount === 10) { currentLevel = 11; updateUI(); resetAutoStartTimer(); } 
+    else if (debugClickCount === 20) { currentLevel = 16; updateUI(); resetAutoStartTimer(); }
 }
 
 function generateSimpleMaze() {
@@ -504,7 +504,7 @@ function moveHunters() {
         const dog = dogs[i];
         if (!dog.isHunter) continue;
 
-        // BFSでプレイヤーへの最短ルートを探す（最短経路タイルは無視して経路計算）
+        // BFSでプレイヤーへの最短ルートを探す
         let q = [{x: dog.x, y: dog.y, path: []}], visited = new Set();
         visited.add(`${dog.x},${dog.y}`);
         let foundPath = null;
@@ -527,18 +527,14 @@ function moveHunters() {
 
             // 侵入禁止/飛び越え判定
             if (pathSet.has(`${nextStep.x},${nextStep.y}`)) {
-                // 次のマスが最短経路なら、そのさらに次（2歩目）を確認
                 if (foundPath.length >= 2) {
                     let secondStep = foundPath[1];
-                    // 2歩目が最短経路でなければ「飛び越え」成功
                     if (!pathSet.has(`${secondStep.x},${secondStep.y}`)) {
                         moveTarget = secondStep;
                     } else {
-                        // 2歩目も最短経路なら、侵入できないためその場に留まる
                         continue;
                     }
                 } else {
-                    // 隣が最短経路で、かつその先がプレイヤー（最短経路上）なら、侵入せず待機
                     continue;
                 }
             }
@@ -546,12 +542,11 @@ function moveHunters() {
             dog.x = moveTarget.x;
             dog.y = moveTarget.y;
 
-            // 移動後にプレイヤーと重なった場合の判定
             if (dog.x === player.x && dog.y === player.y) {
                 if (shotgunAmmo > 0) {
                     shotgunAmmo--;
                     playSound(dogCrySnd);
-                    dogs.splice(i, 1); // 弾があればハンターを消去
+                    dogs.splice(i, 1); 
                     triggerShotgunEffect();
                     updateUI();
                 } else {
@@ -590,11 +585,9 @@ function movePlayer(dx, dy, isAuto = false) {
         player.x = nx; player.y = ny;
         playerMoveCount++;
 
-        // ハンターの移動判定
         if (currentLevel === 20) moveHunters();
         else if (currentLevel >= 16 && playerMoveCount % 2 === 0) moveHunters();
 
-        // 接触判定
         let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
         if (dogIndex !== -1) {
             if (shotgunAmmo > 0) { 
@@ -685,7 +678,6 @@ function draw() {
         }
     }
     
-    // 犬とハンターの描画（ハンターを後に描画して上位レイヤーにする）
     const sortedDogs = [...dogs].sort((a, b) => (a.isHunter === b.isHunter ? 0 : a.isHunter ? 1 : -1));
     sortedDogs.forEach(d => {
         let img = d.isHunter ? hunterImg : dogImg;
@@ -735,8 +727,8 @@ window.addEventListener('touchend', e => {
     tsX = null; tsY = null;
 });
 const startContainer = document.getElementById('start-container');
-startContainer.addEventListener('mousedown', resetAutoStartCountdown);
-startContainer.addEventListener('touchstart', resetAutoStartCountdown, {passive: true});
+startContainer.addEventListener('mousedown', resetAutoStartTimer);
+startContainer.addEventListener('touchstart', resetAutoStartTimer, {passive: true});
 window.onresize = draw; updateUI(); draw();
 </script>
 </body>
