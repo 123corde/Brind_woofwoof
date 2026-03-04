@@ -17,7 +17,8 @@
         
         .item-row { display: flex; gap: 10px; align-items: center; margin-bottom: 5px; height: 1.5em; }
         
-        #controls { position: absolute; bottom: 15px; right: 15px; z-index: 20; display: none; }
+        /* z-indexを300に変更して購入画面(100)より手前に配置 */
+        #controls { position: absolute; bottom: 15px; right: 15px; z-index: 300; display: none; }
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
         
         #start-container { 
@@ -120,8 +121,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-// 💰 デバッグ所持金維持
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -214,7 +214,6 @@ function resetAutoStartTimer() {
 }
 
 function updateUI() {
-    // 🆕 ver. の後はバージョン番号のみ表示
     const verDisplay = document.getElementById('ver-text');
     if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}`;
     
@@ -233,11 +232,13 @@ function updateUI() {
     // デザイン初期化
     startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
+    startBtn.classList.remove('extreme-shake'); // 初期化
     slider.style.setProperty('--toggle-color', "#28a745");
 
     if (isExtreme) {
         const modeColor = "#dc3545"; 
         startBtn.style.backgroundColor = modeColor;
+        startBtn.classList.add('extreme-shake'); // STARTボタンも揺らす
         slider.style.setProperty('--toggle-color', modeColor);
         startContainer.style.border = `10px double ${modeColor}`;
         levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><br><span class="extreme-shake" style="font-size: 18px; color:${modeColor};">EXTREME MODE</span>`;
@@ -268,7 +269,6 @@ function updateUI() {
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     
-    // メガネボタンのグレーアウト挙動修正
     devBtn.disabled = (hasDevGlasses || totalCoins < 1000);
 
     const hpBuyBtn = document.getElementById('hp-buy-btn');
@@ -297,13 +297,11 @@ function updateUI() {
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) { sBtn.innerText = "💥 ショットガン (50コイン)"; sBtn.disabled = totalCoins < 50; } 
     else { sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`; sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30); }
-    // 🆕 ショットガン表示の復活
     document.getElementById('ammo-display').innerText = (hasShotgun && shotgunAmmo > 0) ? "💥".repeat(shotgunAmmo) : "";
 
     const fBtn = document.getElementById('flashlight-btn');
     if (!hasFlashlight) { fBtn.innerText = "🔦 懐中電灯 (15コイン)"; fBtn.disabled = totalCoins < 15; } 
     else { fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`; fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5); }
-    // 🆕 懐中電灯表示の復活
     const fDisplay = document.getElementById('flashlight-display');
     if (hasFlashlight && flashlightBattery > 0) {
         fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
@@ -316,6 +314,7 @@ function updateUI() {
     const amuletBtn = document.getElementById('amulet-btn');
     amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
 
+    // 購入済みなら、購入画面の上にも表示される
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 
     let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
@@ -479,7 +478,6 @@ setInterval(() => {
     }
 }, 100);
 
-// playOscillator
 async function playOscillator(f, t, d, vol = 0.06) {
     if (!audioCtx) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -495,7 +493,6 @@ function movePlayer(dx, dy, isAuto = false) {
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
-        // 壁衝突音: 55Hz, Sine, 0.15s, Vol 0.5
         if(!isAuto) playOscillator(55, 'sine', 0.15, 0.5); 
     } 
     else {
@@ -517,10 +514,7 @@ function movePlayer(dx, dy, isAuto = false) {
             if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
             isAutoDeviceUsedInThisLevel = false;
             gameStarted = false; 
-            
-            // メガネ所持時は視界設定を維持
             if (!hasDevGlasses) isBlind = true; 
-            
             stopAutoProcess(); stopAllBGM();
             const container = document.getElementById('start-container');
             container.classList.remove('opaque'); container.style.display = 'flex'; 
