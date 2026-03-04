@@ -105,7 +105,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.4.0"; 
+const GAME_VERSION = "21.5.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/25fcfc444f24c7c3523c3defdb2c3182e2421220/Watchdog.png';
@@ -494,7 +494,7 @@ async function playOscillator(f, t, d, vol = 0.06) {
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
 
-// ハンターの移動ロジック (改良版: 最短経路+近接時のみ制限)
+// ハンターの移動ロジック
 function moveHunters() {
     if (currentLevel < 16) return;
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
@@ -503,67 +503,50 @@ function moveHunters() {
         const dog = dogs[i];
         if (!dog.isHunter) continue;
 
-        // BFSでプレイヤーへの最短ルートを探す
-        let q = [{x: dog.x, y: dog.y, path: []}], visited = new Set();
-        visited.add(`${dog.x},${dog.y}`);
-        let foundPath = null;
+        let bestMove = null;
+        let minDistToPlayer = Infinity;
 
-        while(q.length > 0) {
-            let curr = q.shift();
-            if (curr.x === player.x && curr.y === player.y) { foundPath = curr.path; break; }
-            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
-                if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key)) {
-                    visited.add(key);
-                    q.push({x: nx, y: ny, path: [...curr.path, {x: nx, y: ny}]});
+        // 上下左右の候補マスを評価
+        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            let nx = dog.x + dx, ny = dog.y + dy;
+            
+            // 1. マップ範囲内かつ壁でない
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1) {
+                
+                // マンハッタン距離計算
+                let distToPlayer = Math.abs(nx - player.x) + Math.abs(ny - player.y);
+                
+                // 2. 制約チェック: 最短経路上かつプレイヤーからマンハッタン距離6以内なら侵入禁止
+                // ただし、そのマスがプレイヤー自身の位置であれば、接触（ゲームオーバー/撃退）を許可
+                let isOnPath = pathSet.has(`${nx},${ny}`);
+                if (isOnPath && distToPlayer <= 6 && !(nx === player.x && ny === player.y)) {
+                    continue; 
+                }
+
+                // 最もプレイヤーに近いマスを選択
+                if (distToPlayer < minDistToPlayer) {
+                    minDistToPlayer = distToPlayer;
+                    bestMove = {x: nx, y: ny};
                 }
             }
         }
 
-        if (foundPath && foundPath.length > 0) {
-            // ハンターが目指すマスの候補を隣接4マスから選ぶ
-            let bestMove = null;
-            let minDistToPlayer = Infinity;
+        // 移動実行
+        if (bestMove) {
+            dog.x = bestMove.x;
+            dog.y = bestMove.y;
 
-            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                let nx = dog.x + dx, ny = dog.y + dy;
-                // 移動先がマップ内かつ壁でない
-                if (nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1) {
-                    
-                    // 制限ルールチェック: 最短経路上かつプレイヤーから6マス以内なら侵入禁止
-                    let isOnPath = pathSet.has(`${nx},${ny}`);
-                    let distToPlayer = Math.abs(nx - player.x) + Math.abs(ny - player.y);
-                    
-                    if (isOnPath && distToPlayer <= 6) {
-                        // プレイヤーそのものの座標であれば例外的に許可(接触=ゲームオーバーのため)
-                        if (!(nx === player.x && ny === player.y)) {
-                            continue; 
-                        }
-                    }
-
-                    // 禁止区域でなければ、そこからプレイヤーへの直線距離を計算
-                    if (distToPlayer < minDistToPlayer) {
-                        minDistToPlayer = distToPlayer;
-                        bestMove = {x: nx, y: ny};
-                    }
-                }
-            }
-
-            if (bestMove) {
-                dog.x = bestMove.x;
-                dog.y = bestMove.y;
-
-                if (dog.x === player.x && dog.y === player.y) {
-                    if (shotgunAmmo > 0) {
-                        shotgunAmmo--;
-                        playSound(dogCrySnd);
-                        dogs.splice(i, 1); 
-                        triggerShotgunEffect();
-                        updateUI();
-                    } else {
-                        triggerGameOver();
-                        return;
-                    }
+            // 移動後の衝突判定
+            if (dog.x === player.x && dog.y === player.y) {
+                if (shotgunAmmo > 0) {
+                    shotgunAmmo--;
+                    playSound(dogCrySnd);
+                    dogs.splice(i, 1); 
+                    triggerShotgunEffect();
+                    updateUI();
+                } else {
+                    triggerGameOver();
+                    return;
                 }
             }
         }
@@ -597,9 +580,14 @@ function movePlayer(dx, dy, isAuto = false) {
         player.x = nx; player.y = ny;
         playerMoveCount++;
 
-        if (currentLevel === 20) moveHunters();
-        else if (currentLevel >= 16 && playerMoveCount % 2 === 0) moveHunters();
+        // ハンターの移動頻度判定
+        if (currentLevel === 20) {
+            moveHunters(); // 毎歩移動
+        } else if (currentLevel >= 16 && playerMoveCount % 2 === 0) {
+            moveHunters(); // 2歩ごとに移動
+        }
 
+        // プレイヤー側からの衝突判定
         let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
         if (dogIndex !== -1) {
             if (shotgunAmmo > 0) { 
@@ -690,6 +678,7 @@ function draw() {
         }
     }
     
+    // 犬とハンターの描画（ハンターを後に描画して上位レイヤーにする）
     const sortedDogs = [...dogs].sort((a, b) => (a.isHunter === b.isHunter ? 0 : a.isHunter ? 1 : -1));
     sortedDogs.forEach(d => {
         let img = d.isHunter ? hunterImg : dogImg;
