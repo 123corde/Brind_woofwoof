@@ -105,7 +105,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.3.0"; 
+const GAME_VERSION = "21.4.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/25fcfc444f24c7c3523c3defdb2c3182e2421220/Watchdog.png';
@@ -494,7 +494,7 @@ async function playOscillator(f, t, d, vol = 0.06) {
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
 
-// ハンターの移動ロジック (改良版)
+// ハンターの移動ロジック (改良版: 最短経路+近接時のみ制限)
 function moveHunters() {
     if (currentLevel < 16) return;
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
@@ -521,42 +521,37 @@ function moveHunters() {
         }
 
         if (foundPath && foundPath.length > 0) {
-            let moveTarget = null;
+            // ハンターが目指すマスの候補を隣接4マスから選ぶ
+            let bestMove = null;
+            let minDistToPlayer = Infinity;
 
-            // ルート上のタイルのうち、最短経路に含まれない最初のタイルを探す
-            for (let step = 0; step < foundPath.length; step++) {
-                let tile = foundPath[step];
-                if (!pathSet.has(`${tile.x},${tile.y}`)) {
-                    // 最短経路でないタイルを発見
-                    moveTarget = tile;
-                    break;
-                }
-                // もし次のタイルがプレイヤーそのものなら、最短経路タイルであっても接触(移動)可能
-                if (tile.x === player.x && tile.y === player.y) {
-                    moveTarget = tile;
-                    break;
-                }
-            }
+            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                let nx = dog.x + dx, ny = dog.y + dy;
+                // 移動先がマップ内かつ壁でない
+                if (nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1) {
+                    
+                    // 制限ルールチェック: 最短経路上かつプレイヤーから6マス以内なら侵入禁止
+                    let isOnPath = pathSet.has(`${nx},${ny}`);
+                    let distToPlayer = Math.abs(nx - player.x) + Math.abs(ny - player.y);
+                    
+                    if (isOnPath && distToPlayer <= 6) {
+                        // プレイヤーそのものの座標であれば例外的に許可(接触=ゲームオーバーのため)
+                        if (!(nx === player.x && ny === player.y)) {
+                            continue; 
+                        }
+                    }
 
-            // もし「飛び越え先」が見つからなかった場合、スタック防止のため周辺の空き地から接近を試みる
-            if (!moveTarget) {
-                let neighbors = [[0,1],[0,-1],[1,0],[-1,0]]
-                    .map(([dx, dy]) => ({x: dog.x + dx, y: dog.y + dy}))
-                    .filter(n => n.x >= 0 && n.x < COLS && n.y >= 0 && n.y < ROWS && map[n.y][n.x] !== 1 && !pathSet.has(`${n.x},${n.y}`));
-                
-                if (neighbors.length > 0) {
-                    neighbors.sort((a, b) => {
-                        let distA = Math.abs(a.x - player.x) + Math.abs(a.y - player.y);
-                        let distB = Math.abs(b.x - player.x) + Math.abs(b.y - player.y);
-                        return distA - distB;
-                    });
-                    moveTarget = neighbors[0];
+                    // 禁止区域でなければ、そこからプレイヤーへの直線距離を計算
+                    if (distToPlayer < minDistToPlayer) {
+                        minDistToPlayer = distToPlayer;
+                        bestMove = {x: nx, y: ny};
+                    }
                 }
             }
 
-            if (moveTarget) {
-                dog.x = moveTarget.x;
-                dog.y = moveTarget.y;
+            if (bestMove) {
+                dog.x = bestMove.x;
+                dog.y = bestMove.y;
 
                 if (dog.x === player.x && dog.y === player.y) {
                     if (shotgunAmmo > 0) {
