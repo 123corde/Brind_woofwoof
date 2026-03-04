@@ -51,7 +51,9 @@
             pointer-events: auto; 
         }
         
-        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; background-color: #28a745; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; flex-shrink: 0; min-width: 220px; }
+        #start-btn { padding: 15px 40px; font-size: 20px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; margin: 10px 0; flex-shrink: 0; min-width: 220px; }
+        #stop-btn { padding: 8px 30px; font-size: 14px; font-weight: bold; color: white; border: none; border-radius: 6px; cursor: pointer; margin-top: 5px; flex-shrink: 0; display: none; }
+        
         .shop-btn { padding: 10px; margin: 3px; background: #ffd54f; color: #333; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; flex-shrink: 0; }
         .shop-btn:disabled { background: #ccc; cursor: not-allowed; color: #777; }
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
@@ -73,6 +75,7 @@
         <button id="dev-glass-btn" class="shop-btn" onclick="buyDevGlasses()">👁️購入👁️しては👁️いけない👁️ (1000コイン)</button>
         <br>
         <button id="start-btn" onclick="startGame()">START</button>
+        <button id="stop-btn" onclick="stopAutoStart()">STOP</button>
     </div>
 
     <div id="ui">
@@ -83,14 +86,13 @@
             <div id="auto-status"></div>
             <div id="flashlight-display"></div>
         </div>
-        <div id="level-text-ui" style="font-size: 1.1em; color: #fff; margin-bottom: 2px;">Level 1</div>
+        <div id="level-text-ui" style="font-size: 1.1em; color: #fff; margin-bottom: 2px;">Level 1/20</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
         <div id="ver-text" style="font-size: 0.85em; margin-top: 5px; color: #aaa;"></div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
     
-    <!-- 🎵 BGMファイル群 -->
     <audio id="bgm-koori" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/koorinohana.mp3" loop></audio>
     <audio id="bgm-hikari" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/wasurezinohikari.mp3" loop></audio>
     <audio id="bgm-suzumusi" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Suzumusi.mp3" loop></audio>
@@ -99,7 +101,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "17.0.0"; 
+const GAME_VERSION = "18.0.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -113,7 +115,7 @@ let isBlind = true, gameStarted = false;
 let autoStartTimeout = null;
 let countdownInterval = null;
 
-let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -174,15 +176,35 @@ function startAutoStartCountdown() {
     if (currentLevel < 2 || gameStarted) return;
     let remaining = 12;
     const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
+    
     startBtn.innerText = `START (${remaining}s)`;
+    stopBtn.style.display = 'inline-block'; // STOPボタンを表示
+
     countdownInterval = setInterval(() => {
         remaining--;
-        if (remaining <= 0) { clearInterval(countdownInterval); startBtn.innerText = "START"; } 
-        else { startBtn.innerText = `START (${remaining}s)`; }
+        if (remaining <= 0) {
+            clearInterval(countdownInterval);
+            startBtn.innerText = "START";
+        } else {
+            startBtn.innerText = `START (${remaining}s)`;
+        }
     }, 1000);
-    autoStartTimeout = setTimeout(() => { if (!gameStarted) startGame(); }, 12000);
+
+    autoStartTimeout = setTimeout(() => {
+        if (!gameStarted) startGame();
+    }, 12000);
+}
+
+// 🆕 STOPボタン用関数
+function stopAutoStart() {
+    if (autoStartTimeout) clearTimeout(autoStartTimeout);
+    if (countdownInterval) clearInterval(countdownInterval);
+    document.getElementById('start-btn').innerText = "START";
+    document.getElementById('stop-btn').style.display = 'none'; // STOPボタンを隠す
 }
 
 function resetAutoStartTimer() {
@@ -196,14 +218,32 @@ function updateUI() {
     
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
-    const isHardMode = currentLevel >= 11;
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    
+    // モード判定
+    let modeColor = "#28a745"; // Normal: Green
+    let modeText = "";
+    const isHard = currentLevel >= 11 && currentLevel <= 15;
+    const isExtreme = currentLevel >= 16;
 
-    // スタート画面のレベル表示（HARDは下の行へ）
-    if (isHardMode) {
-        levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: #ff4444; margin-top: 4px;">HARD MODE</div>`;
-        levelDisplay.style.color = "#ff4444";
-        startContainer.style.border = "6px solid #ff4444";
-        startContainer.style.boxShadow = "0 0 25px #ff0000";
+    if (isExtreme) {
+        modeColor = "#dc3545"; // Red
+        modeText = "EXTREME MODE";
+    } else if (isHard) {
+        modeColor = "#007bff"; // Blue
+        modeText = "HARD MODE";
+    }
+
+    // 購入画面のスタイル更新
+    startBtn.style.backgroundColor = modeColor;
+    stopBtn.style.backgroundColor = modeColor;
+    
+    if (isHard || isExtreme) {
+        levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: ${modeColor}; margin-top: 4px;">${modeText}</div>`;
+        levelDisplay.style.color = modeColor;
+        startContainer.style.border = `6px solid ${modeColor}`;
+        startContainer.style.boxShadow = `0 0 25px ${modeColor}`;
         document.getElementById('shotgun-btn').style.display = 'block';
         document.getElementById('auto-device-btn').style.display = 'block';
     } else {
@@ -266,8 +306,8 @@ function updateUI() {
         fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
     } else { fDisplay.innerText = ""; }
 
-    // 左下のUI：レベルを表示
-    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}${isHardMode ? " (HARD)" : ""}`;
+    // 左下のUI
+    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "")}`;
 
     let statusText = "";
     if (hasAutoDevice) {
@@ -304,7 +344,15 @@ function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoin
 function triggerDebugJump() {
     if (gameStarted) return;
     debugClickCount++;
-    if (debugClickCount >= 10) { currentLevel = 11; debugClickCount = 0; updateUI(); resetAutoStartTimer(); }
+    if (debugClickCount === 10) {
+        currentLevel = 11;
+        updateUI();
+        resetAutoStartTimer();
+    } else if (debugClickCount === 20) {
+        currentLevel = 16;
+        updateUI();
+        resetAutoStartTimer();
+    }
 }
 
 function generateSimpleMaze() {
@@ -476,11 +524,27 @@ function movePlayer(dx, dy, isAuto = false) {
             }
         }
         if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
+        
+        // --- 🏁 ゴール到達判定 ---
         if (map[ny][nx] === 2) {
-            playGoalSound(); currentLevel++; 
+            playGoalSound();
+            
+            // 🆕 全20ステージクリア判定
+            if (currentLevel === 20) {
+                gameStarted = false;
+                stopAllBGM();
+                setTimeout(() => {
+                    alert("Congratulations \n全ステージクリア！");
+                    resetGame();
+                }, 100);
+                return;
+            }
+
+            currentLevel++; 
             if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
             isAutoDeviceUsedInThisLevel = false;
             gameStarted = false; isBlind = true; stopAutoProcess(); stopAllBGM();
+            
             const container = document.getElementById('start-container');
             container.classList.remove('opaque'); container.style.display = 'flex'; 
             setTimeout(() => {
@@ -501,6 +565,8 @@ async function startGame() {
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
     document.getElementById('start-btn').innerText = "START";
+    document.getElementById('stop-btn').style.display = 'none';
+
     unlockAudio(); document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
     isAutoDeviceUsedInThisLevel = false;
@@ -516,11 +582,14 @@ function resetGame() {
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
     document.getElementById('start-btn').innerText = "START";
+    document.getElementById('stop-btn').style.display = 'none';
+
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0;
     hasHeadphone = false; currentBGM = null;
     coinMultiplier = 1; gameStarted = false; isBlind = true; 
+    debugClickCount = 0;
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
 
