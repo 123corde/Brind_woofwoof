@@ -105,7 +105,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.5.0"; 
+const GAME_VERSION = "21.6.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/25fcfc444f24c7c3523c3defdb2c3182e2421220/Watchdog.png';
@@ -494,17 +494,44 @@ async function playOscillator(f, t, d, vol = 0.06) {
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
 
+/**
+ * プレイヤーの現在地から全マスへの「歩数（最短経路距離）」を計算する
+ * 壁を考慮したBFSアルゴリズム
+ */
+function calculateWalkDistancesFromPlayer() {
+    let distGrid = Array.from({ length: ROWS }, () => Array(COLS).fill(Infinity));
+    let q = [{x: player.x, y: player.y, d: 0}];
+    distGrid[player.y][player.x] = 0;
+
+    while(q.length > 0) {
+        let curr = q.shift();
+        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            let nx = curr.x + dx, ny = curr.y + dy;
+            if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1) {
+                if (distGrid[ny][nx] === Infinity) {
+                    distGrid[ny][nx] = curr.d + 1;
+                    q.push({x: nx, y: ny, d: curr.d + 1});
+                }
+            }
+        }
+    }
+    return distGrid;
+}
+
 // ハンターの移動ロジック
 function moveHunters() {
     if (currentLevel < 16) return;
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
     
+    // 全マスへの歩数を事前に計算（壁を認識する）
+    const walkDistGrid = calculateWalkDistancesFromPlayer();
+
     for (let i = dogs.length - 1; i >= 0; i--) {
         const dog = dogs[i];
         if (!dog.isHunter) continue;
 
         let bestMove = null;
-        let minDistToPlayer = Infinity;
+        let minWalkDist = Infinity;
 
         // 上下左右の候補マスを評価
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
@@ -513,19 +540,19 @@ function moveHunters() {
             // 1. マップ範囲内かつ壁でない
             if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && map[ny][nx] !== 1) {
                 
-                // マンハッタン距離計算
-                let distToPlayer = Math.abs(nx - player.x) + Math.abs(ny - player.y);
+                // BFSで算出した「プレイヤーまでの歩数（実距離）」を取得
+                let distToPlayer = walkDistGrid[ny][nx];
                 
-                // 2. 制約チェック: 最短経路上かつプレイヤーからマンハッタン距離6以内なら侵入禁止
+                // 2. 制約チェック: 最短経路上かつプレイヤーから実歩数6以内なら侵入禁止
                 // ただし、そのマスがプレイヤー自身の位置であれば、接触（ゲームオーバー/撃退）を許可
                 let isOnPath = pathSet.has(`${nx},${ny}`);
                 if (isOnPath && distToPlayer <= 6 && !(nx === player.x && ny === player.y)) {
                     continue; 
                 }
 
-                // 最もプレイヤーに近いマスを選択
-                if (distToPlayer < minDistToPlayer) {
-                    minDistToPlayer = distToPlayer;
+                // 最もプレイヤーに近い（歩数が少ない）マスを選択
+                if (distToPlayer < minWalkDist) {
+                    minWalkDist = distToPlayer;
                     bestMove = {x: nx, y: ny};
                 }
             }
