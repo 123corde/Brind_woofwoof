@@ -105,7 +105,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.2.0"; 
+const GAME_VERSION = "21.3.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/25fcfc444f24c7c3523c3defdb2c3182e2421220/Watchdog.png';
@@ -494,12 +494,11 @@ async function playOscillator(f, t, d, vol = 0.06) {
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime + d);
 }
 
-// ハンターの移動ロジック
+// ハンターの移動ロジック (改良版)
 function moveHunters() {
     if (currentLevel < 16) return;
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
     
-    // ハンターごとに処理
     for (let i = dogs.length - 1; i >= 0; i--) {
         const dog = dogs[i];
         if (!dog.isHunter) continue;
@@ -522,36 +521,54 @@ function moveHunters() {
         }
 
         if (foundPath && foundPath.length > 0) {
-            let nextStep = foundPath[0];
-            let moveTarget = nextStep;
+            let moveTarget = null;
 
-            // 侵入禁止/飛び越え判定
-            if (pathSet.has(`${nextStep.x},${nextStep.y}`)) {
-                if (foundPath.length >= 2) {
-                    let secondStep = foundPath[1];
-                    if (!pathSet.has(`${secondStep.x},${secondStep.y}`)) {
-                        moveTarget = secondStep;
-                    } else {
-                        continue;
-                    }
-                } else {
-                    continue;
+            // ルート上のタイルのうち、最短経路に含まれない最初のタイルを探す
+            for (let step = 0; step < foundPath.length; step++) {
+                let tile = foundPath[step];
+                if (!pathSet.has(`${tile.x},${tile.y}`)) {
+                    // 最短経路でないタイルを発見
+                    moveTarget = tile;
+                    break;
+                }
+                // もし次のタイルがプレイヤーそのものなら、最短経路タイルであっても接触(移動)可能
+                if (tile.x === player.x && tile.y === player.y) {
+                    moveTarget = tile;
+                    break;
                 }
             }
 
-            dog.x = moveTarget.x;
-            dog.y = moveTarget.y;
+            // もし「飛び越え先」が見つからなかった場合、スタック防止のため周辺の空き地から接近を試みる
+            if (!moveTarget) {
+                let neighbors = [[0,1],[0,-1],[1,0],[-1,0]]
+                    .map(([dx, dy]) => ({x: dog.x + dx, y: dog.y + dy}))
+                    .filter(n => n.x >= 0 && n.x < COLS && n.y >= 0 && n.y < ROWS && map[n.y][n.x] !== 1 && !pathSet.has(`${n.x},${n.y}`));
+                
+                if (neighbors.length > 0) {
+                    neighbors.sort((a, b) => {
+                        let distA = Math.abs(a.x - player.x) + Math.abs(a.y - player.y);
+                        let distB = Math.abs(b.x - player.x) + Math.abs(b.y - player.y);
+                        return distA - distB;
+                    });
+                    moveTarget = neighbors[0];
+                }
+            }
 
-            if (dog.x === player.x && dog.y === player.y) {
-                if (shotgunAmmo > 0) {
-                    shotgunAmmo--;
-                    playSound(dogCrySnd);
-                    dogs.splice(i, 1); 
-                    triggerShotgunEffect();
-                    updateUI();
-                } else {
-                    triggerGameOver();
-                    return;
+            if (moveTarget) {
+                dog.x = moveTarget.x;
+                dog.y = moveTarget.y;
+
+                if (dog.x === player.x && dog.y === player.y) {
+                    if (shotgunAmmo > 0) {
+                        shotgunAmmo--;
+                        playSound(dogCrySnd);
+                        dogs.splice(i, 1); 
+                        triggerShotgunEffect();
+                        updateUI();
+                    } else {
+                        triggerGameOver();
+                        return;
+                    }
                 }
             }
         }
