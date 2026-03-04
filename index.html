@@ -22,31 +22,25 @@
         
         #start-container { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            background: #000; display: flex; flex-direction: column; 
+            background: rgba(255,255,255,0.35); display: flex; flex-direction: column; 
             justify-content: center; align-items: center; z-index: 100; text-align: center;
             padding: 20px; box-sizing: border-box; overflow-y: auto;
-            transition: background 2.0s ease-in-out, border 0.5s, box-shadow 0.5s; 
+            transition: background-color 2.0s ease-in-out; 
         }
         #start-container > * { opacity: 0; transition: opacity 2.0s ease-in-out; pointer-events: none; }
-        #start-container.opaque { background: rgba(0,0,0,1.0) !important; }
-
-        /* EXTREME背景 */
-        #start-container.extreme-bg {
-            background: radial-gradient(circle, #440000 0%, #000000 100%) !important;
-        }
-
+        #start-container.opaque { background: rgba(255,255,255,1.0) !important; }
         #start-container.opaque > * { opacity: 1; pointer-events: auto; }
         
         .start-action-row { display: flex; align-items: center; gap: 20px; margin: 10px 0; justify-content: center; }
         #start-btn { padding: 15px 40px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; min-width: 240px; }
         
-        /* トグルスイッチ */
+        /* トグルスイッチのスタイル */
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #444; transition: .4s; border-radius: 26px; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 26px; }
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         
-        /* 動的に色を変えるためのCSS変数 */
+        /* EXTREME時にJSから--toggle-colorを#dc3545に書き換える */
         input:checked + .slider { background-color: var(--toggle-color, #28a745); }
         input:checked + .slider:before { transform: translateX(24px); }
 
@@ -55,26 +49,22 @@
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
         #level-display { cursor: default; user-select: none; -webkit-user-select: none; line-height: 1.2; }
 
-        /* アニメーション */
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 20px #ff0000, inset 0 0 10px #ff0000; border-color: #ff0000; }
-            50% { box-shadow: 0 0 50px #ff0000, inset 0 0 25px #ff0000; border-color: #ff4444; }
-            100% { box-shadow: 0 0 20px #ff0000, inset 0 0 10px #ff0000; border-color: #ff0000; }
-        }
-        @keyframes shake {
+        /* EXTREME用震えるアニメーション */
+        @keyframes extreme-shake {
             0% { transform: translate(0,0); }
-            25% { transform: translate(1px, -1px); }
-            50% { transform: translate(-1px, 1px); }
-            75% { transform: translate(1px, 1px); }
+            20% { transform: translate(1px, -1px); }
+            40% { transform: translate(-1px, 1px); }
+            60% { transform: translate(1px, 1px); }
+            80% { transform: translate(-1px, -1px); }
             100% { transform: translate(0,0); }
         }
-        .extreme-shake { animation: shake 0.12s infinite; display: inline-block; }
+        .extreme-shake { animation: extreme-shake 0.1s infinite; display: inline-block; }
     </style>
 </head>
 <body>
 
     <div id="start-container" class="opaque">
-        <div id="level-display" style="font-size: 28px; font-weight: bold;" onclick="triggerDebugJump()">Level 1</div>
+        <div id="level-display" onclick="triggerDebugJump()">Level 1</div>
         <br><br>
         <button id="hp-buy-btn" class="shop-btn" onclick="buyHeadphone()">🎹 キーボード (5コイン)</button>
         <button id="bgm-cycle-btn" class="shop-btn" style="display:none;" onclick="cycleBGM()"></button>        
@@ -119,7 +109,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "18.7.0"; 
+const GAME_VERSION = "18.8.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -193,11 +183,10 @@ function stopAllBGM() {
 
 function toggleStartMode(isAuto) {
     isManualMode = !isAuto;
-    const startBtn = document.getElementById('start-btn');
     if (isManualMode) {
         if (autoStartTimeout) clearTimeout(autoStartTimeout);
         if (countdownInterval) clearInterval(countdownInterval);
-        startBtn.innerText = "START";
+        document.getElementById('start-btn').innerText = "START";
     } else {
         if (currentLevel >= 2) startAutoStartCountdown();
     }
@@ -238,43 +227,36 @@ function updateUI() {
     
     toggleContainer.style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
 
-    let modeColor = "#28a745"; // Normal Green
+    let modeColor = "#28a745"; // Normal
     let modeName = "NORMAL MODE";
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
 
-    // リセット
-    startContainer.classList.remove('extreme-bg');
-    startContainer.style.animation = "none";
+    // シャドウリセット
+    startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
-    slider.style.setProperty('--toggle-color', "#28a745");
+    slider.style.setProperty('--toggle-color', "#28a745"); // デフォルトトグル色
 
-    if (isExtreme) { 
-        modeColor = "#dc3545"; // Red
-        modeName = "EXTREME MODE"; 
-        startContainer.classList.add('extreme-bg'); 
+    if (isExtreme) {
+        modeColor = "#dc3545"; // 赤
+        modeName = "EXTREME MODE";
         startContainer.style.border = `10px double ${modeColor}`;
-        startContainer.style.animation = "pulse-red 2s infinite";
-        startBtn.style.backgroundColor = modeColor; 
-        slider.style.setProperty('--toggle-color', "#dc3545"); // トグルも赤に
-        levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor}; text-shadow:0 0 10px #ff0000;">Level ${currentLevel}</span><div class="extreme-shake" style="font-size: 18px; color:${modeColor}; margin-top: 4px;">${modeName}</div>`;
-    } else if (isHard) { 
-        modeColor = "#28a745"; // HARDも緑スタート
-        modeName = "HARD MODE"; 
-        startContainer.style.border = `6px solid #000`; // 黒枠線
-        startContainer.style.boxShadow = `0 0 25px #007bff`; // 見えるように青いシャドウ
         startBtn.style.backgroundColor = modeColor;
-        levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: #007bff; margin-top: 4px;">${modeName}</div>`;
+        slider.style.setProperty('--toggle-color', "#dc3545"); // トグルも赤
+        levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><div class="extreme-shake" style="font-size: 18px; color:${modeColor}; margin-top: 4px;">${modeName}</div>`;
+    } else if (isHard) {
+        modeColor = "#28a745"; // STARTボタンは緑
+        modeName = "HARD MODE";
+        startContainer.style.border = `6px solid #000`; // 枠線黒1本
+        startBtn.style.backgroundColor = modeColor;
+        levelDisplay.innerHTML = `<span style="color:#333;">Level ${currentLevel}</span><div style="font-size: 18px; color:#333; margin-top: 4px;">${modeName}</div>`;
     } else {
-        modeColor = "#28a745"; // Normal
+        modeColor = "#28a745"; // 緑
         modeName = "NORMAL MODE";
         startContainer.style.border = "none";
-        startContainer.style.boxShadow = "none";
         startBtn.style.backgroundColor = modeColor;
-        levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: ${modeColor}; margin-top: 4px;">${modeName}</div>`;
+        levelDisplay.innerHTML = `<span style="color:#333;">Level ${currentLevel}</span><div style="font-size: 18px; color:#333; margin-top: 4px;">${modeName}</div>`;
     }
-
-    levelDisplay.style.color = (isHard) ? "#fff" : modeColor; 
 
     if (currentLevel >= 11) {
         document.getElementById('shotgun-btn').style.display = 'block';
@@ -325,16 +307,6 @@ function updateUI() {
 
     const amuletBtn = document.getElementById('amulet-btn');
     amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
-
-    document.getElementById('dev-glass-btn').disabled = (hasDevGlasses || totalCoins < 1000);
-    document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
-    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
-    
-    let fDisplay = document.getElementById('flashlight-display');
-    if (hasFlashlight && flashlightBattery > 0) {
-        fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
-        fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
-    } else { fDisplay.innerText = ""; }
 
     let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
     document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${diffTag}`;
@@ -525,9 +497,7 @@ function movePlayer(dx, dy, isAuto = false) {
             if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
             isAutoDeviceUsedInThisLevel = false;
             gameStarted = false; 
-            
             if (!hasDevGlasses) isBlind = true; 
-            
             stopAutoProcess(); stopAllBGM();
             const container = document.getElementById('start-container');
             container.classList.remove('opaque'); container.style.display = 'flex'; 
