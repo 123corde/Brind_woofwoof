@@ -17,7 +17,6 @@
         
         .item-row { display: flex; gap: 10px; align-items: center; margin-bottom: 5px; height: 1.5em; }
         
-        /* z-indexを300に変更して購入画面(100)より手前に配置 */
         #controls { position: absolute; bottom: 15px; right: 15px; z-index: 300; display: none; }
         button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
         
@@ -121,12 +120,14 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
+// 💰 totalCoinsは維持
 let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
 
 let hasShotgun = false, shotgunAmmo = 0; 
+let shotgunRevealActive = false; // ショットガン発動時のマップ表示用
 let hasFlashlight = false, flashlightBattery = 0;
 const FLASHLIGHT_MAX = 200; 
 const FLASHLIGHT_BONUS = 180;
@@ -229,16 +230,15 @@ function updateUI() {
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
 
-    // デザイン初期化
     startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
-    startBtn.classList.remove('extreme-shake'); // 初期化
+    startBtn.classList.remove('extreme-shake');
     slider.style.setProperty('--toggle-color', "#28a745");
 
     if (isExtreme) {
         const modeColor = "#dc3545"; 
         startBtn.style.backgroundColor = modeColor;
-        startBtn.classList.add('extreme-shake'); // STARTボタンも揺らす
+        startBtn.classList.add('extreme-shake');
         slider.style.setProperty('--toggle-color', modeColor);
         startContainer.style.border = `10px double ${modeColor}`;
         levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><br><span class="extreme-shake" style="font-size: 18px; color:${modeColor};">EXTREME MODE</span>`;
@@ -314,7 +314,6 @@ function updateUI() {
     const amuletBtn = document.getElementById('amulet-btn');
     amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
 
-    // 購入済みなら、購入画面の上にも表示される
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
 
     let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
@@ -499,14 +498,25 @@ function movePlayer(dx, dy, isAuto = false) {
         player.x = nx; player.y = ny;
         let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
         if (dogIndex !== -1) {
-            if (shotgunAmmo > 0) { shotgunAmmo--; playSound(dogCrySnd); dogs.splice(dogIndex, 1); updateUI(); } 
+            if (shotgunAmmo > 0) { 
+                shotgunAmmo--; 
+                playSound(dogCrySnd); 
+                dogs.splice(dogIndex, 1); 
+                // 💥 ショットガン発動: 0.5秒マップを表示
+                shotgunRevealActive = true;
+                draw();
+                setTimeout(() => { shotgunRevealActive = false; draw(); }, 500);
+                updateUI(); 
+            } 
             else {
                 gameStarted = false; playSound(biteSnd); stopAllBGM();
                 let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
                 setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100); return;
             }
         }
-        if (dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
+        // 📍 Google Map案内中(isAuto)は唸り声を再生しない
+        if (!isAuto && dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
+        
         if (map[ny][nx] === 2) {
             playGoalSound();
             if (currentLevel === 20) { gameStarted = false; stopAllBGM(); setTimeout(() => { alert("Congratulations \n全ステージクリア！"); resetGame(); }, 100); return; }
@@ -592,7 +602,9 @@ function draw() {
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); } 
     else { ctx.drawImage(playerImg, pX, pY, size, size); }
     ctx.restore();
-    if (isBlind && gameStarted) { 
+    
+    // ショットガン発動中(shotgunRevealActive)はブラインドを描画しない
+    if (isBlind && gameStarted && !shotgunRevealActive) { 
         ctx.save();
         const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
         const tCtx = tempCanvas.getContext('2d');
