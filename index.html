@@ -34,7 +34,6 @@
         .start-action-row { display: flex; align-items: center; gap: 20px; margin: 10px 0; justify-content: center; }
         #start-btn { padding: 15px 40px; font-size: 18px; font-weight: bold; color: white; border: none; border-radius: 8px; cursor: pointer; min-width: 240px; }
         
-        /* トグルスイッチ */
         .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 26px; }
@@ -106,7 +105,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "20.0.0"; 
+const GAME_VERSION = "20.1.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -215,8 +214,9 @@ function resetAutoStartTimer() {
 }
 
 function updateUI() {
+    // 🆕 ver. の後はバージョン番号のみ表示
     const verDisplay = document.getElementById('ver-text');
-    if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}${hasDevGlasses ? " (Debug Mode)" : ""}`;
+    if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}`;
     
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
@@ -227,28 +227,28 @@ function updateUI() {
     
     toggleContainer.style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
 
-    // モード判定
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
 
-    // シャドウの全削除
+    // デザイン初期化
     startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
+    slider.style.setProperty('--toggle-color', "#28a745");
 
     if (isExtreme) {
-        const modeColor = "#dc3545"; // Red
+        const modeColor = "#dc3545"; 
         startBtn.style.backgroundColor = modeColor;
         slider.style.setProperty('--toggle-color', modeColor);
         startContainer.style.border = `10px double ${modeColor}`;
         levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><br><span class="extreme-shake" style="font-size: 18px; color:${modeColor};">EXTREME MODE</span>`;
     } else if (isHard) {
-        const modeColor = "#007bff"; // Blue
+        const modeColor = "#007bff"; 
         startBtn.style.backgroundColor = modeColor;
         slider.style.setProperty('--toggle-color', modeColor);
         startContainer.style.border = `6px solid ${modeColor}`;
         levelDisplay.innerHTML = `<span style="color:${modeColor};">Level ${currentLevel}</span><br><span style="font-size: 18px; color:${modeColor};">HARD MODE</span>`;
     } else {
-        const modeColor = "#28a745"; // Green
+        const modeColor = "#28a745"; 
         startBtn.style.backgroundColor = modeColor;
         slider.style.setProperty('--toggle-color', modeColor);
         startContainer.style.border = "none";
@@ -297,10 +297,18 @@ function updateUI() {
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) { sBtn.innerText = "💥 ショットガン (50コイン)"; sBtn.disabled = totalCoins < 50; } 
     else { sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`; sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30); }
+    // 🆕 ショットガン表示の復活
+    document.getElementById('ammo-display').innerText = (hasShotgun && shotgunAmmo > 0) ? "💥".repeat(shotgunAmmo) : "";
 
     const fBtn = document.getElementById('flashlight-btn');
     if (!hasFlashlight) { fBtn.innerText = "🔦 懐中電灯 (15コイン)"; fBtn.disabled = totalCoins < 15; } 
     else { fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`; fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5); }
+    // 🆕 懐中電灯表示の復活
+    const fDisplay = document.getElementById('flashlight-display');
+    if (hasFlashlight && flashlightBattery > 0) {
+        fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
+        fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
+    } else { fDisplay.innerText = ""; }
 
     const aBtn = document.getElementById('auto-device-btn');
     aBtn.innerText = "📍 Google Map (200コイン)"; aBtn.disabled = (hasAutoDevice || totalCoins < 200);
@@ -348,7 +356,7 @@ function buyDevGlasses() {
     if (!hasDevGlasses && totalCoins >= 1000) { 
         totalCoins -= 1000; 
         hasDevGlasses = true; 
-        updateUI(); // 購入直後にボタンをグレーにする
+        updateUI(); 
         resetAutoStartTimer();
     } 
 }
@@ -487,7 +495,7 @@ function movePlayer(dx, dy, isAuto = false) {
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
-        // 🆕 壁衝突音: 55Hz, Sine, 0.15s, Vol 0.5
+        // 壁衝突音: 55Hz, Sine, 0.15s, Vol 0.5
         if(!isAuto) playOscillator(55, 'sine', 0.15, 0.5); 
     } 
     else {
