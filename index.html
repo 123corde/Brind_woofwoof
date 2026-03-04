@@ -65,13 +65,11 @@
         
         <div class="start-action-row">
             <button id="start-btn" onclick="startGame()">START</button>
-            <div style="display: flex; flex-direction: column; align-items: center;">
+            <div id="toggle-container" style="display: flex; flex-direction: column; align-items: center;">
                 <label class="switch">
-                    <!-- デフォルトでON(自動) -->
                     <input type="checkbox" id="mode-toggle" checked onchange="toggleStartMode(this.checked)">
                     <span class="slider"></span>
                 </label>
-                <span id="mode-label" class="switch-label">AUTO START</span>
             </div>
         </div>
     </div>
@@ -99,7 +97,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "18.3.0"; 
+const GAME_VERSION = "18.5.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -113,6 +111,7 @@ let isBlind = true, gameStarted = false;
 let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
+
 let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
@@ -172,10 +171,7 @@ function stopAllBGM() {
 
 function toggleStartMode(isAuto) {
     isManualMode = !isAuto;
-    const label = document.getElementById('mode-label');
     const startBtn = document.getElementById('start-btn');
-    label.innerText = isAuto ? "自動" : "手動";
-    
     if (isManualMode) {
         if (autoStartTimeout) clearTimeout(autoStartTimeout);
         if (countdownInterval) clearInterval(countdownInterval);
@@ -191,8 +187,7 @@ function startAutoStartCountdown() {
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
 
-    if (isManualMode) { startBtn.innerText = "START"; return; }
-    if (currentLevel < 2) { startBtn.innerText = "START"; return; }
+    if (isManualMode || currentLevel < 2) { startBtn.innerText = "START"; return; }
 
     let remaining = 12;
     startBtn.innerText = `START (${remaining}s)`;
@@ -201,7 +196,7 @@ function startAutoStartCountdown() {
         if (remaining <= 0) { clearInterval(countdownInterval); startBtn.innerText = "START"; }
         else { startBtn.innerText = `START (${remaining}s)`; }
     }, 1000);
-    autoStartTimeout = setTimeout(() => { if (!gameStarted && !isManualMode) startGame(); }, 12000);
+    autoStartTimeout = setTimeout(() => { if (!gameStarted && !isManualMode) startGame(); }, 10000);
 }
 
 function resetAutoStartTimer() {
@@ -216,9 +211,12 @@ function updateUI() {
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
     const startBtn = document.getElementById('start-btn');
+    const toggleContainer = document.getElementById('toggle-container');
     
-    let modeColor = "#28a745"; // Normal
-    let modeName = "";
+    toggleContainer.style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
+
+    let modeColor = "#28a745"; 
+    let modeName = "NORMAL MODE";
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
 
@@ -226,24 +224,32 @@ function updateUI() {
     else if (isHard) { modeColor = "#007bff"; modeName = "HARD MODE"; }
 
     startBtn.style.backgroundColor = modeColor;
-    
-    if (isHard || isExtreme) {
-        levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: ${modeColor}; margin-top: 4px;">${modeName}</div>`;
-        levelDisplay.style.color = modeColor;
+    levelDisplay.innerHTML = `Level ${currentLevel}<div style="font-size: 18px; color: ${modeColor}; margin-top: 4px;">${modeName}</div>`;
+    levelDisplay.style.color = modeColor;
+
+    // 枠線演出の切り替え
+    if (isExtreme) {
+        // EXTREME: 豪華な二重線枠＋強力な赤色発光
+        startContainer.style.border = `10px double ${modeColor}`;
+        startContainer.style.boxShadow = `0 0 30px ${modeColor}, inset 0 0 15px ${modeColor}`;
+    } else if (isHard) {
+        // HARD: 青色の実線枠
         startContainer.style.border = `6px solid ${modeColor}`;
         startContainer.style.boxShadow = `0 0 25px ${modeColor}`;
+    } else {
+        // NORMAL: 枠線なし
+        startContainer.style.border = "none";
+        startContainer.style.boxShadow = "none";
+    }
+
+    if (currentLevel >= 11) {
         document.getElementById('shotgun-btn').style.display = 'block';
         document.getElementById('auto-device-btn').style.display = 'block';
     } else {
-        levelDisplay.innerText = `Level ${currentLevel}`;
-        levelDisplay.style.color = "#333";
-        startContainer.style.border = "none";
-        startContainer.style.boxShadow = "none";
         document.getElementById('shotgun-btn').style.display = 'none';
         document.getElementById('auto-device-btn').style.display = 'none';
     }
 
-    // モードトグルの反映
     if (isManualMode || currentLevel === 1) startBtn.innerText = "START";
     
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
@@ -464,7 +470,7 @@ function movePlayer(dx, dy, isAuto = false) {
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
-        if(!isAuto) playOscillator(50, 'sine', 0.4, 0.15); // 音量を0.25に強化
+        if(!isAuto) playOscillator(55, 'sine', 0.15, 0.5); 
     } 
     else {
         player.x = nx; player.y = ny;
@@ -486,7 +492,6 @@ function movePlayer(dx, dy, isAuto = false) {
             isAutoDeviceUsedInThisLevel = false;
             gameStarted = false; 
             
-            // Devモード（メガネ）所持時は視界設定（isBlind）を維持する
             if (!hasDevGlasses) isBlind = true; 
             
             stopAutoProcess(); stopAllBGM();
@@ -507,10 +512,7 @@ function movePlayer(dx, dy, isAuto = false) {
 async function startGame() { 
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-    
-    // 開始時にボタンを「START」にリセット（次回表示用）
     document.getElementById('start-btn').innerText = "START";
-
     unlockAudio(); document.getElementById('start-container').style.display = 'none'; 
     gameStarted = true; lastMoveTime = Date.now(); debugClickCount = 0; 
     isAutoDeviceUsedInThisLevel = false;
