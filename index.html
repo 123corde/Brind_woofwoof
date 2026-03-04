@@ -39,6 +39,8 @@
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 26px; }
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        
+        /* JSで--toggle-colorを動的に変更 */
         input:checked + .slider { background-color: var(--toggle-color, #28a745); }
         input:checked + .slider:before { transform: translateX(24px); }
 
@@ -107,7 +109,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "18.9.0"; 
+const GAME_VERSION = "19.1.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/f1f834b0da2f6c4fa3399e7536b86e8b8a43c98d/Watchdog.png';
@@ -122,7 +124,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-// 💰 デバッグ中：所持金を101000に維持
+// 💰 デバッグ用所持金
 let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
@@ -227,35 +229,36 @@ function updateUI() {
     
     toggleContainer.style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
 
-    let modeColor = "#28a745"; 
+    let modeColor = "#28a745"; // Default Normal (Green)
     let modeName = "NORMAL MODE";
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
 
-    // 初期化（シャドウなし・通常トグル色）
+    // シャドウの全削除
     startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
-    slider.style.setProperty('--toggle-color', "#28a745");
 
     if (isExtreme) {
-        modeColor = "#dc3545"; // 赤
+        modeColor = "#dc3545"; // Red
         modeName = "EXTREME MODE";
         startContainer.style.border = `10px double ${modeColor}`;
         startBtn.style.backgroundColor = modeColor;
-        slider.style.setProperty('--toggle-color', "#dc3545"); // トグルも赤
-        levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><div class="extreme-shake" style="font-size: 18px; color:${modeColor}; margin-top: 4px;">${modeName}</div>`;
+        slider.style.setProperty('--toggle-color', modeColor);
+        levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><br><span class="extreme-shake" style="font-size: 18px; color:${modeColor};">${modeName}</span>`;
     } else if (isHard) {
-        modeColor = "#28a745"; // ボタンは緑
+        modeColor = "#007bff"; // Blue
         modeName = "HARD MODE";
         startContainer.style.border = `6px solid #000`; // 枠線黒1本
         startBtn.style.backgroundColor = modeColor;
-        levelDisplay.innerHTML = `<span style="color:#333;">Level ${currentLevel}</span><div style="font-size: 18px; color:#333; margin-top: 4px;">${modeName}</div>`;
+        slider.style.setProperty('--toggle-color', modeColor);
+        levelDisplay.innerHTML = `<span style="color:${modeColor};">Level ${currentLevel}</span><br><span style="font-size: 18px; color:${modeColor};">${modeName}</span>`;
     } else {
-        modeColor = "#28a745"; // 緑
+        modeColor = "#28a745"; // Green
         modeName = "NORMAL MODE";
         startContainer.style.border = "none";
         startBtn.style.backgroundColor = modeColor;
-        levelDisplay.innerHTML = `<span style="color:#333;">Level ${currentLevel}</span><div style="font-size: 18px; color:#333; margin-top: 4px;">${modeName}</div>`;
+        slider.style.setProperty('--toggle-color', modeColor);
+        levelDisplay.innerHTML = `<span style="color:${modeColor};">Level ${currentLevel}</span><br><span style="font-size: 18px; color:${modeColor};">${modeName}</span>`;
     }
 
     if (currentLevel >= 11) {
@@ -307,16 +310,6 @@ function updateUI() {
 
     const amuletBtn = document.getElementById('amulet-btn');
     amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
-
-    document.getElementById('dev-glass-btn').disabled = (hasDevGlasses || totalCoins < 1000);
-    document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
-    document.getElementById('ammo-display').innerText = shotgunAmmo > 0 ? "💥".repeat(shotgunAmmo) : "";
-    
-    let fDisplay = document.getElementById('flashlight-display');
-    if (hasFlashlight && flashlightBattery > 0) {
-        fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
-        fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
-    } else { fDisplay.innerText = ""; }
 
     let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
     document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${diffTag}`;
@@ -471,7 +464,7 @@ setInterval(() => {
     }
 }, 100);
 
-// playOscillator (壁音指定)
+// playOscillator
 async function playOscillator(f, t, d, vol = 0.06) {
     if (!audioCtx) return;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
@@ -487,7 +480,6 @@ function movePlayer(dx, dy, isAuto = false) {
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
-        // 🆕 壁衝突音: 55Hz, Sine, 0.15s, Vol 0.5
         if(!isAuto) playOscillator(55, 'sine', 0.15, 0.5); 
     } 
     else {
@@ -510,7 +502,6 @@ function movePlayer(dx, dy, isAuto = false) {
             isAutoDeviceUsedInThisLevel = false;
             gameStarted = false; 
             
-            // 🆕 Devモード（メガネ）所持時は視界設定を維持。持っていない時だけ暗転リセット
             if (!hasDevGlasses) isBlind = true; 
             
             stopAutoProcess(); stopAllBGM();
