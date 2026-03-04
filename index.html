@@ -105,10 +105,10 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "22.1.0"; 
+const GAME_VERSION = "22.3.0"; 
 
 // ★ハンターが最短経路を避ける「プレイヤーからの実歩数」
-const HUNTER_AVOID_DIST = 6; 
+const HUNTER_AVOID_DIST = 3; 
 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
@@ -130,7 +130,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -533,7 +533,7 @@ function playDefeatSequence(isHunter) {
     playOverlap(shotgunSnd);
     setTimeout(() => {
         playOverlap(isHunter ? hunterDefeatSnd : watchdogDefeatSnd);
-    }, 150);
+    }, 1300);
 }
 
 // ハンターの移動ロジック
