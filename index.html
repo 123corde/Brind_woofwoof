@@ -121,7 +121,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -198,14 +198,14 @@ function startAutoStartCountdown() {
 
     if (isManualMode || currentLevel < 2) { startBtn.innerText = "START"; return; }
 
-    let remaining = 12;
+    let remaining = 10;
     startBtn.innerText = `START (${remaining}s)`;
     countdownInterval = setInterval(() => {
         remaining--;
         if (remaining <= 0) { clearInterval(countdownInterval); startBtn.innerText = "START"; }
         else { startBtn.innerText = `START (${remaining}s)`; }
     }, 1000);
-    autoStartTimeout = setTimeout(() => { if (!gameStarted && !isManualMode) startGame(); }, 12000);
+    autoStartTimeout = setTimeout(() => { if (!gameStarted && !isManualMode) startGame(); }, 10000);
 }
 
 function resetAutoStartTimer() {
