@@ -105,7 +105,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.0.0"; 
+const GAME_VERSION = "21.1.0"; 
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/20fde8abcea576876580874124524fe52102d019/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/25fcfc444f24c7c3523c3defdb2c3182e2421220/Watchdog.png';
@@ -121,7 +121,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -141,7 +141,6 @@ let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 let loadingDots = 0;
 let isAutoDeviceUsedInThisLevel = false;
 
-// 追跡者用
 let playerMoveCount = 0;
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
@@ -199,9 +198,7 @@ function startAutoStartCountdown() {
     const startBtn = document.getElementById('start-btn');
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-
     if (isManualMode || currentLevel < 2) { startBtn.innerText = "START"; return; }
-
     let remaining = 10;
     startBtn.innerText = `START (${remaining}s)`;
     countdownInterval = setInterval(() => {
@@ -220,19 +217,15 @@ function resetAutoStartTimer() {
 function updateUI() {
     const verDisplay = document.getElementById('ver-text');
     if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}`;
-    
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
     const startBtn = document.getElementById('start-btn');
     const toggleContainer = document.getElementById('toggle-container');
     const slider = document.querySelector('.slider');
     const devBtn = document.getElementById('dev-glass-btn');
-    
     toggleContainer.style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
-
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
-
     startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
     startBtn.classList.remove('extreme-shake');
@@ -266,18 +259,14 @@ function updateUI() {
         document.getElementById('shotgun-btn').style.display = 'none';
         document.getElementById('auto-device-btn').style.display = 'none';
     }
-
     if (isManualMode || currentLevel === 1) startBtn.innerText = "START";
-    
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
-    
     devBtn.disabled = (hasDevGlasses || totalCoins < 1000);
 
     const hpBuyBtn = document.getElementById('hp-buy-btn');
     const cycleBtn = document.getElementById('bgm-cycle-btn');
     const hpDisplay = document.getElementById('headphone-display');
-
     if (hasHeadphone) {
         let bgmStatusIcon = "🔕";
         let nextSongName = "❄️ 氷の華";
@@ -313,12 +302,9 @@ function updateUI() {
 
     const aBtn = document.getElementById('auto-device-btn');
     aBtn.innerText = "📍 Google Map (200コイン)"; aBtn.disabled = (hasAutoDevice || totalCoins < 200);
-
     const amuletBtn = document.getElementById('amulet-btn');
     amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
-
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
-
     let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
     document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${diffTag}`;
 
@@ -331,42 +317,34 @@ function updateUI() {
     document.getElementById('auto-status').innerText = statusText;
 }
 
-function buyHeadphone() { if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; currentBGM = null; updateUI(); resetAutoStartTimer(); } }
+function buyHeadphone() { if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; currentBGM = null; updateUI(); resetAutoStartCountdown(); } }
 function cycleBGM() {
     if (currentBGM === null) currentBGM = 1;
     else if (currentBGM === 1) currentBGM = 2;
     else if (currentBGM === 2) currentBGM = 3;
     else if (currentBGM === 3) currentBGM = 4;
     else currentBGM = null;
-    updateUI(); resetAutoStartTimer();
+    updateUI(); resetAutoStartCountdown();
 }
 function buyShotgun() {
     if (!hasShotgun) { if (totalCoins >= 50) { totalCoins -= 50; hasShotgun = true; shotgunAmmo = 2; } } 
     else { if (totalCoins >= 30 && shotgunAmmo < 2) { totalCoins -= 30; shotgunAmmo += 1; } }
-    updateUI(); resetAutoStartTimer();
+    updateUI(); resetAutoStartCountdown();
 }
 function buyFlashlight() {
     if (!hasFlashlight) { if (totalCoins >= 15) { totalCoins -= 15; hasFlashlight = true; flashlightBattery = 60; } } 
     else { if (totalCoins >= 5 && flashlightBattery < FLASHLIGHT_MAX) { totalCoins -= 5; flashlightBattery = Math.min(FLASHLIGHT_MAX, flashlightBattery + 10); } }
-    updateUI(); resetAutoStartTimer();
+    updateUI(); resetAutoStartCountdown();
 }
-function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; hasAmulet = true; coinMultiplier = 3; updateUI(); resetAutoStartTimer(); } }
-function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); resetAutoStartTimer(); } }
-
-function buyDevGlasses() { 
-    if (!hasDevGlasses && totalCoins >= 1000) { 
-        totalCoins -= 1000; 
-        hasDevGlasses = true; 
-        updateUI(); 
-        resetAutoStartTimer();
-    } 
-}
+function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; hasAmulet = true; coinMultiplier = 3; updateUI(); resetAutoStartCountdown(); } }
+function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); resetAutoStartCountdown(); } }
+function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); resetAutoStartCountdown(); } }
 
 function triggerDebugJump() {
     if (gameStarted) return;
     debugClickCount++;
-    if (debugClickCount === 10) { currentLevel = 11; updateUI(); resetAutoStartTimer(); } 
-    else if (debugClickCount === 20) { currentLevel = 16; updateUI(); resetAutoStartTimer(); }
+    if (debugClickCount === 10) { currentLevel = 11; updateUI(); resetAutoStartCountdown(); } 
+    else if (debugClickCount === 20) { currentLevel = 16; updateUI(); resetAutoStartCountdown(); }
 }
 
 function generateSimpleMaze() {
@@ -378,7 +356,6 @@ function generateSimpleMaze() {
     };
     const s = sizeMap[currentLevel] || [17, 21];
     COLS = s[0]; ROWS = s[1];
-
     let found = false, attempts = 0;
     while (!found && attempts < 50) {
         attempts++;
@@ -407,8 +384,7 @@ function generateSimpleMaze() {
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = curr.x + dx, ny = curr.y + dy;
                 if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] !== 1 && dists[ny][nx] === -1) { 
-                    dists[ny][nx] = curr.d + 1; 
-                    q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]}); 
+                    dists[ny][nx] = curr.d + 1; q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]}); 
                 }
             }
         }
@@ -416,15 +392,12 @@ function generateSimpleMaze() {
         let target = allWalkable[0];
         if(target && dists[target.y][target.x] > 2) {
             map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
-            // 最短経路を保存
             shortestPath = [{x: sX, y: sY}, ...target.fullPath];
             coinsCollectedInLevel = 0;
-            
             if (currentLevel <= 10) {
                 let stepSize = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 }[currentLevel] || 5;
                 for (let i = 0; i < shortestPath.length; i += stepSize) { 
-                    let p = shortestPath[i]; 
-                    if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3; 
+                    let p = shortestPath[i]; if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3; 
                 }
             } else {
                 let walkableTiles = [];
@@ -433,46 +406,33 @@ function generateSimpleMaze() {
                 let coinCount = Math.min(currentLevel, walkableTiles.length);
                 for (let i = 0; i < coinCount; i++) map[walkableTiles[i].y][walkableTiles[i].x] = 3;
             }
-
             dogs = [];
             let safetyZone = new Set(); safetyZone.add(`${player.x},${player.y}`);
             [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => safetyZone.add(`${player.x + dx},${player.y + dy}`));
-            
             let pathSet = new Set(), pathSurroundSet = new Set();
             shortestPath.forEach(p => { 
-                pathSet.add(`${p.x},${p.y}`); 
-                [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => pathSurroundSet.add(`${p.x + dx},${p.y + dy}`)); 
+                pathSet.add(`${p.x},${p.y}`); [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => pathSurroundSet.add(`${p.x + dx},${p.y + dy}`)); 
             });
-
             let spawnCandidates = allWalkable.filter(p => { 
-                const posKey = `${p.x},${p.y}`; 
-                if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false; 
+                const posKey = `${p.x},${p.y}`; if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false; 
                 return (currentLevel <= 10) ? (!pathSet.has(posKey) && !pathSurroundSet.has(posKey)) : !pathSet.has(posKey); 
             });
-
             let dogNum = Math.min(15, currentLevel - 1);
             for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) { 
                 let idx = Math.floor(Math.random() * spawnCandidates.length); 
-                dogs.push({ x: spawnCandidates[idx].x, y: spawnCandidates[idx].y, isHunter: false }); 
-                spawnCandidates.splice(idx, 1); 
+                dogs.push({ x: spawnCandidates[idx].x, y: spawnCandidates[idx].y, isHunter: false }); spawnCandidates.splice(idx, 1); 
             }
-
-            // Extreme Hunter Logic
             if (currentLevel >= 16) {
                 let hunterCount = (currentLevel >= 18) ? 2 : 1;
-                // 既存の犬からランダムにハンターに変換、犬が足りない場合は追加
                 for (let i = 0; i < hunterCount; i++) {
-                    if (dogs.length > i) {
-                        dogs[i].isHunter = true;
-                    } else if (spawnCandidates.length > 0) {
+                    if (dogs.length > i) dogs[i].isHunter = true;
+                    else if (spawnCandidates.length > 0) {
                         let idx = Math.floor(Math.random() * spawnCandidates.length);
-                        dogs.push({ x: spawnCandidates[idx].x, y: spawnCandidates[idx].y, isHunter: true });
-                        spawnCandidates.splice(idx, 1);
+                        dogs.push({ x: spawnCandidates[idx].x, y: spawnCandidates[idx].y, isHunter: true }); spawnCandidates.splice(idx, 1);
                     }
                 }
             }
-            playerMoveCount = 0;
-            found = true;
+            playerMoveCount = 0; found = true;
         }
     }
 }
@@ -537,43 +497,77 @@ async function playOscillator(f, t, d, vol = 0.06) {
 // ハンターの移動ロジック
 function moveHunters() {
     if (currentLevel < 16) return;
-    
-    // 最短経路の座標セット（踏まないため）
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
     
-    dogs.forEach(dog => {
-        if (!dog.isHunter) return;
+    // ハンターごとに処理
+    for (let i = dogs.length - 1; i >= 0; i--) {
+        const dog = dogs[i];
+        if (!dog.isHunter) continue;
 
-        // BFSでプレイヤーへの最短ルートを探す（ただし最短経路タイルは避ける）
+        // BFSでプレイヤーへの最短ルートを探す（最短経路タイルは無視して経路計算）
         let q = [{x: dog.x, y: dog.y, path: []}], visited = new Set();
         visited.add(`${dog.x},${dog.y}`);
-        let nextMove = null;
+        let foundPath = null;
 
         while(q.length > 0) {
             let curr = q.shift();
-            if (curr.x === player.x && curr.y === player.y) {
-                nextMove = curr.path[0];
-                break;
-            }
+            if (curr.x === player.x && curr.y === player.y) { foundPath = curr.path; break; }
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
-                // 移動条件: 範囲内、壁でない、未訪問、かつ「最短経路タイルでない」
-                if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !pathSet.has(key)) {
+                if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key)) {
                     visited.add(key);
                     q.push({x: nx, y: ny, path: [...curr.path, {x: nx, y: ny}]});
                 }
             }
         }
 
-        if (nextMove) {
-            dog.x = nextMove.x;
-            dog.y = nextMove.y;
-            // 移動後にプレイヤーと重なったらゲームオーバー
+        if (foundPath && foundPath.length > 0) {
+            let nextStep = foundPath[0];
+            let moveTarget = nextStep;
+
+            // 侵入禁止/飛び越え判定
+            if (pathSet.has(`${nextStep.x},${nextStep.y}`)) {
+                // 次のマスが最短経路なら、そのさらに次（2歩目）を確認
+                if (foundPath.length >= 2) {
+                    let secondStep = foundPath[1];
+                    // 2歩目が最短経路でなければ「飛び越え」成功
+                    if (!pathSet.has(`${secondStep.x},${secondStep.y}`)) {
+                        moveTarget = secondStep;
+                    } else {
+                        // 2歩目も最短経路なら、侵入できないためその場に留まる
+                        continue;
+                    }
+                } else {
+                    // 隣が最短経路で、かつその先がプレイヤー（最短経路上）なら、侵入せず待機
+                    continue;
+                }
+            }
+
+            dog.x = moveTarget.x;
+            dog.y = moveTarget.y;
+
+            // 移動後にプレイヤーと重なった場合の判定
             if (dog.x === player.x && dog.y === player.y) {
-                triggerGameOver();
+                if (shotgunAmmo > 0) {
+                    shotgunAmmo--;
+                    playSound(dogCrySnd);
+                    dogs.splice(i, 1); // 弾があればハンターを消去
+                    triggerShotgunEffect();
+                    updateUI();
+                } else {
+                    triggerGameOver();
+                    return;
+                }
             }
         }
-    });
+    }
+}
+
+function triggerShotgunEffect() {
+    setTimeout(() => {
+        shotgunRevealActive = true; draw();
+        setTimeout(() => { shotgunRevealActive = false; draw(); }, 250);
+    }, 500);
 }
 
 function triggerGameOver() {
@@ -597,27 +591,16 @@ function movePlayer(dx, dy, isAuto = false) {
         playerMoveCount++;
 
         // ハンターの移動判定
-        if (currentLevel === 20) {
-            moveHunters(); // 毎歩移動
-        } else if (currentLevel >= 16 && playerMoveCount % 2 === 0) {
-            moveHunters(); // 2歩ごとに移動
-        }
+        if (currentLevel === 20) moveHunters();
+        else if (currentLevel >= 16 && playerMoveCount % 2 === 0) moveHunters();
 
+        // 接触判定
         let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
         if (dogIndex !== -1) {
             if (shotgunAmmo > 0) { 
-                shotgunAmmo--; 
-                playSound(dogCrySnd); 
-                dogs.splice(dogIndex, 1); 
-                setTimeout(() => {
-                    shotgunRevealActive = true; draw();
-                    setTimeout(() => { shotgunRevealActive = false; draw(); }, 250);
-                }, 500);
-                updateUI(); 
-            } 
-            else {
-                triggerGameOver(); return;
-            }
+                shotgunAmmo--; playSound(dogCrySnd); dogs.splice(dogIndex, 1); 
+                triggerShotgunEffect(); updateUI(); 
+            } else { triggerGameOver(); return; }
         }
         
         if (!isAuto && dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
@@ -667,8 +650,7 @@ function resetGame() {
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0; hasHeadphone = false; currentBGM = null;
     coinMultiplier = 1; gameStarted = false; isBlind = true; debugClickCount = 0;
-    playerMoveCount = 0;
-    stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
+    playerMoveCount = 0; stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
 
 function toggleBlind() { isBlind = !isBlind; draw(); }
@@ -703,8 +685,9 @@ function draw() {
         }
     }
     
-    // 犬とハンターの描画
-    dogs.forEach(d => {
+    // 犬とハンターの描画（ハンターを後に描画して上位レイヤーにする）
+    const sortedDogs = [...dogs].sort((a, b) => (a.isHunter === b.isHunter ? 0 : a.isHunter ? 1 : -1));
+    sortedDogs.forEach(d => {
         let img = d.isHunter ? hunterImg : dogImg;
         ctx.drawImage(img, oX+d.x*size, oY+d.y*size, size, size);
     });
@@ -752,8 +735,8 @@ window.addEventListener('touchend', e => {
     tsX = null; tsY = null;
 });
 const startContainer = document.getElementById('start-container');
-startContainer.addEventListener('mousedown', resetAutoStartTimer);
-startContainer.addEventListener('touchstart', resetAutoStartTimer, {passive: true});
+startContainer.addEventListener('mousedown', resetAutoStartCountdown);
+startContainer.addEventListener('touchstart', resetAutoStartCountdown, {passive: true});
 window.onresize = draw; updateUI(); draw();
 </script>
 </body>
