@@ -105,7 +105,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "22.0.0"; 
+const GAME_VERSION = "22.1.0"; 
 
 // ★ハンターが最短経路を避ける「プレイヤーからの実歩数」
 const HUNTER_AVOID_DIST = 6; 
@@ -130,7 +130,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -562,17 +562,7 @@ function moveHunters() {
 
         if (bestMove) {
             dog.x = bestMove.x; dog.y = bestMove.y;
-            if (dog.x === player.x && dog.y === player.y) {
-                if (shotgunAmmo > 0) {
-                    shotgunAmmo--;
-                    playDefeatSequence(true); // ハンター撃退シーケンス
-                    dogs.splice(i, 1); 
-                    triggerShotgunEffect();
-                    updateUI();
-                } else {
-                    triggerGameOver(); return;
-                }
-            }
+            // ここでの衝突判定は後続の判定処理で行うため座標更新のみ
         }
     }
 }
@@ -604,28 +594,29 @@ function movePlayer(dx, dy, isAuto = false) {
         player.x = nx; player.y = ny;
         playerMoveCount++;
 
+        // ハンター移動
         if (currentLevel === 20) moveHunters();
         else if (currentLevel >= 16 && playerMoveCount % 2 === 0) moveHunters();
 
+        // 1. 移動完了後の座標での【重なり（接触）】判定
         let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
         if (dogIndex !== -1) {
             const collidedDog = dogs[dogIndex];
-            if (collidedDog && shotgunAmmo > 0) { 
+            if (shotgunAmmo > 0) { 
                 shotgunAmmo--; 
-                playDefeatSequence(collidedDog.isHunter); // 犬撃退シーケンス
+                playDefeatSequence(collidedDog.isHunter);
                 dogs.splice(dogIndex, 1); 
                 triggerShotgunEffect(); updateUI(); 
             } else { triggerGameOver(); return; }
         }
         
-        // 隣接マスの警告音（woof）
-        if (!isAuto) {
-            const adjacentDogs = dogs.filter(d => Math.abs(d.x - player.x) + Math.abs(d.y - player.y) === 1);
-            adjacentDogs.forEach(d => {
-                if (d.isHunter) playOverlap(hunterWoofSnd);
-                else playOverlap(watchdogWoofSnd);
-            });
-        }
+        // 2. 移動完了後の座標での【隣接（吠え）】判定
+        // ここですべての移動が終わった後の座標で判定を行う
+        const adjacentDogs = dogs.filter(d => Math.abs(d.x - player.x) + Math.abs(d.y - player.y) === 1);
+        adjacentDogs.forEach(d => {
+            if (d.isHunter) playOverlap(hunterWoofSnd);
+            else playOverlap(watchdogWoofSnd);
+        });
         
         if (map[ny][nx] === 2) {
             playGoalSound();
