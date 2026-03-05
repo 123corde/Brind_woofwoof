@@ -48,9 +48,9 @@
 
         /* キーボード選択時のハイライト */
         .kb-selected {
-            outline: 4px solid #ffeb3b !important;
-            box-shadow: 0 0 15px #ffeb3b !important;
-            transform: scale(1.05);
+            outline: 4px solid #ccc !important;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2) !important;
+            transform: scale(1.15);
             transition: transform 0.1s;
         }
 
@@ -113,7 +113,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.0.0";
+const GAME_VERSION = "21.0.1";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -151,7 +151,7 @@ let loadingDots = 0;
 let isAutoDeviceUsedInThisLevel = false;
 
 // キーボードナビゲーション用
-let selectedMenuIndex = 0;
+let selectedMenuIndex = 1;
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
@@ -581,7 +581,7 @@ function movePlayer(dx, dy, isAuto = false) {
             stopAutoProcess(); stopAllBGM();
             const container = document.getElementById('start-container');
             container.classList.remove('opaque'); container.style.display = 'flex'; 
-            selectedMenuIndex = 0; // メニューリセット
+            selectedMenuIndex = 1;
             setTimeout(() => { if (!gameStarted) { container.classList.add('opaque'); startAutoStartCountdown(); } }, 1750); 
             updateUI();
         } else if (map[ny][nx] === 3) {
@@ -616,7 +616,7 @@ function resetGame() {
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0; hasHeadphone = false; currentBGM = null;
     coinMultiplier = 1; gameStarted = false; isBlind = true; debugClickCount = 0;
-    selectedMenuIndex = 0;
+    selectedMenuIndex = 1;
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
 
