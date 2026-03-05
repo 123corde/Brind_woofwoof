@@ -44,7 +44,15 @@
         .shop-btn { padding: 10px; margin: 3px; background: #ffd54f; color: #333; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; flex-shrink: 0; }
         .shop-btn:disabled { background: #ccc !important; cursor: not-allowed; color: #777 !important; }
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
-        #level-display { cursor: default; user-select: none; -webkit-user-select: none; line-height: 1.2; font-weight: bold; font-size: 28px; }
+        #level-display { cursor: pointer; user-select: none; -webkit-user-select: none; line-height: 1.2; font-weight: bold; font-size: 28px; padding: 5px; border-radius: 5px; }
+
+        /* キーボード選択時のハイライト */
+        .kb-selected {
+            outline: 4px solid #ffeb3b !important;
+            box-shadow: 0 0 15px #ffeb3b !important;
+            transform: scale(1.05);
+            transition: transform 0.1s;
+        }
 
         @keyframes extreme-shake {
             0% { transform: translate(0,0); }
@@ -74,7 +82,7 @@
         <div class="start-action-row">
             <button id="start-btn" onclick="startGame()">START</button>
             <div id="toggle-container" style="display: flex; flex-direction: column; align-items: center;">
-                <label class="switch">
+                <label class="switch" id="mode-toggle-label">
                     <input type="checkbox" id="mode-toggle" checked onchange="toggleStartMode(this.checked)">
                     <span class="slider"></span>
                 </label>
@@ -105,7 +113,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "20.1.2";
+const GAME_VERSION = "21.0.0";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -141,6 +149,9 @@ let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 let loadingDots = 0;
 let isAutoDeviceUsedInThisLevel = false;
+
+// キーボードナビゲーション用
+let selectedMenuIndex = 0;
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
@@ -183,6 +194,8 @@ function stopAllBGM() {
 function toggleStartMode(isAuto) {
     isManualMode = !isAuto;
     const startBtn = document.getElementById('start-btn');
+    const checkbox = document.getElementById('mode-toggle');
+    checkbox.checked = isAuto;
     if (isManualMode) {
         if (autoStartTimeout) clearTimeout(autoStartTimeout);
         if (countdownInterval) clearInterval(countdownInterval);
@@ -213,6 +226,31 @@ function startAutoStartCountdown() {
 function resetAutoStartTimer() {
     if (gameStarted || currentLevel < 2 || isManualMode) return;
     startAutoStartCountdown();
+}
+
+// 選択可能なメニュー要素を配列で取得
+function getSelectableElements() {
+    const ids = [
+        'level-display',
+        'hp-buy-btn', 'bgm-cycle-btn',
+        'flashlight-btn', 'amulet-btn',
+        'shotgun-btn', 'auto-device-btn',
+        'dev-glass-btn', 'start-btn',
+        'mode-toggle-label', 'toggleMode'
+    ];
+    return ids.map(id => document.getElementById(id)).filter(el => {
+        if (!el) return false;
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+    });
+}
+
+function updateMenuSelection() {
+    const elements = getSelectableElements();
+    elements.forEach((el, idx) => {
+        if (idx === selectedMenuIndex) el.classList.add('kb-selected');
+        else el.classList.remove('kb-selected');
+    });
 }
 
 function updateUI() {
@@ -327,6 +365,8 @@ function updateUI() {
         else if (autoLoadState === "MOVING") statusText = `📍[案内中](${getDistanceToGoal()}s)`;
     }
     document.getElementById('auto-status').innerText = statusText;
+
+    if (!gameStarted) updateMenuSelection();
 }
 
 function buyHeadphone() { if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; currentBGM = null; updateUI(); resetAutoStartTimer(); } }
@@ -368,7 +408,6 @@ function triggerDebugJump() {
 }
 
 function generateSimpleMaze() {
-    // 固定サイズテーブル
     const sizeMap = {
         1: [5, 7],   2: [7, 9],   3: [7, 9],   4: [9, 11],  5: [9, 11],
         6: [11, 13], 7: [11, 13], 8: [13, 15], 9: [13, 15], 10: [15, 19],
@@ -513,7 +552,6 @@ function movePlayer(dx, dy, isAuto = false) {
                 setTimeout(() => {
                     playSound(dogCrySnd);
                 }, 1300);
-                // ショットガンフラッシュ: 0.5s待ってから0.25s透過背景
                 setTimeout(() => {
                     shotgunRevealActive = true;
                     draw();
@@ -543,6 +581,7 @@ function movePlayer(dx, dy, isAuto = false) {
             stopAutoProcess(); stopAllBGM();
             const container = document.getElementById('start-container');
             container.classList.remove('opaque'); container.style.display = 'flex'; 
+            selectedMenuIndex = 0; // メニューリセット
             setTimeout(() => { if (!gameStarted) { container.classList.add('opaque'); startAutoStartCountdown(); } }, 1750); 
             updateUI();
         } else if (map[ny][nx] === 3) {
@@ -577,6 +616,7 @@ function resetGame() {
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0; hasHeadphone = false; currentBGM = null;
     coinMultiplier = 1; gameStarted = false; isBlind = true; debugClickCount = 0;
+    selectedMenuIndex = 0;
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
 
@@ -644,6 +684,43 @@ function draw() {
         ctx.drawImage(tempCanvas, 0, 0); ctx.restore();
     }
 }
+
+// ⌨️ キーボードイベント
+window.addEventListener('keydown', e => {
+    const key = e.key.toLowerCase();
+    
+    if (!gameStarted) {
+        // メニュー操作
+        const items = getSelectableElements();
+        if (key === 'w' || e.key === 'ArrowUp') {
+            selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
+            updateMenuSelection();
+            e.preventDefault();
+        } else if (key === 's' || e.key === 'ArrowDown') {
+            selectedMenuIndex = (selectedMenuIndex + 1) % items.length;
+            updateMenuSelection();
+            e.preventDefault();
+        } else if (e.key === ' ' || e.key === 'Enter') {
+            const target = items[selectedMenuIndex];
+            if (target) {
+                if (target.id === 'mode-toggle-label') {
+                    const cb = document.getElementById('mode-toggle');
+                    toggleStartMode(!cb.checked);
+                } else {
+                    target.click();
+                }
+            }
+            e.preventDefault();
+        }
+    } else {
+        // プレイヤー移動
+        if (key === 'w' || e.key === 'ArrowUp') movePlayer(0, -1);
+        else if (key === 's' || e.key === 'ArrowDown') movePlayer(0, 1);
+        else if (key === 'a' || e.key === 'ArrowLeft') movePlayer(-1, 0);
+        else if (key === 'd' || e.key === 'ArrowRight') movePlayer(1, 0);
+    }
+});
+
 let tsX = null, tsY = null;
 window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e.touches[0].clientY; });
 window.addEventListener('touchend', e => {
