@@ -105,13 +105,14 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "20.1.1";
+const GAME_VERSION = "20.1.2";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog_woof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane_watchdog.mp3');
+const shotgunSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Shotgun.mp3');
 
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
@@ -162,7 +163,7 @@ function unlockAudio() {
         audio.muted = true;
         audio.play().then(() => { audio.pause(); audio.currentTime = 0; audio.muted = false; }).catch(e => {}); 
     };
-    [growlSnd, biteSnd, dogCrySnd].forEach(silentPlay);
+    [growlSnd, biteSnd, dogCrySnd, shotgunSnd].forEach(silentPlay);
     soundReady = true;
 }
 
@@ -507,9 +508,12 @@ function movePlayer(dx, dy, isAuto = false) {
         if (dogIndex !== -1) {
             if (shotgunAmmo > 0) { 
                 shotgunAmmo--; 
-                playSound(dogCrySnd); 
+                playSound(shotgunSnd); 
                 dogs.splice(dogIndex, 1); 
-                // 💥 ショットガン発動: 0.5s待ってから0.25s表示
+                setTimeout(() => {
+                    playSound(dogCrySnd);
+                }, 1300);
+                // ショットガンフラッシュ: 0.5s待ってから0.25s透過背景
                 setTimeout(() => {
                     shotgunRevealActive = true;
                     draw();
