@@ -113,7 +113,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.0.1";
+const GAME_VERSION = "21.0.2";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -692,12 +692,23 @@ window.addEventListener('keydown', e => {
     if (!gameStarted) {
         // メニュー操作
         const items = getSelectableElements();
-        if (key === 'w' || e.key === 'ArrowUp') {
-            selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
+
+        // (Shift + W) のときだけ Level表示 (Index 0) を強制選択
+        if (e.key === 'W') {
+            selectedMenuIndex = 0;
             updateMenuSelection();
             e.preventDefault();
-        } else if (key === 's' || e.key === 'ArrowDown') {
+            return;
+        }
+
+        if (key === 'w' || key === 'a' || e.key === 'ArrowUp') {
+            selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
+            if (selectedMenuIndex === 0) selectedMenuIndex = items.length - 1;
+            updateMenuSelection();
+            e.preventDefault();
+        } else if (key === 's' || key === 'd' || e.key === 'ArrowDown') {
             selectedMenuIndex = (selectedMenuIndex + 1) % items.length;
+            if (selectedMenuIndex === 0) selectedMenuIndex = 1;
             updateMenuSelection();
             e.preventDefault();
         } else if (e.key === ' ' || e.key === 'Enter') {
