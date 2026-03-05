@@ -688,27 +688,33 @@ function draw() {
 // ⌨️ キーボードイベント
 window.addEventListener('keydown', e => {
     const key = e.key.toLowerCase();
-    
+    const items = getSelectableElements();
+    const isRestricted = (el) => el.id === 'level-display' || el.id === 'toggleMode';
+
+    if (e.key === 'W' && !gameStarted) {
+        const idx = items.findIndex(el => el.id === 'level-display');
+        if (idx !== -1) { selectedMenuIndex = idx; updateMenuSelection(); }
+        e.preventDefault(); return;
+    }
+    if (e.key === 'D') {
+        const idx = items.findIndex(el => el.id === 'toggleMode');
+        if (idx !== -1) { selectedMenuIndex = idx; updateMenuSelection(); }
+        e.preventDefault(); return;
+    }
+
     if (!gameStarted) {
-        // メニュー操作
-        const items = getSelectableElements();
-
-        // (Shift + W) のときだけ Level表示 (Index 0) を強制選択
-        if (e.key === 'W') {
-            selectedMenuIndex = 0;
-            updateMenuSelection();
-            e.preventDefault();
-            return;
-        }
-
         if (key === 'w' || key === 'a' || e.key === 'ArrowUp') {
             selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
-            if (selectedMenuIndex === 0) selectedMenuIndex = items.length - 1;
+            while (isRestricted(items[selectedMenuIndex])) {
+                selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
+            }
             updateMenuSelection();
             e.preventDefault();
         } else if (key === 's' || key === 'd' || e.key === 'ArrowDown') {
             selectedMenuIndex = (selectedMenuIndex + 1) % items.length;
-            if (selectedMenuIndex === 0) selectedMenuIndex = 1;
+            while (isRestricted(items[selectedMenuIndex])) {
+                selectedMenuIndex = (selectedMenuIndex + 1) % items.length;
+            }
             updateMenuSelection();
             e.preventDefault();
         } else if (e.key === ' ' || e.key === 'Enter') {
@@ -724,7 +730,11 @@ window.addEventListener('keydown', e => {
             e.preventDefault();
         }
     } else {
-        // プレイヤー移動
+        if ((e.key === ' ' || e.key === 'Enter') && items[selectedMenuIndex]?.id === 'toggleMode') {
+            items[selectedMenuIndex].click();
+            e.preventDefault();
+            return;
+        }
         if (key === 'w' || e.key === 'ArrowUp') movePlayer(0, -1);
         else if (key === 's' || e.key === 'ArrowDown') movePlayer(0, 1);
         else if (key === 'a' || e.key === 'ArrowLeft') movePlayer(-1, 0);
