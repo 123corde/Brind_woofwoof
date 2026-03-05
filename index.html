@@ -113,7 +113,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.0.2";
+const GAME_VERSION = "21.0.3";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -753,8 +753,8 @@ window.addEventListener('touchend', e => {
     tsX = null; tsY = null;
 });
 const startContainer = document.getElementById('start-container');
-startContainer.addEventListener('mousedown', resetAutoStartTimer);
-startContainer.addEventListener('touchstart', resetAutoStartTimer, {passive: true});
+startContainer.addEventListener('mousedown', (e) => resetAutoStartTimer(e));
+startContainer.addEventListener('touchstart', (e) => resetAutoStartTimer(e), {passive: true});
 window.onresize = draw; updateUI(); draw();
 </script>
 </body>
