@@ -29,8 +29,14 @@
         #ranking-table { width: 100%; margin: 10px 0; border-collapse: collapse; font-size: 10px; }
         #ranking-table th, #ranking-table td { padding: 5px 2px; border-bottom: 1px solid #444; text-align: center; }
         .retry-btn { padding: 10px 20px; background: #ffd700; color: #000; border: none; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .kb-selected { outline: 4px solid #ccc !important; transform: scale(1.05); }
-        @keyframes extreme-shake { 0% { transform: translate(0,0); } 20% { transform: translate(1px, -1px); } 100% { transform: translate(0,0); } }
+        .kb-selected { outline: 4px solid #ccc !important; transform: scale(1.05); box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        @keyframes extreme-shake { 
+            0% { transform: translate(0,0); } 
+            25% { transform: translate(2px, -2px); } 
+            50% { transform: translate(-2px, 2px); } 
+            75% { transform: translate(2px, 2px); } 
+            100% { transform: translate(0,0); } 
+        }
         .extreme-shake { animation: extreme-shake 0.1s infinite; display: inline-block; }
     </style>
 </head>
@@ -68,6 +74,7 @@
         </div>
         <div id="level-text-ui">Level 1/20</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
+        <div id="ver-text" style="font-size: 0.8em; color: #888;"></div>
     </div>
 
     <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
@@ -84,7 +91,7 @@
 const GAME_VERSION = "24.5.9";
 const GAS_URL = "https://script.google.com/macros/s/AKfycby2EiyJEB9tKFKRZh_F53Up1beC-zIxrIMirvxj8i-bmZCfAz-rnlrSEWMxUE5K_opvOQ/exec";
 
-// Asset Settings
+// Assets
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -99,29 +106,33 @@ const hunterCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind
 
 // Game State
 let audioCtx = null, soundReady = false, isBlind = true, gameStarted = false;
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1;
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1;
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false, hasHeadphone = false;
 let currentBGM = null, shotgunAmmo = 0, hasShotgun = false, hasFlashlight = false, flashlightBattery = 0;
-let isManualMode = false, autoStartTimeout = null, countdownInterval = null;
+let isManualMode = false, autoStartTimeout = null, countdownInterval = null, loadingDots = 0;
 let ROWS, COLS, map = [], dogs = [], hunters = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let scentMap = [], playerHistory = [], shortestPath = [], lastMoveTime = Date.now(), autoLoadState = "NONE";
-let lastDir = { dx: 0, dy: -1 }, flipX = false, debugClickCount = 0, selectedMenuIndex = 1;
+let lastDir = { dx: 0, dy: -1 }, flipX = false, debugClickCount = 0, selectedMenuIndex = 0;
 let shotgunRevealActive = false;
 
-// Statistics
+// Stats
 let gameStartTime = null;
 let stats = { totalSteps: 0, totalLightTime: 0, totalShots: 0, totalMapUses: 0, bgmTime: { "🔕": 0, "❄️": 0, "🏝️": 0, "🌌": 0, "🎵": 0 }, neotiCount: 0 };
 let isWaitingNeotiResumption = false;
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
 
-// --- Initialization & Audio ---
+// --- Core Logic ---
 function unlockAudio() {
     if (soundReady) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    [growlSnd, biteSnd, dogCrySnd, shotgunSnd, hunterWoofSnd, hunterBiteSnd, hunterCrySnd].forEach(a => { a.muted=true; a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false;}); });
+    [growlSnd, biteSnd, dogCrySnd, shotgunSnd, hunterWoofSnd, hunterBiteSnd, hunterCrySnd].forEach(a => { 
+        a.muted=true; a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false;}).catch(()=>{}); 
+    });
     soundReady = true;
 }
-function playSound(a) { if(!a)return; a.pause(); a.currentTime=0; a.play().catch(()=>{}); }
+
+function playSound(a) { if(!a || !soundReady) return; a.pause(); a.currentTime=0; a.play().catch(()=>{}); }
+
 async function playOscillator(f, t, d, vol=0.06) {
     if(!audioCtx) return;
     const o=audioCtx.createOscillator(), g=audioCtx.createGain();
@@ -130,7 +141,35 @@ async function playOscillator(f, t, d, vol=0.06) {
     o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+d);
 }
 
-// --- Shop Logic ---
+// --- Shop & Mode ---
+function toggleStartMode(isAuto) {
+    isManualMode = !isAuto;
+    if (isManualMode) {
+        if (autoStartTimeout) clearTimeout(autoStartTimeout);
+        if (countdownInterval) clearInterval(countdownInterval);
+    } else if (currentLevel > 1) {
+        startAutoStartCountdown();
+    }
+    updateUI();
+}
+
+function startAutoStartCountdown() {
+    if (gameStarted || isManualMode || currentLevel === 1) return;
+    let remaining = 10;
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) clearInterval(countdownInterval);
+        updateUI(remaining);
+    }, 1000);
+    if (autoStartTimeout) clearTimeout(autoStartTimeout);
+    autoStartTimeout = setTimeout(() => { if(!gameStarted && !isManualMode) startGame(); }, 10000);
+}
+
+function resetAutoStartTimer() {
+    if (!gameStarted && !isManualMode && currentLevel > 1) startAutoStartCountdown();
+}
+
 function buyHeadphone() { if(totalCoins>=5){totalCoins-=5; hasHeadphone=true; updateUI(); resetAutoStartTimer();} }
 function cycleBGM() { currentBGM = (currentBGM === null)? 1 : (currentBGM < 4 ? currentBGM+1 : null); updateUI(); resetAutoStartTimer(); }
 function buyFlashlight() { if(!hasFlashlight){ if(totalCoins>=15){totalCoins-=15; hasFlashlight=true; flashlightBattery=60;} } else { if(totalCoins>=5 && flashlightBattery<200){totalCoins-=5; flashlightBattery=Math.min(200, flashlightBattery+10);} } updateUI(); resetAutoStartTimer(); }
@@ -139,21 +178,76 @@ function buyShotgun() { if(!hasShotgun){ if(totalCoins>=50){totalCoins-=50; hasS
 function buyAutoDevice() { if(!hasAutoDevice && totalCoins>=200){totalCoins-=200; hasAutoDevice=true; updateUI(); resetAutoStartTimer();} }
 function buyDevGlasses() { if(!hasDevGlasses && totalCoins>=1000){totalCoins-=1000; hasDevGlasses=true; updateUI(); resetAutoStartTimer();} }
 
-// --- Maze Logic ---
+// --- UI Rendering ---
+function getSelectableElements() {
+    const ids = ['hp-buy-btn','bgm-cycle-btn','flashlight-btn','amulet-btn','shotgun-btn','auto-device-btn','dev-glass-btn','start-btn','mode-toggle-label'];
+    return ids.map(id => document.getElementById(id)).filter(el => el && el.style.display !== 'none' && window.getComputedStyle(el).visibility !== 'hidden');
+}
+
+function updateUI(remaining = 10) {
+    const isExtreme = currentLevel>=16, isHard = currentLevel>=11;
+    const levelDisplay = document.getElementById('level-display');
+    const startBtn = document.getElementById('start-btn');
+    const container = document.getElementById('start-container');
+    const slider = document.querySelector('.slider');
+    
+    document.getElementById('ver-text').innerText = `ver.${GAME_VERSION}`;
+    document.getElementById('mode-toggle-label').style.visibility = (currentLevel===1)?"hidden":"visible";
+    
+    // Mode UI
+    slider.style.setProperty('--toggle-color', isExtreme ? "#dc3545" : (isHard ? "#007bff" : "#28a745"));
+    if(isExtreme) { 
+        startBtn.style.background="#dc3545"; startBtn.classList.add('extreme-shake'); 
+        levelDisplay.innerHTML=`<span class='extreme-shake' style='color:#dc3545'>Level ${currentLevel}<br>EXTREME</span>`; 
+    } else if(isHard) { 
+        startBtn.style.background="#007bff"; startBtn.classList.remove('extreme-shake');
+        levelDisplay.innerHTML=`<span style='color:#007bff'>Level ${currentLevel}<br>HARD</span>`; 
+    } else { 
+        startBtn.style.background="#28a745"; startBtn.classList.remove('extreme-shake');
+        levelDisplay.innerHTML=`<span style='color:#28a745'>Level ${currentLevel}<br>NORMAL</span>`; 
+    }
+
+    startBtn.innerText = (isManualMode || currentLevel === 1) ? "START" : `START (${remaining}s)`;
+
+    // Shop Buttons Visibility
+    document.getElementById('hp-buy-btn').style.display = hasHeadphone?"none":"block";
+    document.getElementById('bgm-cycle-btn').style.display = hasHeadphone?"block":"none";
+    document.getElementById('bgm-cycle-btn').innerText = `🎹BGM変更 (${currentBGM===1?'❄️':currentBGM===2?'🏝️':currentBGM===3?'🌌':currentBGM===4?'🎵':'🔕'})`;
+    document.getElementById('shotgun-btn').style.display = isHard ? "block" : "none";
+    document.getElementById('auto-device-btn').style.display = (isHard && !hasAutoDevice) ? "block" : "none";
+    
+    // Status UI
+    document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
+    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20`;
+    document.getElementById('amulet-display').innerText = hasAmulet?"⛩️":"";
+    document.getElementById('headphone-display').innerText = hasHeadphone ? "🎹" : "";
+    document.getElementById('ammo-display').innerText = "💥".repeat(shotgunAmmo);
+    document.getElementById('flashlight-display').innerText = hasFlashlight?`🔦${Math.ceil(flashlightBattery)}s`:"";
+    
+    let autoText = "";
+    if(hasAutoDevice) autoText = (autoLoadState==="LOADING") ? "📡"+".".repeat(loadingDots) : (autoLoadState==="MOVING" ? "📍案内中" : "📍");
+    document.getElementById('auto-status').innerText = autoText;
+
+    // Keyboard Selection
+    const items = getSelectableElements();
+    if (selectedMenuIndex >= items.length) selectedMenuIndex = items.length - 1;
+    items.forEach((el, i) => { if(i===selectedMenuIndex) el.classList.add('kb-selected'); else el.classList.remove('kb-selected'); });
+}
+
+// --- Game Logic ---
 function generateSimpleMaze() {
-    const sizeMap = { 1:[5,7], 5:[9,11], 10:[15,19], 15:[17,21], 20:[17,21] };
+    const sizeMap = { 1:[7,9], 5:[9,11], 10:[13,15], 15:[15,19], 20:[17,21] };
     let s = sizeMap[currentLevel] || [13,15];
     COLS = s[0]; ROWS = s[1];
     map = Array.from({length:ROWS}, () => Array(COLS).fill(1));
     
-    // Simple Drunkard Walk + Random Dig
     let rx = 1, ry = 1; map[ry][rx] = 0; player = {x:rx, y:ry};
     for(let i=0; i<2000; i++) {
         let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random()*4)];
         let nx=rx+dx, ny=ry+dy;
         if(nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1) { map[ny][nx]=0; rx=nx; ry=ny; }
     }
-    // Goal placement (Furthest)
+    
     let q=[{x:1, y:1, d:0}], dists=Array.from({length:ROWS},()=>Array(COLS).fill(-1)), lastP={x:1,y:1};
     dists[1][1]=0;
     while(q.length>0) {
@@ -167,23 +261,21 @@ function generateSimpleMaze() {
     }
     map[lastP.y][lastP.x] = 2; goalPos = {x:lastP.x, y:lastP.y};
 
-    // Coins
     for(let i=0; i<currentLevel+2; i++) {
         let cx = Math.floor(Math.random()*COLS), cy = Math.floor(Math.random()*ROWS);
         if(map[cy][cx]===0 && (cx!==player.x || cy!==player.y)) map[cy][cx]=3;
     }
 
-    // Enemies
     dogs = []; hunters = [];
-    let dogCount = Math.min(10, Math.floor(currentLevel/2));
+    let dogCount = Math.min(12, Math.floor(currentLevel/1.5));
     for(let i=0; i<dogCount; i++) {
         let dx = Math.floor(Math.random()*COLS), dy = Math.floor(Math.random()*ROWS);
-        if(map[dy][dx]===0 && Math.abs(dx-player.x)+Math.abs(dy-player.y)>3) dogs.push({x:dx, y:dy});
+        if(map[dy][dx]===0 && Math.abs(dx-player.x)+Math.abs(dy-player.y)>2) dogs.push({x:dx, y:dy});
     }
-    if(currentLevel>=16) {
-        hunters.push({x:goalPos.x, y:goalPos.y, alerted:false, lastDir:{dx:0,dy:0}});
-    }
-    playerHistory = [{x:player.x, y:player.y}]; updateScentMap();
+    if(currentLevel>=16) hunters.push({x:goalPos.x, y:goalPos.y, alerted:false});
+    
+    playerHistory = [{x:player.x, y:player.y}];
+    updateScentMap();
 }
 
 function updateScentMap() {
@@ -194,7 +286,6 @@ function updateScentMap() {
     });
 }
 
-// --- Movement & AI ---
 function movePlayer(dx, dy, isAuto=false) {
     if(!gameStarted) return;
     if(isWaitingNeotiResumption){ stats.neotiCount++; isWaitingNeotiResumption=false; }
@@ -207,7 +298,7 @@ function movePlayer(dx, dy, isAuto=false) {
     player.x=nx; player.y=ny; flipX=(dx===1); lastDir={dx,dy};
     playerHistory.push({x:nx, y:ny}); updateScentMap();
 
-    // Check Dog
+    // Collisions
     let di = dogs.findIndex(d=>d.x===nx && d.y===ny);
     if(di!==-1) {
         if(shotgunAmmo>0){ shotgunAmmo--; stats.totalShots++; playSound(shotgunSnd); dogs.splice(di,1); updateUI(); }
@@ -215,18 +306,22 @@ function movePlayer(dx, dy, isAuto=false) {
     }
     
     moveHunters();
-
-    // Check Hunter Collision
     if(hunters.some(h=>h.x===nx && h.y===ny)) {
         if(shotgunAmmo>0){ shotgunAmmo--; stats.totalShots++; playSound(shotgunSnd); hunters=[]; updateUI(); }
         else { triggerGameOver(hunterBiteSnd); return; }
     }
 
-    if(map[ny][nx]===2) { // Goal
+    if(map[ny][nx]===2) {
         if(currentLevel===20) finishGame();
-        else { currentLevel++; gameStarted=false; stopAllBGM(); document.getElementById('start-container').style.display='flex'; setTimeout(()=>document.getElementById('start-container').classList.add('opaque'),50); updateUI(); startAutoStartCountdown(); }
-    } else if(map[ny][nx]===3) { // Coin
-        map[ny][nx]=0; totalCoins += (currentLevel>=11?10:1)*coinMultiplier; playOscillator(WHITE_KEYS[stats.totalSteps%8],'sine',0.1); updateUI();
+        else { 
+            currentLevel++; gameStarted=false; stopAllBGM(); 
+            document.getElementById('start-container').style.display='flex'; 
+            setTimeout(()=> { document.getElementById('start-container').classList.add('opaque'); startAutoStartCountdown(); }, 50); 
+            updateUI(); 
+        }
+    } else if(map[ny][nx]===3) {
+        map[ny][nx]=0; totalCoins += (currentLevel>=11?10:1)*coinMultiplier; 
+        playOscillator(WHITE_KEYS[stats.totalSteps%8],'sine',0.1); updateUI();
     }
     draw();
 }
@@ -245,7 +340,7 @@ function moveHunters() {
     });
 }
 
-// --- Stats & Ranking ---
+// --- System ---
 async function finishGame() {
     gameStarted=false; stopAllBGM();
     const clearTimeMin = (Date.now()-gameStartTime)/60000;
@@ -264,50 +359,20 @@ async function finishGame() {
         data.forEach((r, i) => { html += `<tr><td>${i+1}</td><td>${r.name}</td><td>${Math.floor(r.score)}</td><td>${r.cleartime}m</td><td>${r.neoti}</td><td>${r.coin}</td><td>${r.hosuu}</td><td>${Math.floor(r.light)}s</td><td>${r.gun}</td><td>${r.map}</td></tr>`; });
         html += "</table><button class='retry-btn' onclick='location.reload()'>タイトルへ</button>";
         rankingDiv.innerHTML = html;
-    } catch(e) { rankingDiv.innerHTML = "<h3>送信完了(表示エラー)</h3><button class='retry-btn' onclick='location.reload()'>戻る</button>"; }
-}
-
-// --- UI & Controls ---
-function updateUI() {
-    const isExtreme = currentLevel>=16, isHard = currentLevel>=11;
-    const levelDisplay = document.getElementById('level-display');
-    const startBtn = document.getElementById('start-btn');
-    const container = document.getElementById('start-container');
-    
-    document.getElementById('mode-toggle-label').style.visibility = (currentLevel===1)?"hidden":"visible";
-    
-    if(isExtreme) { startBtn.style.background="#dc3545"; startBtn.classList.add('extreme-shake'); levelDisplay.innerHTML=`<span class='extreme-shake' style='color:#dc3545'>Level ${currentLevel}<br>EXTREME</span>`; }
-    else if(isHard) { startBtn.style.background="#007bff"; levelDisplay.innerHTML=`<span style='color:#007bff'>Level ${currentLevel}<br>HARD</span>`; }
-    else { startBtn.style.background="#28a745"; levelDisplay.innerHTML=`<span style='color:#28a745'>Level ${currentLevel}<br>NORMAL</span>`; }
-
-    document.getElementById('hp-buy-btn').style.display = hasHeadphone?"none":"block";
-    document.getElementById('bgm-cycle-btn').style.display = hasHeadphone?"block":"none";
-    document.getElementById('bgm-cycle-btn').innerText = `🎹BGM切替 (${currentBGM||'🔕'})`;
-    document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
-    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20`;
-    document.getElementById('amulet-display').innerText = hasAmulet?"⛩️":"";
-    document.getElementById('ammo-display').innerText = "💥".repeat(shotgunAmmo);
-    document.getElementById('flashlight-display').innerText = hasFlashlight?`🔦${Math.ceil(flashlightBattery)}s`:"";
-    
-    const items = getSelectableElements();
-    items.forEach((el, i) => { if(i===selectedMenuIndex) el.classList.add('kb-selected'); else el.classList.remove('kb-selected'); });
-}
-
-function getSelectableElements() {
-    return ['hp-buy-btn','bgm-cycle-btn','flashlight-btn','amulet-btn','shotgun-btn','auto-device-btn','dev-glass-btn','start-btn'].map(id=>document.getElementById(id)).filter(el=>el && el.style.display!=='none');
+    } catch(e) { rankingDiv.innerHTML = "<h3>送信完了</h3><button class='retry-btn' onclick='location.reload()'>タイトルへ</button>"; }
 }
 
 function startGame() {
     if(currentLevel===1){ gameStartTime=Date.now(); stats={totalSteps:0,totalLightTime:0,totalShots:0,totalMapUses:0,bgmTime:{"🔕":0,"❄️":0,"🏝️":0,"🌌":0,"🎵":0},neotiCount:0}; }
     unlockAudio(); document.getElementById('start-container').style.display='none'; gameStarted=true;
     if(hasHeadphone && currentBGM){
-        const b = [null, 'bgm-koori','bgm-hikari','bgm-suzumusi','bgm-brown'][currentBGM];
-        if(b) document.getElementById(b).play();
+        const bId = ['bgm-koori','bgm-hikari','bgm-suzumusi','bgm-brown'][currentBGM-1];
+        const audio = document.getElementById(bId); if(audio) audio.play().catch(()=>{});
     }
     generateSimpleMaze(); draw();
 }
 
-function stopAllBGM() { ['bgm-koori','bgm-hikari','bgm-suzumusi','bgm-brown'].forEach(id=>document.getElementById(id).pause()); }
+function stopAllBGM() { ['bgm-koori','bgm-hikari','bgm-suzumusi','bgm-brown'].forEach(id=> { const a=document.getElementById(id); if(a){a.pause(); a.currentTime=0;} }); }
 function triggerGameOver(s){ gameStarted=false; playSound(s); stopAllBGM(); setTimeout(()=>{alert("GAME OVER"); location.reload();},200); }
 function toggleBlind(){ isBlind=!isBlind; draw(); }
 
@@ -319,6 +384,8 @@ setInterval(()=>{
     if(hasFlashlight && flashlightBattery>0){ flashlightBattery-=0.1; stats.totalLightTime+=0.1; if(flashlightBattery<=0)updateUI(); }
     let k = currentBGM===1?"❄️":currentBGM===2?"🏝️":currentBGM===3?"🌌":currentBGM===4?"🎵":"🔕";
     stats.bgmTime[k]+=0.1;
+    if(hasAutoDevice && idle > 3000 && autoLoadState==="NONE") { autoLoadState="LOADING"; loadingDots=0; }
+    if(autoLoadState==="LOADING") { loadingDots = (loadingDots+1)%4; updateUI(); if(idle > 7000) { autoLoadState="MOVING"; stats.totalMapUses++; } }
 }, 100);
 
 function draw() {
@@ -329,30 +396,40 @@ function draw() {
     for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++){
         let px=oX+x*size, py=oY+y*size;
         if(map[y][x]===1) ctx.drawImage(wallImg, px, py, size+0.5, size+0.5);
-        else if(map[y][x]===2) { ctx.fillStyle="#fff"; ctx.fillRect(px,py,size,size); ctx.fillStyle="#000"; ctx.fillText("GOAL",px+size/2,py+size/2); }
+        else if(map[y][x]===2) { ctx.fillStyle="#fff"; ctx.fillRect(px,py,size,size); ctx.fillStyle="#000"; ctx.textAlign="center"; ctx.fillText("GOAL",px+size/2,py+size/2); }
         else if(map[y][x]===3) { ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); }
     }
     dogs.forEach(d=>ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size));
     hunters.forEach(h=>ctx.drawImage(hunterImg, oX+h.x*size, oY+h.y*size, size, size));
-    ctx.save(); if(flipX){ ctx.translate(oX+player.x*size+size, oY+player.y*size); ctx.scale(-1,1); ctx.drawImage(playerImg,0,0,size,size); } else { ctx.drawImage(playerImg,oX+player.x*size, oY+player.y*size, size, size); } ctx.restore();
-    if(isBlind && !hasDevGlasses && !shotgunRevealActive){
+    ctx.save(); 
+    if(flipX){ ctx.translate(oX+player.x*size+size, oY+player.y*size); ctx.scale(-1,1); ctx.drawImage(playerImg,0,0,size,size); } 
+    else { ctx.drawImage(playerImg,oX+player.x*size, oY+player.y*size, size, size); } 
+    ctx.restore();
+    
+    if(isBlind && !hasDevGlasses && gameStarted){
+        ctx.save();
         ctx.globalCompositeOperation='multiply'; ctx.fillStyle="black";
         if(hasFlashlight && flashlightBattery>0){
-            // Gradient Flashlight Light
-            let grad = ctx.createRadialGradient(oX+player.x*size+size/2, oY+player.y*size+size/2, size, oX+player.x*size+size/2, oY+player.y*size+size/2, size*4);
+            let grad = ctx.createRadialGradient(oX+player.x*size+size/2, oY+player.y*size+size/2, size/2, oX+player.x*size+size/2, oY+player.y*size+size/2, size*3.5);
             grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(1, 'rgba(0,0,0,1)');
             ctx.fillStyle=grad;
         }
-        ctx.fillRect(0,0,canvas.width,canvas.height); ctx.globalCompositeOperation='source-over';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.restore();
     }
 }
 
+// Controls
 window.addEventListener('keydown', e => {
+    const items = getSelectableElements();
     if(!gameStarted){
-        const items = getSelectableElements();
         if(e.key==='ArrowUp'||e.key==='w') selectedMenuIndex=(selectedMenuIndex-1+items.length)%items.length;
         if(e.key==='ArrowDown'||e.key==='s') selectedMenuIndex=(selectedMenuIndex+1)%items.length;
-        if(e.key==='Enter'||e.key===' ') items[selectedMenuIndex].click();
+        if(e.key==='Enter'||e.key===' ') {
+            const target = items[selectedMenuIndex];
+            if(target.id === 'mode-toggle-label') document.getElementById('mode-toggle').click();
+            else target.click();
+        }
         updateUI();
     } else {
         if(e.key==='ArrowUp'||e.key==='w') movePlayer(0,-1);
@@ -363,10 +440,9 @@ window.addEventListener('keydown', e => {
 });
 
 function stopAutoProcess(){ autoLoadState="NONE"; updateUI(); }
-function resetAutoStartTimer(){ if(autoStartTimeout) clearTimeout(autoStartTimeout); }
-function startAutoStartCountdown(){ /* 簡易版 */ }
-function triggerDebugJump(){ debugClickCount++; if(debugClickCount>=10) currentLevel=19; updateUI(); }
+function triggerDebugJump(){ debugClickCount++; if(debugClickCount>=10) { totalCoins += 1000; currentLevel=19; updateUI(); } }
 
+window.addEventListener('resize', draw);
 updateUI();
 </script>
 </body>
