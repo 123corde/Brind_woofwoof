@@ -49,7 +49,7 @@
         .kb-selected {
             outline: 4px solid #ccc !important;
             box-shadow: 0 0 15px rgba(0,0,0,0.2) !important;
-            transform: scale(1.15);
+            transform: scale(1.1);
             transition: transform 0.1s;
         }
 
@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "23.2.3";
+const GAME_VERSION = "24.0.0";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -123,7 +123,6 @@ const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woof
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane_watchdog.mp3');
 const shotgunSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Shotgun.mp3');
 
-// Hunter関連サウンド
 const hunterWoofSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Hunter_woof.mp3');
 const hunterBiteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Hunterbite.mp3');
 const hunterCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane_hunter.mp3');
@@ -134,7 +133,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 10100, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -149,8 +148,8 @@ let flipX = false;
 let debugClickCount = 0;
 
 let ROWS, COLS, map = [], dogs = [], hunters = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
-let scentMap = []; // 嗅覚システム用のニオイ強度マップ
-let playerHistory = []; // 通った道の履歴
+let scentMap = []; 
+let playerHistory = []; 
 let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 let loadingDots = 0;
@@ -164,11 +163,7 @@ const gameOverMessages = [
     "一度噛んだら離さない。\nイッヌの執念があなたの魂を Level1 まで引きずり戻しました。",
     "ガブッ！\nイッヌがあなたを「巨大な骨付き肉」と勘違いしました。",
     "あなたの骨が砕ける音だけが迷宮に響き渡りました。",
-    "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。",
-    "画面の🐾🐾🐾の部分を🐾🐾🐾🐾プすると...？",
-    "懐中電灯の光が弱いですか？ケチらずフル充🐾🐾🐾しよう。",
-    "🐾ードモードでは、獲得コインが10倍に🐾🐾ます。",
-    "画面を閉じてもBGMは続きます。今日はここまで、もう寝る時間です。"
+    "イッヌの愛情(物理)を受け、あなたは可愛さのあまり意識を失いました。"
 ];
 
 function unlockAudio() {
@@ -509,7 +504,6 @@ function getManhattanDist(p1, p2) {
     return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y);
 }
 
-// Hunterサウンド更新 (移動後に再生)
 function triggerHunterSound() {
     if (hunters.length === 0) return;
     let minDist = 999;
@@ -525,7 +519,6 @@ function triggerHunterSound() {
 function moveHunters() {
     if (!gameStarted) return;
     hunters.forEach(h => {
-        // トリガーチェック (隣接マスのニオイ)
         if (!h.alerted) {
             for(let[dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
@@ -538,7 +531,6 @@ function moveHunters() {
         let nextMove = null;
 
         if (h.alerted) {
-            // 嗅覚モード (77% 匂い最大, 23% 次点)
             let scents =[];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
@@ -553,7 +545,6 @@ function moveHunters() {
                 else nextMove = scents[1];            
             }
         } else {
-            // 徘徊モード (60% 維持, 40% 変更)
             let possible =[];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
@@ -564,33 +555,22 @@ function moveHunters() {
             if (possible.length > 0) {
                 let sameDir = possible.find(p => p.dx === h.lastDir.dx && p.dy === h.lastDir.dy);
                 let roll = Math.random();
-                if (sameDir && roll < 0.60) {
-                    nextMove = sameDir;
-                } else {
-                    nextMove = possible[Math.floor(Math.random() * possible.length)];
-                }
+                if (sameDir && roll < 0.60) nextMove = sameDir;
+                else nextMove = possible[Math.floor(Math.random() * possible.length)];
             }
         }
 
         if (nextMove) {
             let nx = h.x + nextMove.dx;
             let ny = h.y + nextMove.dy;
-
-            // --- 修正箇所: プレイヤーに直接重なる移動をキャンセル ---
-            if (nx === player.x && ny === player.y) {
-                return; // 衝突を避けてその場に留まる
-            }
-            // ----------------------------------------------------
-
+            if (nx === player.x && ny === player.y) return; 
             h.x = nx;
             h.y = ny;
             h.lastDir = { dx: nextMove.dx, dy: nextMove.dy };
         }
     });
 
-    // Hunter移動後の衝突・撃破判定
     checkHunterCollision();
-    // 距離に応じたサウンド
     triggerHunterSound();
     draw();
 }
@@ -603,19 +583,12 @@ function checkHunterCollision() {
             playSound(shotgunSnd);
             hunters.splice(hIdx, 1);
             setTimeout(() => playSound(hunterCrySnd), 1300);
-            
-            // 画面フラッシュ演出
             setTimeout(() => {
                 shotgunRevealActive = true;
                 draw();
-                setTimeout(() => {
-                    shotgunRevealActive = false;
-                    draw();
-                }, 250);
+                setTimeout(() => { shotgunRevealActive = false; draw(); }, 250);
             }, 500);
-
             updateUI();
-            triggerHunterSound(); 
         } else {
             triggerGameOver(hunterBiteSnd);
         }
@@ -702,7 +675,6 @@ function movePlayer(dx, dy, isAuto = false) {
         return;
     } 
 
-    // 移動先のHunterチェック (すれ違い防止)
     let hunterHere = hunters.find(h => h.x === nx && h.y === ny);
     if (hunterHere) {
         player.x = nx; player.y = ny;
@@ -714,25 +686,18 @@ function movePlayer(dx, dy, isAuto = false) {
     playerHistory.push({x: player.x, y: player.y});
     updateScentMap();
 
-    // Dog衝突判定
     let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
     if (dogIndex !== -1) {
         if (shotgunAmmo > 0) { 
             shotgunAmmo--; 
             playSound(shotgunSnd); 
             dogs.splice(dogIndex, 1); 
-            
-            // Watchdog撃破時もHunterと同様にフラッシュさせる
             setTimeout(() => playSound(dogCrySnd), 1300);
             setTimeout(() => {
                 shotgunRevealActive = true;
                 draw();
-                setTimeout(() => {
-                    shotgunRevealActive = false;
-                    draw();
-                }, 250);
+                setTimeout(() => { shotgunRevealActive = false; draw(); }, 250);
             }, 500);
-            
             updateUI(); 
         } else {
             triggerGameOver(biteSnd); return;
@@ -741,15 +706,45 @@ function movePlayer(dx, dy, isAuto = false) {
 
     if (!isAuto && dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
     
-    // Hunterターン移動
     moveHunters();
 
     if (map[ny][nx] === 2) {
         playGoalSound();
+        // --- Level 20 クリア処理の変更 ---
         if (currentLevel === 20) { 
-            gameStarted = false; stopAllBGM(); hunterWoofSnd.pause();
-            setTimeout(() => { alert("Congratulations \n全ステージクリア！"); resetGame(); }, 100); return; 
+            gameStarted = false; 
+            stopAllBGM(); 
+            hunterWoofSnd.pause();
+            
+            setTimeout(async () => {
+                const playerName = prompt("全ステージクリア！おめでとうございます！\nランキングに登録する名前を入力してください:", "AAA") || "ななし";
+                
+                try {
+                    const response = await fetch("API_URL", { // 実際のURLに書き換えてください
+                        method: "POST",
+                        body: new URLSearchParams({
+                            name: playerName,
+                            score: totalCoins
+                        })
+                    });
+
+                    if (response.ok) {
+                        const scorePageHtml = await response.text();
+                        document.open();
+                        document.write(scorePageHtml);
+                        document.close();
+                    } else {
+                        throw new Error("APIレスポンスエラー");
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert("スコアの送信に失敗しました。最終コイン: " + totalCoins);
+                    resetGame();
+                }
+            }, 100);
+            return; 
         }
+        
         currentLevel++; 
         if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
         isAutoDeviceUsedInThisLevel = false;
@@ -884,14 +879,14 @@ window.addEventListener('keydown', e => {
     if (!gameStarted) {
         if (key === 'w' || key === 'a' || e.key === 'ArrowUp') {
             selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
-            while (isRestricted(items[selectedMenuIndex])) {
+            while (items[selectedMenuIndex] && isRestricted(items[selectedMenuIndex])) {
                 selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
             }
             updateMenuSelection();
             e.preventDefault();
         } else if (key === 's' || key === 'd' || e.key === 'ArrowDown') {
             selectedMenuIndex = (selectedMenuIndex + 1) % items.length;
-            while (isRestricted(items[selectedMenuIndex])) {
+            while (items[selectedMenuIndex] && isRestricted(items[selectedMenuIndex])) {
                 selectedMenuIndex = (selectedMenuIndex + 1) % items.length;
             }
             updateMenuSelection();
@@ -902,9 +897,7 @@ window.addEventListener('keydown', e => {
                 if (target.id === 'mode-toggle-label') {
                     const cb = document.getElementById('mode-toggle');
                     toggleStartMode(!cb.checked);
-                } else {
-                    target.click();
-                }
+                } else target.click();
             }
             e.preventDefault();
         }
