@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち - Hunter Update</title>
+    <title>イッヌと寝落ち - Hunter Scent Update</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "22.0.0";
+const GAME_VERSION = "22.1.0-Scent";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -134,7 +134,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -149,6 +149,8 @@ let flipX = false;
 let debugClickCount = 0;
 
 let ROWS, COLS, map = [], dogs = [], hunters = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
+let scentMap = []; // 嗅覚システム用のニオイ強度マップ
+let playerHistory = []; // 通った道の履歴
 let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 let loadingDots = 0;
@@ -402,6 +404,29 @@ function triggerDebugJump() {
     else if (debugClickCount === 20) { currentLevel = 16; updateUI(); resetAutoStartTimer(); }
 }
 
+// 嗅覚システムの初期化と更新
+function initScentMap() {
+    scentMap = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    playerHistory = [{x: player.x, y: player.y}];
+    updateScentMap();
+}
+
+function updateScentMap() {
+    // マップを一旦リセット
+    for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) scentMap[y][x] = 0;
+    
+    // 履歴からニオイ強度を書き込む (古い順に処理して、新しいニオイで上書き)
+    // n: 0(最新), 1, 2...
+    // 10手前まで: (100 - 10n) + 1
+    // 11手前以降: 1
+    for (let i = 0; i < playerHistory.length; i++) {
+        let pos = playerHistory[i];
+        let n = (playerHistory.length - 1) - i;
+        let power = (n <= 10) ? (100 - 10 * n) + 1 : 1;
+        scentMap[pos.y][pos.x] = power;
+    }
+}
+
 function generateSimpleMaze() {
     const sizeMap = {
         1: [5, 7],   2: [7, 9],   3: [7, 9],   4: [9, 11],  5: [9, 11],
@@ -472,7 +497,6 @@ function generateSimpleMaze() {
             });
 
             if (currentLevel >= 16) {
-                // Hunterスポーン (EXTREMEモード: 1体固定)
                 let idx = Math.floor(Math.random() * spawnCandidates.length);
                 let h = spawnCandidates[idx];
                 hunters.push({ x: h.x, y: h.y, alerted: false });
@@ -487,6 +511,7 @@ function generateSimpleMaze() {
             found = true;
         }
     }
+    initScentMap();
 }
 
 // マンハッタン距離
@@ -494,29 +519,12 @@ function getManhattanDist(p1, p2) {
     return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y);
 }
 
-// Hunter用のBFS経路探索 (最短距離の1歩目を返す)
-function getHunterNextStep(hunter, target) {
-    let q = [{x: hunter.x, y: hunter.y, path: []}];
-    let visited = new Set(); visited.add(`${hunter.x},${hunter.y}`);
-    while(q.length > 0) {
-        let curr = q.shift();
-        if(curr.x === target.x && curr.y === target.y) return curr.path[0];
-        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-            let nx = curr.x + dx, ny = curr.y + dy, key = `${nx},${ny}`;
-            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key)) {
-                visited.add(key);
-                q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
-            }
-        }
-    }
-    return null;
-}
-
 function updateHunterSound() {
     if (hunters.length === 0) { hunterWoofSnd.pause(); return; }
     let minDist = 999;
     hunters.forEach(h => { minDist = Math.min(minDist, getManhattanDist(player, h)); });
     
+    // 接近警告音: マンハッタン距離に基づく音量設定
     const volMap = { 1: 1.0, 2: 0.4, 3: 0.2, 4: 0.1, 5: 0.05 };
     let vol = volMap[minDist] || 0;
     
@@ -531,13 +539,36 @@ function updateHunterSound() {
 function moveHunters() {
     if (!gameStarted) return;
     hunters.forEach(h => {
-        let dist = getManhattanDist(player, h);
-        if (dist <= 6) h.alerted = true;
+        // トリガー：隣接マスにニオイを検知したら嗅覚モードへ
+        if (!h.alerted) {
+            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                let nx = h.x + dx, ny = h.y + dy;
+                if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && scentMap[ny][nx] > 0) {
+                    h.alerted = true; break;
+                }
+            }
+        }
 
         if (h.alerted) {
-            // 追跡モード: プレイヤーへの最短経路
-            let step = getHunterNextStep(h, player);
-            if (step) { h.x += step.dx; h.y += step.dy; }
+            // 嗅覚モード: 上下左右で最もニオイが強いマスへ移動
+            let bestScent = -1;
+            let bestMoves = [];
+            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                let nx = h.x + dx, ny = h.y + dy;
+                if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1) {
+                    let s = scentMap[ny][nx];
+                    if (s > bestScent) {
+                        bestScent = s;
+                        bestMoves = [{dx, dy}];
+                    } else if (s === bestScent && s !== -1) {
+                        bestMoves.push({dx, dy});
+                    }
+                }
+            }
+            if (bestMoves.length > 0) {
+                let m = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+                h.x += m.dx; h.y += m.dy;
+            }
         }
     });
     checkHunterCollision();
@@ -651,6 +682,10 @@ function movePlayer(dx, dy, isAuto = false) {
     }
 
     player.x = nx; player.y = ny;
+    
+    // ニオイ履歴の更新
+    playerHistory.push({x: player.x, y: player.y});
+    updateScentMap();
 
     // Dog衝突判定
     let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
@@ -712,7 +747,7 @@ async function startGame() {
     }
     generateSimpleMaze(); 
     
-    // Hunter徘徊タイマー
+    // Hunter徘徊タイマー (ニオイを検知していないとき)
     if (currentLevel >= 16) {
         hunterWanderInterval = setInterval(() => {
             if (!gameStarted) return;
