@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "23.2.1";
+const GAME_VERSION = "23.2.2";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -527,7 +527,7 @@ function moveHunters() {
     hunters.forEach(h => {
         // トリガーチェック (隣接マスのニオイ)
         if (!h.alerted) {
-            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            for(let[dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
                 if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && scentMap[ny][nx] > 0) {
                     h.alerted = true; break;
@@ -539,7 +539,7 @@ function moveHunters() {
 
         if (h.alerted) {
             // 嗅覚モード (75% 匂い最大, 25 次点)
-            let scents = [];
+            let scents =[];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
                 if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1) {
@@ -550,10 +550,11 @@ function moveHunters() {
                 scents.sort((a, b) => b.val - a.val);
                 let roll = Math.random();
                 if (roll < 0.75 || scents.length < 2) nextMove = scents[0];
-                else nextMove = scents[1];            }
+                else nextMove = scents[1];            
+            }
         } else {
             // 徘徊モード (60% 維持, 40% 変更)
-            let possible = [];
+            let possible =[];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
                 if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1) {
@@ -572,8 +573,17 @@ function moveHunters() {
         }
 
         if (nextMove) {
-            h.x += nextMove.dx;
-            h.y += nextMove.dy;
+            let nx = h.x + nextMove.dx;
+            let ny = h.y + nextMove.dy;
+
+            // --- 修正箇所: プレイヤーに直接重なる移動をキャンセル ---
+            if (nx === player.x && ny === player.y) {
+                return; // 衝突を避けてその場に留まる
+            }
+            // ----------------------------------------------------
+
+            h.x = nx;
+            h.y = ny;
             h.lastDir = { dx: nextMove.dx, dy: nextMove.dy };
         }
     });
