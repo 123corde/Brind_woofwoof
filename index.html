@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "24.0.1";
+const GAME_VERSION = "24.0.2";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -714,33 +714,35 @@ function movePlayer(dx, dy, isAuto = false) {
         if (currentLevel === 20) { 
             gameStarted = false; 
             stopAllBGM(); 
-            hunterWoofSnd.pause();
+            if (hunterWoofSnd) hunterWoofSnd.pause();
             
-            setTimeout(async () => {
-                const playerName = prompt("全ステージクリア！おめでとうございます！\nランキングに登録する名前を入力してください:", "イッヌ") || "ネコ";
+            setTimeout(() => {
+                const playerName = prompt("全ステージクリア！おめでとうございます！\nランキングに登録する名前を入力してください:", "ネコ") || "イッヌ";
                 
-                try {
-                    const response = await fetch("https://script.google.com/macros/s/AKfycbxHGaRNXb4PobSsPHTxJD9syaYRnNTxPjqGnU_mwIqqmBQevWkEaF36vXWgeeHj6_jinQ/exec", { 
-                        method: "POST",
-                        body: new URLSearchParams({
-                            name: playerName,
-                            score: totalCoins
-                        })
-                    });
-
-                    if (response.ok) {
-                        const scorePageHtml = await response.text();
-                        document.open();
-                        document.write(scorePageHtml);
-                        document.close();
-                    } else {
-                        throw new Error("APIレスポンスエラー");
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert("スコアの送信に失敗しました。最終コイン: " + totalCoins);
-                    resetGame();
-                }
+                // --- 【修正】fetchの代わりにForm送信を使用 ---
+                const form = document.createElement('form');
+                form.method = 'POST';
+                // あなたのGASのURL
+                form.action = "https://script.google.com/macros/s/AKfycbxHGaRNXb4PobSsPHTxJD9syaYRnNTxPjqGnU_mwIqqmBQevWkEaF36vXWgeeHj6_jinQ/exec";
+                
+                // 名前をセット
+                const nameInput = document.createElement('input');
+                nameInput.type = 'hidden';
+                nameInput.name = 'name';
+                nameInput.value = playerName;
+                form.appendChild(nameInput);
+                
+                // スコアをセット
+                const scoreInput = document.createElement('input');
+                scoreInput.type = 'hidden';
+                scoreInput.name = 'score';
+                scoreInput.value = totalCoins;
+                form.appendChild(scoreInput);
+                
+                // 画面に追加して送信（自動的にGASのスコア画面に切り替わります）
+                document.body.appendChild(form);
+                form.submit();
+                
             }, 100);
             return; 
         }
