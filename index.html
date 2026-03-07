@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "24.0.4";
+const GAME_VERSION = "24.0.5";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -718,12 +718,12 @@ function movePlayer(dx, dy, isAuto = false) {
             if (hunterWoofSnd) hunterWoofSnd.pause();
             
             setTimeout(() => {
-                const playerName = prompt("全ステージクリア！おめでとうございます！\nランキングに登録する名前を入力してください:", "ネコ") || "イッヌ";
+                const playerName = prompt("全ステージクリア！おめでとうございます！\nランキングに登録する名前を入力してください:", "スーパーネコ") || "イッヌ";
                 
                 // --- 【修正】fetchの代わりにForm送信を使用 ---
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = "https://script.google.com/macros/s/AKfycbxlx539dp7--iPgPVPZKC6sCyLv3O_Z8iC9-Z8Eywpq8GYhuYltrUpGOBslOVUAfwgcpQ/exec";
+                form.action = "https://script.google.com/macros/s/AKfycby8YLcvv_c1TU4CAU_p-CtzjdKmIfVFpa-GnWgxNjjy0BybQoGNA2Io1VyE64SSoINcmg/exec";
                 
                 // 名前をセット
                 const nameInput = document.createElement('input');
