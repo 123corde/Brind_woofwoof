@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "24.0.3";
+const GAME_VERSION = "24.0.4";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -723,8 +723,7 @@ function movePlayer(dx, dy, isAuto = false) {
                 // --- 【修正】fetchの代わりにForm送信を使用 ---
                 const form = document.createElement('form');
                 form.method = 'POST';
-                // あなたのGASのURL
-                form.action = "https://script.google.com/macros/s/AKfycbxHGaRNXb4PobSsPHTxJD9syaYRnNTxPjqGnU_mwIqqmBQevWkEaF36vXWgeeHj6_jinQ/exec";
+                form.action = "https://script.google.com/macros/s/AKfycbxlx539dp7--iPgPVPZKC6sCyLv3O_Z8iC9-Z8Eywpq8GYhuYltrUpGOBslOVUAfwgcpQ/exec";
                 
                 // 名前をセット
                 const nameInput = document.createElement('input');
