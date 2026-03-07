@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.0.2";
+const GAME_VERSION = "25.0.3";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -439,105 +439,72 @@ function generateSimpleMaze() {
     let found = false;
     let attempts = 0;
 
-    while (!found && attempts < 10) {
+    while (!found && attempts < 20) {
         attempts++;
-        // 1. 初期化: 外周以外をランダムに埋める
-        // Level 3以下は床を多め(密度30%)、それ以降は壁を多め(密度45%)
-        let wallChance = currentLevel <= 3 ? 0.3 : 0.45;
-        let tempMap = Array.from({ length: ROWS }, (_, y) =>
-            Array.from({ length: COLS }, (_, x) => {
-                if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) return 1;
-                return Math.random() < wallChance ? 1 : 0;
-            })
-        );
+        // 1. 全てを壁(1)で埋める
+        map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
 
-        // 2. セル・オートマトン (Level 3以上のみ実行)
-        if (currentLevel >= 3) {
-            let iterations = currentLevel <= 10 ? 1 : 2;
-            for (let i = 0; i < iterations; i++) {
-                let nextGen = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-                for (let y = 1; y < ROWS - 1; y++) {
-                    for (let x = 1; x < COLS - 1; x++) {
-                        let walls = 0;
-                        for (let yy = -1; yy <= 1; yy++) {
-                            for (let xx = -1; xx <= 1; xx++) {
-                                if (tempMap[y + yy][x + xx] === 1) walls++;
-                            }
-                        }
-                        nextGen[y][x] = (walls >= 5) ? 1 : 0;
-                    }
-                }
-                tempMap = nextGen;
-            }
+        // 2. 「小部屋（アリの巣の拠点）」の種をまく
+        let seedCount = Math.floor((ROWS * COLS) / 20) + 2;
+        let seeds = [];
+        for (let i = 0; i < seedCount; i++) {
+            let sx = 1 + Math.floor(Math.random() * (COLS - 2));
+            let sy = 1 + Math.floor(Math.random() * (ROWS - 2));
+            map[sy][sx] = 0;
+            seeds.push({x: sx, y: sy});
         }
 
-        // 3. 領域抽出 (Flood Fill)
-        let regions = [];
-        let visited = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
-        for (let y = 1; y < ROWS - 1; y++) {
-            for (let x = 1; x < COLS - 1; x++) {
-                if (tempMap[y][x] === 0 && !visited[y][x]) {
-                    let region = [];
-                    let q = [{x, y}];
-                    visited[y][x] = true;
-                    while (q.length > 0) {
-                        let p = q.shift();
-                        region.push(p);
-                        [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
-                            let nx = p.x + dx, ny = p.y + dy;
-                            if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && tempMap[ny][nx] === 0 && !visited[ny][nx]) {
-                                visited[ny][nx] = true;
-                                q.push({x: nx, y: ny});
-                            }
-                        });
+        // 3. 種と種を「アリの歩行（酔歩）」で繋ぐ
+        for (let i = 0; i < seeds.length - 1; i++) {
+            let start = seeds[i];
+            let end = seeds[i+1];
+            let cx = start.x, cy = start.y;
+
+            while (cx !== end.x || cy !== end.y) {
+                // 70%の確率で目的地に近づき、30%の確率でランダムに動く（曲がりくねらせる）
+                if (Math.random() < 0.7) {
+                    if (cx !== end.x) cx += (end.x > cx ? 1 : -1);
+                    else if (cy !== end.y) cy += (end.y > cy ? 1 : -1);
+                } else {
+                    let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+                    let d = dirs[Math.floor(Math.random() * 4)];
+                    let nx = cx + d[0], ny = cy + d[1];
+                    if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) {
+                        cx = nx; cy = ny;
                     }
-                    regions.push(region);
+                }
+                map[cy][cx] = 0;
+                // たまに少し広げる（アリの巣の膨らみ）
+                if (Math.random() < 0.05) {
+                    [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
+                        let nx = cx+dx, ny = cy+dy;
+                        if (nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1) map[ny][nx] = 0;
+                    });
                 }
             }
         }
 
-        // 4. 連結と地図の確定
-        map = tempMap;
-        if (regions.length > 0) {
-            // 全ての小部屋を繋ぐ
-            const pathWidth = currentLevel <= 5 ? 1 : 2;
-            for (let i = 0; i < regions.length - 1; i++) {
-                let p1 = regions[i][0], p2 = regions[i+1][0];
-                let cx = p1.x, cy = p1.y;
-                while (cx !== p2.x || cy !== p2.y) {
-                    if (cx !== p2.x) cx += (p2.x > cx ? 1 : -1);
-                    else if (cy !== p2.y) cy += (p2.y > cy ? 1 : -1);
-                    for(let dy=0; dy<pathWidth; dy++) {
-                        for(let dx=0; dx<pathWidth; dx++) {
-                            let nx = cx+dx, ny = cy+dy;
-                            if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) map[ny][nx] = 0;
-                        }
-                    }
-                }
-            }
-        } else {
-            // 部屋が一つもなかったら中心を強制的に床にする
-            map[Math.floor(ROWS/2)][Math.floor(COLS/2)] = 0;
-        }
-
-        // 5. プレイヤーとゴールの距離をチェック
+        // 4. プレイヤーとゴールの配置
         let allWalkable = [];
         for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) allWalkable.push({x, y});
         
-        // プレイヤー配置
+        if (allWalkable.length < 3) continue;
+
         let startPos = allWalkable[Math.floor(Math.random() * allWalkable.length)];
         player = { x: startPos.x, y: startPos.y };
 
-        // BFSで一番遠い場所を探す
+        // BFSで到達可能な全マスを探索し、最も遠い場所をゴールに
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let q = [{ x: player.x, y: player.y, d: 0, path: [] }];
         dists[player.y][player.x] = 0;
         let furthest = q[0];
+        let reachableCount = 0;
         let walkableData = [];
 
         while (q.length > 0) {
             let curr = q.shift();
             walkableData.push(curr);
+            reachableCount++;
             if (curr.d > furthest.d) furthest = curr;
             [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
                 let nx = curr.x + dx, ny = curr.y + dy;
@@ -548,14 +515,12 @@ function generateSimpleMaze() {
             });
         }
 
-        // ゴールがプレイヤーから一定以上離れているか確認（Level 1なら距離2以上）
-        let minDist = currentLevel === 1 ? 2 : 3;
-        if (furthest.d >= minDist) {
+        // ステージが狭すぎず、ゴールが一定以上離れていれば確定
+        let minDist = Math.min(COLS, ROWS) - 2; 
+        if (reachableCount >= (COLS * ROWS) * 0.15 && furthest.d >= minDist) {
             goalPos = { x: furthest.x, y: furthest.y };
             map[goalPos.y][goalPos.x] = 2;
             shortestPath = furthest.path;
-            
-            // アイテム・敵配置の実行
             placeEntities(walkableData);
             found = true;
         }
@@ -563,6 +528,33 @@ function generateSimpleMaze() {
     initScentMap();
 }
 
+function placeEntities(walkableData) {
+    let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
+    candidates.sort(() => Math.random() - 0.5);
+
+    // コイン配置: アリの巣らしく、行き止まりや通路に点々と配置
+    let coinCount = (currentLevel <= 10) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel;
+    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
+        map[candidates[i].y][candidates[i].x] = 3;
+    }
+
+    // 敵配置
+    dogs = []; hunters = [];
+    let safetyZone = new Set();
+    for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
+    let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
+
+    if (currentLevel >= 16 && enemyCandidates.length > 0) {
+        let h = enemyCandidates.pop();
+        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
+    }
+    let dogNum = Math.min(15, currentLevel - 1);
+    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
+        let d = enemyCandidates.pop();
+        dogs.push({ x: d.x, y: d.y });
+    }
+}
+    
 function placeEntities(walkableData) {
     let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
     candidates.sort(() => Math.random() - 0.5);
