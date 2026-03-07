@@ -538,7 +538,7 @@ function moveHunters() {
         let nextMove = null;
 
         if (h.alerted) {
-            // 嗅覚モード (75% 匂い最大, 25 次点)
+            // 嗅覚モード (85% 匂い最大, 15% 次点)
             let scents =[];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
@@ -549,7 +549,7 @@ function moveHunters() {
             if (scents.length > 0) {
                 scents.sort((a, b) => b.val - a.val);
                 let roll = Math.random();
-                if (roll < 0.75 || scents.length < 2) nextMove = scents[0];
+                if (roll < 0.85 || scents.length < 2) nextMove = scents[0];
                 else nextMove = scents[1];            
             }
         } else {
