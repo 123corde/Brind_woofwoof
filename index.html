@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち - Hunter Scent Update</title>
+    <title>イッヌと寝落ち - Hunter Scent Turn-based</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "22.1.0";
+const GAME_VERSION = "23.0.0";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -134,7 +134,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 10100, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -157,7 +157,6 @@ let loadingDots = 0;
 let isAutoDeviceUsedInThisLevel = false;
 
 let selectedMenuIndex = 1;
-let hunterWanderInterval = null;
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
@@ -404,7 +403,6 @@ function triggerDebugJump() {
     else if (debugClickCount === 20) { currentLevel = 16; updateUI(); resetAutoStartTimer(); }
 }
 
-// 嗅覚システムの初期化と更新
 function initScentMap() {
     scentMap = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
     playerHistory = [{x: player.x, y: player.y}];
@@ -412,13 +410,7 @@ function initScentMap() {
 }
 
 function updateScentMap() {
-    // マップを一旦リセット
     for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) scentMap[y][x] = 0;
-    
-    // 履歴からニオイ強度を書き込む (古い順に処理して、新しいニオイで上書き)
-    // n: 0(最新), 1, 2...
-    // 10手前まで: (100 - 10n) + 1
-    // 11手前以降: 1
     for (let i = 0; i < playerHistory.length; i++) {
         let pos = playerHistory[i];
         let n = (playerHistory.length - 1) - i;
@@ -483,7 +475,6 @@ function generateSimpleMaze() {
                 for (let i = 0; i < coinCount; i++) map[walkableTiles[i].y][walkableTiles[i].x] = 3;
             }
             
-            // 敵のスポーン設定
             dogs = []; hunters = [];
             let safetyZone = new Set(); safetyZone.add(`${player.x},${player.y}`);
             [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => safetyZone.add(`${player.x + dx},${player.y + dy}`));
@@ -499,7 +490,7 @@ function generateSimpleMaze() {
             if (currentLevel >= 16) {
                 let idx = Math.floor(Math.random() * spawnCandidates.length);
                 let h = spawnCandidates[idx];
-                hunters.push({ x: h.x, y: h.y, alerted: false });
+                hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
                 spawnCandidates.splice(idx, 1);
             }
 
@@ -514,32 +505,27 @@ function generateSimpleMaze() {
     initScentMap();
 }
 
-// マンハッタン距離
 function getManhattanDist(p1, p2) {
     return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y);
 }
 
-function updateHunterSound() {
-    if (hunters.length === 0) { hunterWoofSnd.pause(); return; }
+// Hunterサウンド更新 (移動後に再生)
+function triggerHunterSound() {
+    if (hunters.length === 0) return;
     let minDist = 999;
-    hunters.forEach(h => { minDist = Math.min(minDist, getManhattanDist(player, h)); });
-    
-    // 接近警告音: マンハッタン距離に基づく音量設定
+    hunters.forEach(h => minDist = Math.min(minDist, getManhattanDist(player, h)));
     const volMap = { 1: 1.0, 2: 0.4, 3: 0.2, 4: 0.1, 5: 0.05 };
     let vol = volMap[minDist] || 0;
-    
     if (vol > 0) {
         hunterWoofSnd.volume = vol;
-        if (hunterWoofSnd.paused) hunterWoofSnd.play().catch(e=>{});
-    } else {
-        hunterWoofSnd.pause();
+        playSound(hunterWoofSnd);
     }
 }
 
 function moveHunters() {
     if (!gameStarted) return;
     hunters.forEach(h => {
-        // トリガー：隣接マスにニオイを検知したら嗅覚モードへ
+        // トリガーチェック (隣接マスのニオイ)
         if (!h.alerted) {
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
@@ -549,30 +535,54 @@ function moveHunters() {
             }
         }
 
+        let nextMove = null;
+
         if (h.alerted) {
-            // 嗅覚モード: 上下左右で最もニオイが強いマスへ移動
-            let bestScent = -1;
-            let bestMoves = [];
+            // 嗅覚モード (60/40 確率)
+            let scents = [];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
                 if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1) {
-                    let s = scentMap[ny][nx];
-                    if (s > bestScent) {
-                        bestScent = s;
-                        bestMoves = [{dx, dy}];
-                    } else if (s === bestScent && s !== -1) {
-                        bestMoves.push({dx, dy});
-                    }
+                    scents.push({ dx, dy, val: scentMap[ny][nx] });
                 }
             }
-            if (bestMoves.length > 0) {
-                let m = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-                h.x += m.dx; h.y += m.dy;
+            if (scents.length > 0) {
+                scents.sort((a, b) => b.val - a.val);
+                let roll = Math.random();
+                if (roll < 0.6 || scents.length < 2) nextMove = scents[0];
+                else nextMove = scents[1];
+            }
+        } else {
+            // 徘徊モード (70% 維持, 30% 変更)
+            let possible = [];
+            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+                let nx = h.x + dx, ny = h.y + dy;
+                if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1) {
+                    possible.push({ dx, dy });
+                }
+            }
+            if (possible.length > 0) {
+                let sameDir = possible.find(p => p.dx === h.lastDir.dx && p.dy === h.lastDir.dy);
+                let roll = Math.random();
+                if (sameDir && roll < 0.7) {
+                    nextMove = sameDir;
+                } else {
+                    nextMove = possible[Math.floor(Math.random() * possible.length)];
+                }
             }
         }
+
+        if (nextMove) {
+            h.x += nextMove.dx;
+            h.y += nextMove.dy;
+            h.lastDir = { dx: nextMove.dx, dy: nextMove.dy };
+        }
     });
+
+    // Hunter移動後の衝突・撃破判定
     checkHunterCollision();
-    updateHunterSound();
+    // 距離に応じたサウンド
+    triggerHunterSound();
     draw();
 }
 
@@ -585,7 +595,6 @@ function checkHunterCollision() {
             hunters.splice(hIdx, 1);
             setTimeout(() => playSound(hunterCrySnd), 1300);
             updateUI();
-            updateHunterSound();
         } else {
             triggerGameOver(hunterBiteSnd);
         }
@@ -599,7 +608,6 @@ function triggerGameOver(snd) {
     playSound(snd); 
     stopAllBGM();
     hunterWoofSnd.pause();
-    if (hunterWanderInterval) clearInterval(hunterWanderInterval);
     let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
     setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100);
 }
@@ -682,8 +690,6 @@ function movePlayer(dx, dy, isAuto = false) {
     }
 
     player.x = nx; player.y = ny;
-    
-    // ニオイ履歴の更新
     playerHistory.push({x: player.x, y: player.y});
     updateScentMap();
 
@@ -702,14 +708,13 @@ function movePlayer(dx, dy, isAuto = false) {
 
     if (!isAuto && dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
     
-    // Hunter移動 (プレイヤーが動いたあとに1歩動く)
+    // Hunterターン移動
     moveHunters();
 
     if (map[ny][nx] === 2) {
         playGoalSound();
         if (currentLevel === 20) { 
             gameStarted = false; stopAllBGM(); hunterWoofSnd.pause();
-            if (hunterWanderInterval) clearInterval(hunterWanderInterval);
             setTimeout(() => { alert("Congratulations \n全ステージクリア！"); resetGame(); }, 100); return; 
         }
         currentLevel++; 
@@ -718,7 +723,6 @@ function movePlayer(dx, dy, isAuto = false) {
         gameStarted = false; 
         if (!hasDevGlasses) isBlind = true; 
         stopAutoProcess(); stopAllBGM(); hunterWoofSnd.pause();
-        if (hunterWanderInterval) clearInterval(hunterWanderInterval);
         const container = document.getElementById('start-container');
         container.classList.remove('opaque'); container.style.display = 'flex'; 
         selectedMenuIndex = 1;
@@ -746,35 +750,12 @@ async function startGame() {
         if (active) { active.volume = (currentBGM === 4) ? 0.04 : 0.05; active.currentTime = 0; active.play().catch(e => {}); }
     }
     generateSimpleMaze(); 
-    
-    // Hunter徘徊タイマー (ニオイを検知していないとき)
-    if (currentLevel >= 16) {
-        hunterWanderInterval = setInterval(() => {
-            if (!gameStarted) return;
-            hunters.forEach(h => {
-                if (!h.alerted) {
-                    let dirs = [[0,1],[0,-1],[1,0],[-1,0]].sort(()=>Math.random()-0.5);
-                    for(let [dx, dy] of dirs) {
-                        let nx = h.x+dx, ny = h.y+dy;
-                        if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]===0) {
-                            h.x = nx; h.y = ny; break;
-                        }
-                    }
-                }
-            });
-            checkHunterCollision();
-            updateHunterSound();
-            draw();
-        }, 2000);
-    }
-
     updateUI(); draw(); 
 }
 
 function resetGame() { 
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-    if (hunterWanderInterval) clearInterval(hunterWanderInterval);
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0; hasHeadphone = false; currentBGM = null;
