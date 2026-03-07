@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.0.3";
+const GAME_VERSION = "25.0.4";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -441,70 +441,55 @@ function generateSimpleMaze() {
 
     while (!found && attempts < 20) {
         attempts++;
-        // 1. 全てを壁(1)で埋める
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
 
-        // 2. 「小部屋（アリの巣の拠点）」の種をまく
-        let seedCount = Math.floor((ROWS * COLS) / 20) + 2;
+        // 1. グリッド分割による「種」の均等配置（画面の無駄をなくす）
+        // 3x3マスに1つくらいの密度で「拠点」を作る
         let seeds = [];
-        for (let i = 0; i < seedCount; i++) {
-            let sx = 1 + Math.floor(Math.random() * (COLS - 2));
-            let sy = 1 + Math.floor(Math.random() * (ROWS - 2));
-            map[sy][sx] = 0;
-            seeds.push({x: sx, y: sy});
-        }
-
-        // 3. 種と種を「アリの歩行（酔歩）」で繋ぐ
-        for (let i = 0; i < seeds.length - 1; i++) {
-            let start = seeds[i];
-            let end = seeds[i+1];
-            let cx = start.x, cy = start.y;
-
-            while (cx !== end.x || cy !== end.y) {
-                // 70%の確率で目的地に近づき、30%の確率でランダムに動く（曲がりくねらせる）
-                if (Math.random() < 0.7) {
-                    if (cx !== end.x) cx += (end.x > cx ? 1 : -1);
-                    else if (cy !== end.y) cy += (end.y > cy ? 1 : -1);
-                } else {
-                    let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-                    let d = dirs[Math.floor(Math.random() * 4)];
-                    let nx = cx + d[0], ny = cy + d[1];
-                    if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) {
-                        cx = nx; cy = ny;
-                    }
-                }
-                map[cy][cx] = 0;
-                // たまに少し広げる（アリの巣の膨らみ）
-                if (Math.random() < 0.05) {
-                    [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
-                        let nx = cx+dx, ny = cy+dy;
-                        if (nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1) map[ny][nx] = 0;
-                    });
+        let gridStep = 3; 
+        for (let y = 1; y < ROWS - 1; y += gridStep) {
+            for (let x = 1; x < COLS - 1; x += gridStep) {
+                // 各グリッド内のランダムな位置に種をまく
+                let sx = x + Math.floor(Math.random() * Math.min(gridStep, COLS - 1 - x));
+                let sy = y + Math.floor(Math.random() * Math.min(gridStep, ROWS - 1 - y));
+                if (sx > 0 && sx < COLS - 1 && sy > 0 && sy < ROWS - 1) {
+                    map[sy][sx] = 0;
+                    seeds.push({x: sx, y: sy});
                 }
             }
         }
 
-        // 4. プレイヤーとゴールの配置
+        // 2. 全ての「種」を隣接する種と繋ぐ（一筆書きではなく網目状にする）
+        // シャッフルしてランダムな順序で隣同士を結合
+        let shuffled = [...seeds].sort(() => Math.random() - 0.5);
+        for (let i = 0; i < shuffled.length; i++) {
+            let p1 = shuffled[i];
+            // 近くの種（自分よりインデックスが後のものからランダムに1〜2個）と繋ぐ
+            let connections = currentLevel <= 5 ? 1 : 2; 
+            for (let j = 1; j <= connections; j++) {
+                let p2 = shuffled[(i + j) % shuffled.length];
+                carveOrganicPath(p1, p2);
+            }
+        }
+
+        // 3. プレイヤーとゴールの配置
         let allWalkable = [];
         for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) allWalkable.push({x, y});
         
-        if (allWalkable.length < 3) continue;
+        if (allWalkable.length < 5) continue;
 
         let startPos = allWalkable[Math.floor(Math.random() * allWalkable.length)];
         player = { x: startPos.x, y: startPos.y };
 
-        // BFSで到達可能な全マスを探索し、最も遠い場所をゴールに
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let q = [{ x: player.x, y: player.y, d: 0, path: [] }];
         dists[player.y][player.x] = 0;
         let furthest = q[0];
-        let reachableCount = 0;
         let walkableData = [];
 
         while (q.length > 0) {
             let curr = q.shift();
             walkableData.push(curr);
-            reachableCount++;
             if (curr.d > furthest.d) furthest = curr;
             [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
                 let nx = curr.x + dx, ny = curr.y + dy;
@@ -515,9 +500,8 @@ function generateSimpleMaze() {
             });
         }
 
-        // ステージが狭すぎず、ゴールが一定以上離れていれば確定
-        let minDist = Math.min(COLS, ROWS) - 2; 
-        if (reachableCount >= (COLS * ROWS) * 0.15 && furthest.d >= minDist) {
+        // 4. 判定: 画面の25%以上が床になり、かつゴールが端の方にあること
+        if (walkableData.length >= (COLS * ROWS) * 0.25 && furthest.d >= Math.max(COLS, ROWS) - 2) {
             goalPos = { x: furthest.x, y: furthest.y };
             map[goalPos.y][goalPos.x] = 2;
             shortestPath = furthest.path;
@@ -528,6 +512,60 @@ function generateSimpleMaze() {
     initScentMap();
 }
 
+// アリの巣風の曲がりくねった道を作る関数
+function carveOrganicPath(p1, p2) {
+    let cx = p1.x, cy = p1.y;
+    while (cx !== p2.x || cy !== p2.y) {
+        // 80%でターゲットに近づき、20%で迷走する
+        if (Math.random() < 0.8) {
+            if (cx !== p2.x && (cy === p2.y || Math.random() < 0.5)) cx += (p2.x > cx ? 1 : -1);
+            else cy += (p2.y > cy ? 1 : -1);
+        } else {
+            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            let d = dirs[Math.floor(Math.random() * 4)];
+            if (cx+d[0] > 0 && cx+d[0] < COLS-1 && cy+d[1] > 0 && cy+d[1] < ROWS-1) {
+                cx += d[0]; cy += d[1];
+            }
+        }
+        map[cy][cx] = 0;
+        // 10%の確率で道を少し太くして「部屋」っぽくする
+        if (Math.random() < 0.1) {
+            for(let dy=-1; dy<=1; dy++) {
+                for(let dx=-1; dx<=1; dx++) {
+                    if (Math.random() < 0.7) { // 完全に四角にせず、不整形にする
+                        let nx = cx+dx, ny = cy+dy;
+                        if (nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1) map[ny][nx] = 0;
+                    }
+                }
+            }
+        }
+    }
+}
+
+function placeEntities(walkableData) {
+    let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
+    candidates.sort(() => Math.random() - 0.5);
+
+    let coinCount = (currentLevel <= 10) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel;
+    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
+        map[candidates[i].y][candidates[i].x] = 3;
+    }
+
+    dogs = []; hunters = [];
+    let safetyZone = new Set();
+    for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
+    let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
+
+    if (currentLevel >= 16 && enemyCandidates.length > 0) {
+        let h = enemyCandidates.pop();
+        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
+    }
+    let dogNum = Math.min(15, currentLevel - 1);
+    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
+        let d = enemyCandidates.pop();
+        dogs.push({ x: d.x, y: d.y });
+    }
+}
 function placeEntities(walkableData) {
     let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
     candidates.sort(() => Math.random() - 0.5);
