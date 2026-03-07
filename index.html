@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "24.5.5";
+const GAME_VERSION = "24.5.7";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -747,10 +747,10 @@ function movePlayer(dx, dy, isAuto = false) {
                     // または、GAS側が正しければ通常のfetchでいけます。
                     // 以下は、通常のfetchで再試行するパターン
                     
-                    const responseRank = await fetch("あなたの最新のGASのURL?getRank=1"); // GETでランキングだけ呼ぶのも手ですが、今回はPOSTを修正します
+                    const responseRank = await fetch("https://script.google.com/macros/s/AKfycbxLuGlnmiLM4kgC4Yt2ObD3By2bZxEA_o-x4etF4L3p1osL_-xZirrNcLWljPpitTFoKw/exec?getRank=1"); // GETでランキングだけ呼ぶのも手ですが、今回はPOSTを修正します
                     
                     // --- 修正版：もっともシンプルなfetch ---
-                    const finalResponse = await fetch("あなたの最新のGASのURL", {
+                    const finalResponse = await fetch("https://script.google.com/macros/s/AKfycbxLuGlnmiLM4kgC4Yt2ObD3By2bZxEA_o-x4etF4L3p1osL_-xZirrNcLWljPpitTFoKw/exec", {
                         method: "POST",
                         body: new URLSearchParams({ name: playerName, score: totalCoins })
                     });
