@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち</title>
+    <title>イッヌと寝落ち - Hunter Update</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
@@ -46,7 +46,6 @@
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
         #level-display { cursor: pointer; user-select: none; -webkit-user-select: none; line-height: 1.2; font-weight: bold; font-size: 28px; padding: 5px; border-radius: 5px; }
 
-        /* キーボード選択時のハイライト */
         .kb-selected {
             outline: 4px solid #ccc !important;
             box-shadow: 0 0 15px rgba(0,0,0,0.2) !important;
@@ -113,23 +112,28 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "21.0.3";
+const GAME_VERSION = "22.0.0";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
+const hunterImg = new Image(); hunterImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Hunter.png';
+
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog_woof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane_watchdog.mp3');
 const shotgunSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Shotgun.mp3');
 
+// Hunter関連サウンド
+const hunterWoofSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Hunter_woof.mp3');
+const hunterBiteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Hunterbite.mp3');
+const hunterCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane_hunter.mp3');
+
 let audioCtx = null, soundReady = false;
 let isBlind = true, gameStarted = false;
-
 let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-// 💰 totalCoins維持
 let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
@@ -144,14 +148,14 @@ let lastDir = { dx: 0, dy: -1 };
 let flipX = false; 
 let debugClickCount = 0;
 
-let ROWS, COLS, map = [], dogs = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
+let ROWS, COLS, map = [], dogs = [], hunters = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
 let shortestPath = [], coinsCollectedInLevel = 0;
 let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
 let loadingDots = 0;
 let isAutoDeviceUsedInThisLevel = false;
 
-// キーボードナビゲーション用
 let selectedMenuIndex = 1;
+let hunterWanderInterval = null;
 
 const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
 
@@ -174,7 +178,7 @@ function unlockAudio() {
         audio.muted = true;
         audio.play().then(() => { audio.pause(); audio.currentTime = 0; audio.muted = false; }).catch(e => {}); 
     };
-    [growlSnd, biteSnd, dogCrySnd, shotgunSnd].forEach(silentPlay);
+    [growlSnd, biteSnd, dogCrySnd, shotgunSnd, hunterWoofSnd, hunterBiteSnd, hunterCrySnd].forEach(silentPlay);
     soundReady = true;
 }
 
@@ -228,7 +232,6 @@ function resetAutoStartTimer() {
     startAutoStartCountdown();
 }
 
-// 選択可能なメニュー要素を配列で取得
 function getSelectableElements() {
     const ids = [
         'level-display',
@@ -390,15 +393,7 @@ function buyFlashlight() {
 }
 function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; hasAmulet = true; coinMultiplier = 3; updateUI(); resetAutoStartTimer(); } }
 function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); resetAutoStartTimer(); } }
-
-function buyDevGlasses() { 
-    if (!hasDevGlasses && totalCoins >= 1000) { 
-        totalCoins -= 1000; 
-        hasDevGlasses = true; 
-        updateUI(); 
-        resetAutoStartTimer();
-    } 
-}
+function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); resetAutoStartTimer(); } }
 
 function triggerDebugJump() {
     if (gameStarted) return;
@@ -462,27 +457,130 @@ function generateSimpleMaze() {
                 let coinCount = Math.min(currentLevel, walkableTiles.length);
                 for (let i = 0; i < coinCount; i++) map[walkableTiles[i].y][walkableTiles[i].x] = 3;
             }
-            dogs = [];
+            
+            // 敵のスポーン設定
+            dogs = []; hunters = [];
             let safetyZone = new Set(); safetyZone.add(`${player.x},${player.y}`);
             [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => safetyZone.add(`${player.x + dx},${player.y + dy}`));
             let pathSet = new Set(), pathSurroundSet = new Set();
             shortestPath.forEach(p => { pathSet.add(`${p.x},${p.y}`); [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => pathSurroundSet.add(`${p.x + dx},${p.y + dy}`)); });
-            let spawnCandidates = allWalkable.filter(p => { const posKey = `${p.x},${p.y}`; if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false; return (currentLevel <= 10) ? (!pathSet.has(posKey) && !pathSurroundSet.has(posKey)) : !pathSet.has(posKey); });
+            
+            let spawnCandidates = allWalkable.filter(p => { 
+                const posKey = `${p.x},${p.y}`; 
+                if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false; 
+                return (currentLevel <= 10) ? (!pathSet.has(posKey) && !pathSurroundSet.has(posKey)) : !pathSet.has(posKey); 
+            });
+
+            if (currentLevel >= 16) {
+                // Hunterスポーン (EXTREMEモード: 1体固定)
+                let idx = Math.floor(Math.random() * spawnCandidates.length);
+                let h = spawnCandidates[idx];
+                hunters.push({ x: h.x, y: h.y, alerted: false });
+                spawnCandidates.splice(idx, 1);
+            }
+
             let dogNum = Math.min(15, currentLevel - 1);
-            for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) { let idx = Math.floor(Math.random() * spawnCandidates.length); dogs.push(spawnCandidates[idx]); spawnCandidates.splice(idx, 1); }
+            for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) { 
+                let idx = Math.floor(Math.random() * spawnCandidates.length); 
+                dogs.push(spawnCandidates[idx]); spawnCandidates.splice(idx, 1); 
+            }
             found = true;
         }
     }
 }
 
+// マンハッタン距離
+function getManhattanDist(p1, p2) {
+    return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y);
+}
+
+// Hunter用のBFS経路探索 (最短距離の1歩目を返す)
+function getHunterNextStep(hunter, target) {
+    let q = [{x: hunter.x, y: hunter.y, path: []}];
+    let visited = new Set(); visited.add(`${hunter.x},${hunter.y}`);
+    while(q.length > 0) {
+        let curr = q.shift();
+        if(curr.x === target.x && curr.y === target.y) return curr.path[0];
+        for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+            let nx = curr.x + dx, ny = curr.y + dy, key = `${nx},${ny}`;
+            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key)) {
+                visited.add(key);
+                q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]});
+            }
+        }
+    }
+    return null;
+}
+
+function updateHunterSound() {
+    if (hunters.length === 0) { hunterWoofSnd.pause(); return; }
+    let minDist = 999;
+    hunters.forEach(h => { minDist = Math.min(minDist, getManhattanDist(player, h)); });
+    
+    const volMap = { 1: 1.0, 2: 0.4, 3: 0.2, 4: 0.1, 5: 0.05 };
+    let vol = volMap[minDist] || 0;
+    
+    if (vol > 0) {
+        hunterWoofSnd.volume = vol;
+        if (hunterWoofSnd.paused) hunterWoofSnd.play().catch(e=>{});
+    } else {
+        hunterWoofSnd.pause();
+    }
+}
+
+function moveHunters() {
+    if (!gameStarted) return;
+    hunters.forEach(h => {
+        let dist = getManhattanDist(player, h);
+        if (dist <= 6) h.alerted = true;
+
+        if (h.alerted) {
+            // 追跡モード: プレイヤーへの最短経路
+            let step = getHunterNextStep(h, player);
+            if (step) { h.x += step.dx; h.y += step.dy; }
+        }
+    });
+    checkHunterCollision();
+    updateHunterSound();
+    draw();
+}
+
+function checkHunterCollision() {
+    let hIdx = hunters.findIndex(h => h.x === player.x && h.y === player.y);
+    if (hIdx !== -1) {
+        if (shotgunAmmo > 0) {
+            shotgunAmmo--;
+            playSound(shotgunSnd);
+            hunters.splice(hIdx, 1);
+            setTimeout(() => playSound(hunterCrySnd), 1300);
+            updateUI();
+            updateHunterSound();
+        } else {
+            triggerGameOver(hunterBiteSnd);
+        }
+        return true;
+    }
+    return false;
+}
+
+function triggerGameOver(snd) {
+    gameStarted = false; 
+    playSound(snd); 
+    stopAllBGM();
+    hunterWoofSnd.pause();
+    if (hunterWanderInterval) clearInterval(hunterWanderInterval);
+    let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
+    setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100);
+}
+
 function getDistanceToGoal() {
     let q = [{x: player.x, y: player.y, d: 0}], visited = new Set(); visited.add(`${player.x},${player.y}`);
-    const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
+    const enemySet = new Set([...dogs, ...hunters].map(d => `${d.x},${d.y}`));
     while(q.length > 0) {
         let curr = q.shift(); if(map[curr.y][curr.x] === 2) return curr.d;
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
             let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
-            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) { visited.add(key); q.push({x: nx, y: ny, d: curr.d + 1}); }
+            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !enemySet.has(key)) { visited.add(key); q.push({x: nx, y: ny, d: curr.d + 1}); }
         }
     }
     return 0;
@@ -490,12 +588,12 @@ function getDistanceToGoal() {
 
 function getNextStepToGoal() {
     let q = [{x: player.x, y: player.y, path: []}], visited = new Set(); visited.add(`${player.x},${player.y}`);
-    const dogSet = new Set(dogs.map(d => `${d.x},${d.y}`));
+    const enemySet = new Set([...dogs, ...hunters].map(d => `${d.x},${d.y}`));
     while(q.length > 0) {
         let curr = q.shift(); if(map[curr.y][curr.x] === 2) return curr.path[0];
         for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
             let nx = curr.x+dx, ny = curr.y+dy, key = `${nx},${ny}`;
-            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !dogSet.has(key)) { visited.add(key); q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]}); }
+            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && !visited.has(key) && !enemySet.has(key)) { visited.add(key); q.push({x: nx, y: ny, path: [...curr.path, {dx, dy}]}); }
         }
     }
     return null;
@@ -538,59 +636,65 @@ function movePlayer(dx, dy, isAuto = false) {
     if (dx === -1) flipX = false; if (dx === 1) flipX = true;
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
+    
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
         if(!isAuto) playOscillator(55, 'sine', 0.15, 0.5); 
+        return;
     } 
-    else {
+
+    // 移動先のHunterチェック (すれ違い防止)
+    let hunterHere = hunters.find(h => h.x === nx && h.y === ny);
+    if (hunterHere) {
         player.x = nx; player.y = ny;
-        let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
-        if (dogIndex !== -1) {
-            if (shotgunAmmo > 0) { 
-                shotgunAmmo--; 
-                playSound(shotgunSnd); 
-                dogs.splice(dogIndex, 1); 
-                setTimeout(() => {
-                    playSound(dogCrySnd);
-                }, 1300);
-                setTimeout(() => {
-                    shotgunRevealActive = true;
-                    draw();
-                    setTimeout(() => {
-                        shotgunRevealActive = false;
-                        draw();
-                    }, 250);
-                }, 500);
-                updateUI(); 
-            } 
-            else {
-                gameStarted = false; playSound(biteSnd); stopAllBGM();
-                let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
-                setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100); return;
-            }
-        }
-        if (!isAuto && dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
-        
-        if (map[ny][nx] === 2) {
-            playGoalSound();
-            if (currentLevel === 20) { gameStarted = false; stopAllBGM(); setTimeout(() => { alert("Congratulations \n全ステージクリア！"); resetGame(); }, 100); return; }
-            currentLevel++; 
-            if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
-            isAutoDeviceUsedInThisLevel = false;
-            gameStarted = false; 
-            if (!hasDevGlasses) isBlind = true; 
-            stopAutoProcess(); stopAllBGM();
-            const container = document.getElementById('start-container');
-            container.classList.remove('opaque'); container.style.display = 'flex'; 
-            selectedMenuIndex = 1;
-            setTimeout(() => { if (!gameStarted) { container.classList.add('opaque'); startAutoStartCountdown(); } }, 1750); 
-            updateUI();
-        } else if (map[ny][nx] === 3) {
-            playCoinSound(coinsCollectedInLevel); map[ny][nx] = 0; 
-            totalCoins += ((currentLevel >= 11 ? 10 : 1) * coinMultiplier);
-            coinsCollectedInLevel++; updateUI();
-        }
-        if (isAuto) updateUI();
+        checkHunterCollision();
+        return;
     }
+
+    player.x = nx; player.y = ny;
+
+    // Dog衝突判定
+    let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
+    if (dogIndex !== -1) {
+        if (shotgunAmmo > 0) { 
+            shotgunAmmo--; playSound(shotgunSnd); dogs.splice(dogIndex, 1); 
+            setTimeout(() => playSound(dogCrySnd), 1300);
+            setTimeout(() => { shotgunRevealActive = true; draw(); setTimeout(() => { shotgunRevealActive = false; draw(); }, 250); }, 500);
+            updateUI(); 
+        } else {
+            triggerGameOver(biteSnd); return;
+        }
+    }
+
+    if (!isAuto && dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
+    
+    // Hunter移動 (プレイヤーが動いたあとに1歩動く)
+    moveHunters();
+
+    if (map[ny][nx] === 2) {
+        playGoalSound();
+        if (currentLevel === 20) { 
+            gameStarted = false; stopAllBGM(); hunterWoofSnd.pause();
+            if (hunterWanderInterval) clearInterval(hunterWanderInterval);
+            setTimeout(() => { alert("Congratulations \n全ステージクリア！"); resetGame(); }, 100); return; 
+        }
+        currentLevel++; 
+        if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
+        isAutoDeviceUsedInThisLevel = false;
+        gameStarted = false; 
+        if (!hasDevGlasses) isBlind = true; 
+        stopAutoProcess(); stopAllBGM(); hunterWoofSnd.pause();
+        if (hunterWanderInterval) clearInterval(hunterWanderInterval);
+        const container = document.getElementById('start-container');
+        container.classList.remove('opaque'); container.style.display = 'flex'; 
+        selectedMenuIndex = 1;
+        setTimeout(() => { if (!gameStarted) { container.classList.add('opaque'); startAutoStartCountdown(); } }, 1750); 
+        updateUI();
+    } else if (map[ny][nx] === 3) {
+        playCoinSound(coinsCollectedInLevel); map[ny][nx] = 0; 
+        totalCoins += ((currentLevel >= 11 ? 10 : 1) * coinMultiplier);
+        coinsCollectedInLevel++; updateUI();
+    }
+    if (isAuto) updateUI();
     draw();
 }
 
@@ -606,17 +710,42 @@ async function startGame() {
         const active = bgmMap[currentBGM];
         if (active) { active.volume = (currentBGM === 4) ? 0.04 : 0.05; active.currentTime = 0; active.play().catch(e => {}); }
     }
-    generateSimpleMaze(); updateUI(); draw(); 
+    generateSimpleMaze(); 
+    
+    // Hunter徘徊タイマー
+    if (currentLevel >= 16) {
+        hunterWanderInterval = setInterval(() => {
+            if (!gameStarted) return;
+            hunters.forEach(h => {
+                if (!h.alerted) {
+                    let dirs = [[0,1],[0,-1],[1,0],[-1,0]].sort(()=>Math.random()-0.5);
+                    for(let [dx, dy] of dirs) {
+                        let nx = h.x+dx, ny = h.y+dy;
+                        if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]===0) {
+                            h.x = nx; h.y = ny; break;
+                        }
+                    }
+                }
+            });
+            checkHunterCollision();
+            updateHunterSound();
+            draw();
+        }, 2000);
+    }
+
+    updateUI(); draw(); 
 }
 
 function resetGame() { 
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
+    if (hunterWanderInterval) clearInterval(hunterWanderInterval);
     currentLevel = 1; totalCoins = 0; hasAmulet = false; hasAutoDevice = false; 
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0; hasHeadphone = false; currentBGM = null;
     coinMultiplier = 1; gameStarted = false; isBlind = true; debugClickCount = 0;
     selectedMenuIndex = 1;
+    hunterWoofSnd.pause();
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
 
@@ -652,6 +781,8 @@ function draw() {
         }
     }
     dogs.forEach(d => ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size));
+    hunters.forEach(h => ctx.drawImage(hunterImg, oX+h.x*size, oY+h.y*size, size, size));
+
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); } 
@@ -685,7 +816,6 @@ function draw() {
     }
 }
 
-// ⌨️ キーボードイベント
 window.addEventListener('keydown', e => {
     const key = e.key.toLowerCase();
     const items = getSelectableElements();
@@ -731,9 +861,7 @@ window.addEventListener('keydown', e => {
         }
     } else {
         if ((e.key === ' ' || e.key === 'Enter') && items[selectedMenuIndex]?.id === 'toggleMode') {
-            items[selectedMenuIndex].click();
-            e.preventDefault();
-            return;
+            items[selectedMenuIndex].click(); e.preventDefault(); return;
         }
         if (key === 'w' || e.key === 'ArrowUp') movePlayer(0, -1);
         else if (key === 's' || e.key === 'ArrowDown') movePlayer(0, 1);
