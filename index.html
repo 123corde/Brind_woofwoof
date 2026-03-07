@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.0.5";
+const GAME_VERSION = "25.0.6"; // バージョンアップ
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -144,7 +144,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -221,9 +221,7 @@ function startAutoStartCountdown() {
     const startBtn = document.getElementById('start-btn');
     if (autoStartTimeout) clearTimeout(autoStartTimeout);
     if (countdownInterval) clearInterval(countdownInterval);
-
     if (isManualMode || currentLevel < 2) { startBtn.innerText = "START"; return; }
-
     let remaining = 10;
     startBtn.innerText = `START (${remaining}s)`;
     countdownInterval = setInterval(() => {
@@ -240,14 +238,7 @@ function resetAutoStartTimer() {
 }
 
 function getSelectableElements() {
-    const ids = [
-        'level-display',
-        'hp-buy-btn', 'bgm-cycle-btn',
-        'flashlight-btn', 'amulet-btn',
-        'shotgun-btn', 'auto-device-btn',
-        'dev-glass-btn', 'start-btn',
-        'mode-toggle-label', 'toggleMode'
-    ];
+    const ids = ['level-display', 'hp-buy-btn', 'bgm-cycle-btn', 'flashlight-btn', 'amulet-btn', 'shotgun-btn', 'auto-device-btn', 'dev-glass-btn', 'start-btn', 'mode-toggle-label', 'toggleMode'];
     return ids.map(id => document.getElementById(id)).filter(el => {
         if (!el) return false;
         const style = window.getComputedStyle(el);
@@ -266,24 +257,19 @@ function updateMenuSelection() {
 function updateUI() {
     const verDisplay = document.getElementById('ver-text');
     if (verDisplay) verDisplay.innerText = `ver.${GAME_VERSION}`;
-    
     const levelDisplay = document.getElementById('level-display');
     const startContainer = document.getElementById('start-container');
     const startBtn = document.getElementById('start-btn');
     const toggleContainer = document.getElementById('toggle-container');
     const slider = document.querySelector('.slider');
     const devBtn = document.getElementById('dev-glass-btn');
-    
     toggleContainer.style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
-
     const isHard = currentLevel >= 11 && currentLevel <= 15;
     const isExtreme = currentLevel >= 16;
-
     startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
     startBtn.classList.remove('extreme-shake');
     slider.style.setProperty('--toggle-color', "#28a745");
-
     if (isExtreme) {
         const modeColor = "#dc3545"; 
         startBtn.style.backgroundColor = modeColor;
@@ -304,7 +290,6 @@ function updateUI() {
         startContainer.style.border = "none";
         levelDisplay.innerHTML = `<span style="color:${modeColor};">Level ${currentLevel}</span><br><span style="font-size: 18px; color:${modeColor};">NORMAL MODE</span>`;
     }
-
     if (currentLevel >= 11) {
         document.getElementById('shotgun-btn').style.display = 'block';
         document.getElementById('auto-device-btn').style.display = 'block';
@@ -312,18 +297,13 @@ function updateUI() {
         document.getElementById('shotgun-btn').style.display = 'none';
         document.getElementById('auto-device-btn').style.display = 'none';
     }
-
     if (isManualMode || currentLevel === 1) startBtn.innerText = "START";
-    
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
-    
     devBtn.disabled = (hasDevGlasses || totalCoins < 1000);
-
     const hpBuyBtn = document.getElementById('hp-buy-btn');
     const cycleBtn = document.getElementById('bgm-cycle-btn');
     const hpDisplay = document.getElementById('headphone-display');
-
     if (hasHeadphone) {
         let bgmStatusIcon = "🔕";
         let nextSongName = "❄️ 氷の華";
@@ -342,12 +322,10 @@ function updateUI() {
         hpBuyBtn.disabled = totalCoins < 5;
         cycleBtn.style.display = 'none';
     }
-
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) { sBtn.innerText = "💥 ショットガン (50コイン)"; sBtn.disabled = totalCoins < 50; } 
     else { sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`; sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30); }
     document.getElementById('ammo-display').innerText = (hasShotgun && shotgunAmmo > 0) ? "💥".repeat(shotgunAmmo) : "";
-
     const fBtn = document.getElementById('flashlight-btn');
     if (!hasFlashlight) { fBtn.innerText = "🔦 懐中電灯 (15コイン)"; fBtn.disabled = totalCoins < 15; } 
     else { fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`; fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5); }
@@ -356,18 +334,13 @@ function updateUI() {
         fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
         fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
     } else { fDisplay.innerText = ""; }
-
     const aBtn = document.getElementById('auto-device-btn');
     aBtn.innerText = "📍 Google Map (200コイン)"; aBtn.disabled = (hasAutoDevice || totalCoins < 200);
-
     const amuletBtn = document.getElementById('amulet-btn');
     amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
-
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
-
     let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
     document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${diffTag}`;
-
     let statusText = "";
     if (hasAutoDevice) {
         if (autoLoadState === "NONE") statusText = "📍";
@@ -375,7 +348,6 @@ function updateUI() {
         else if (autoLoadState === "MOVING") statusText = `📍[案内中](${getDistanceToGoal()}s)`;
     }
     document.getElementById('auto-status').innerText = statusText;
-
     if (!gameStarted) updateMenuSelection();
 }
 
@@ -426,6 +398,46 @@ function updateScentMap() {
     }
 }
 
+// 1マス幅を基本とした、うねうねした細い道を作る関数
+function carveThinOrganicPath(p1, p2) {
+    let cx = p1.x, cy = p1.y;
+    while (cx !== p2.x || cy !== p2.y) {
+        if (Math.random() < 0.9) {
+            if (cx !== p2.x && (cy === p2.y || Math.random() < 0.5)) cx += (p2.x > cx ? 1 : -1);
+            else cy += (p2.y > cy ? 1 : -1);
+        } else {
+            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+            let d = dirs[Math.floor(Math.random() * 4)];
+            if (cx+d[0] > 0 && cx+d[0] < COLS-1 && cy+d[1] > 0 && cy+d[1] < ROWS-1) {
+                cx += d[0]; cy += d[1];
+            }
+        }
+        map[cy][cx] = 0;
+    }
+}
+
+function placeEntities(walkableData) {
+    let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
+    candidates.sort(() => Math.random() - 0.5);
+    let coinCount = (currentLevel <= 10) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel;
+    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
+        map[candidates[i].y][candidates[i].x] = 3;
+    }
+    dogs = []; hunters = [];
+    let safetyZone = new Set();
+    for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
+    let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
+    if (currentLevel >= 16 && enemyCandidates.length > 0) {
+        let h = enemyCandidates.pop();
+        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
+    }
+    let dogNum = Math.min(15, currentLevel - 1);
+    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
+        let d = enemyCandidates.pop();
+        dogs.push({ x: d.x, y: d.y });
+    }
+}
+
 function generateSimpleMaze() {
     const sizeMap = {
         1: [5, 7],   2: [7, 9],   3: [7, 9],   4: [9, 11],  5: [9, 11],
@@ -439,69 +451,48 @@ function generateSimpleMaze() {
     let found = false;
     let attempts = 0;
 
-    while (!found && attempts < 20) {
+    while (!found && attempts < 50) {
         attempts++;
-        // 1. 全てを壁で埋める
         map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-
-        // 2. 拠点をグリッド状に定義（ただし繋ぎ方は限定する）
         let seeds = [];
-        let step = 2; // 通路の密度（2〜3がアリの巣に最適）
+        let step = 2; 
         for (let y = 1; y < ROWS - 1; y += step) {
             for (let x = 1; x < COLS - 1; x += step) {
                 seeds.push({x: x, y: y});
-                map[y][x] = 0; // 拠点を床にする
+                map[y][x] = 0;
             }
         }
-
-        // 3. 隣接する拠点同士のみを繋ぐ（網目状の細い通路を作成）
-        // 全ての拠点をシャッフルして、未接続の拠点を繋いでいく（プリム法風）
         let connectedSeeds = [seeds[0]];
         let unvisitedSeeds = seeds.slice(1);
-
         while (unvisitedSeeds.length > 0) {
             let p1Idx = Math.floor(Math.random() * connectedSeeds.length);
             let p1 = connectedSeeds[p1Idx];
-            
-            // p1に最も近い（隣接する）未訪問の拠点を探す
-            let p2Idx = -1;
-            let minDist = 999;
+            let p2Idx = -1, minDist = 999;
             for(let i=0; i<unvisitedSeeds.length; i++) {
                 let d = Math.abs(p1.x - unvisitedSeeds[i].x) + Math.abs(p1.y - unvisitedSeeds[i].y);
                 if (d < minDist) { minDist = d; p2Idx = i; }
             }
-
             if (p2Idx !== -1) {
                 let p2 = unvisitedSeeds[p2Idx];
-                carveThinOrganicPath(p1, p2); // 1マス幅の細い道で繋ぐ
+                carveThinOrganicPath(p1, p2);
                 connectedSeeds.push(p2);
                 unvisitedSeeds.splice(p2Idx, 1);
             }
         }
-
-        // 4. アリの巣っぽさを出すために少しだけランダムな道（サイクル）を足す
         for(let i=0; i < seeds.length / 4; i++) {
             carveThinOrganicPath(seeds[Math.floor(Math.random()*seeds.length)], seeds[Math.floor(Math.random()*seeds.length)]);
         }
-
-        // 5. 到達チェックとプレイヤー・ゴール配置
         let allWalkable = [];
         for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) allWalkable.push({x, y});
-        
-        if (allWalkable.length < 5) continue;
-
+        if (allWalkable.length < 3) continue;
         let startPos = allWalkable[Math.floor(Math.random() * allWalkable.length)];
         player = { x: startPos.x, y: startPos.y };
-
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let q = [{ x: player.x, y: player.y, d: 0, path: [] }];
         dists[player.y][player.x] = 0;
-        let furthest = q[0];
-        let walkableData = [];
-
+        let furthest = q[0], walkableData = [];
         while (q.length > 0) {
-            let curr = q.shift();
-            walkableData.push(curr);
+            let curr = q.shift(); walkableData.push(curr);
             if (curr.d > furthest.d) furthest = curr;
             [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
                 let nx = curr.x + dx, ny = curr.y + dy;
@@ -511,10 +502,8 @@ function generateSimpleMaze() {
                 }
             });
         }
-
-        // 6. 条件判定: 適切な密度(20-40%)かつ、ゴールが十分に遠い
-        let density = walkableData.length / (COLS * ROWS);
-        if (density >= 0.20 && density <= 0.45 && furthest.d >= Math.min(COLS, ROWS)) {
+        // 条件を緩和：距離が少なくとも2以上なら採用する（小さいマップ対策）
+        if (furthest.d >= 2) {
             goalPos = { x: furthest.x, y: furthest.y };
             map[goalPos.y][goalPos.x] = 2;
             shortestPath = furthest.path;
@@ -523,157 +512,6 @@ function generateSimpleMaze() {
         }
     }
     initScentMap();
-}
-
-// 1マス幅を基本とした、うねうねした細い道を作る関数
-function carveThinOrganicPath(p1, p2) {
-    let cx = p1.x, cy = p1.y;
-    while (cx !== p2.x || cy !== p2.y) {
-        // 90%で目的地へ、10%でランダムに揺らぐ（アリの細い道）
-        if (Math.random() < 0.9) {
-            if (cx !== p2.x && (cy === p2.y || Math.random() < 0.5)) cx += (p2.x > cx ? 1 : -1);
-            else cy += (p2.y > cy ? 1 : -1);
-        } else {
-            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-            let d = dirs[Math.floor(Math.random() * 4)];
-            if (cx+d[0] > 0 && cx+d[0] < COLS-1 && cy+d[1] > 0 && cy+d[1] < ROWS-1) {
-                cx += d[0]; cy += d[1];
-            }
-        }
-        map[cy][cx] = 0; // 1マスずつ削る
-    }
-}
-
-function placeEntities(walkableData) {
-    let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
-    candidates.sort(() => Math.random() - 0.5);
-
-    let coinCount = (currentLevel <= 10) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel;
-    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
-        map[candidates[i].y][candidates[i].x] = 3;
-    }
-
-    dogs = []; hunters = [];
-    let safetyZone = new Set();
-    for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
-    let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
-
-    if (currentLevel >= 16 && enemyCandidates.length > 0) {
-        let h = enemyCandidates.pop();
-        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
-    }
-    let dogNum = Math.min(15, currentLevel - 1);
-    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
-        let d = enemyCandidates.pop();
-        dogs.push({ x: d.x, y: d.y });
-    }
-}
-// アリの巣風の曲がりくねった道を作る関数
-function carveOrganicPath(p1, p2) {
-    let cx = p1.x, cy = p1.y;
-    while (cx !== p2.x || cy !== p2.y) {
-        // 80%でターゲットに近づき、20%で迷走する
-        if (Math.random() < 0.8) {
-            if (cx !== p2.x && (cy === p2.y || Math.random() < 0.5)) cx += (p2.x > cx ? 1 : -1);
-            else cy += (p2.y > cy ? 1 : -1);
-        } else {
-            let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
-            let d = dirs[Math.floor(Math.random() * 4)];
-            if (cx+d[0] > 0 && cx+d[0] < COLS-1 && cy+d[1] > 0 && cy+d[1] < ROWS-1) {
-                cx += d[0]; cy += d[1];
-            }
-        }
-        map[cy][cx] = 0;
-        // 10%の確率で道を少し太くして「部屋」っぽくする
-        if (Math.random() < 0.1) {
-            for(let dy=-1; dy<=1; dy++) {
-                for(let dx=-1; dx<=1; dx++) {
-                    if (Math.random() < 0.7) { // 完全に四角にせず、不整形にする
-                        let nx = cx+dx, ny = cy+dy;
-                        if (nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1) map[ny][nx] = 0;
-                    }
-                }
-            }
-        }
-    }
-}
-
-function placeEntities(walkableData) {
-    let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
-    candidates.sort(() => Math.random() - 0.5);
-
-    let coinCount = (currentLevel <= 10) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel;
-    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
-        map[candidates[i].y][candidates[i].x] = 3;
-    }
-
-    dogs = []; hunters = [];
-    let safetyZone = new Set();
-    for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
-    let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
-
-    if (currentLevel >= 16 && enemyCandidates.length > 0) {
-        let h = enemyCandidates.pop();
-        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
-    }
-    let dogNum = Math.min(15, currentLevel - 1);
-    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
-        let d = enemyCandidates.pop();
-        dogs.push({ x: d.x, y: d.y });
-    }
-}
-function placeEntities(walkableData) {
-    let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
-    candidates.sort(() => Math.random() - 0.5);
-
-    // コイン配置: アリの巣らしく、行き止まりや通路に点々と配置
-    let coinCount = (currentLevel <= 10) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel;
-    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
-        map[candidates[i].y][candidates[i].x] = 3;
-    }
-
-    // 敵配置
-    dogs = []; hunters = [];
-    let safetyZone = new Set();
-    for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
-    let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
-
-    if (currentLevel >= 16 && enemyCandidates.length > 0) {
-        let h = enemyCandidates.pop();
-        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
-    }
-    let dogNum = Math.min(15, currentLevel - 1);
-    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
-        let d = enemyCandidates.pop();
-        dogs.push({ x: d.x, y: d.y });
-    }
-}
-    
-function placeEntities(walkableData) {
-    let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
-    candidates.sort(() => Math.random() - 0.5);
-
-    // コイン配置
-    let coinCount = (currentLevel <= 10) ? Math.max(1, Math.floor(shortestPath.length / 5)) : currentLevel;
-    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
-        map[candidates[i].y][candidates[i].x] = 3;
-    }
-
-    // 敵配置
-    dogs = []; hunters = [];
-    let safetyZone = new Set();
-    for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
-    let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`) && map[p.y][p.x] === 0);
-
-    if (currentLevel >= 16 && enemyCandidates.length > 0) {
-        let h = enemyCandidates.pop();
-        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
-    }
-    let dogNum = Math.min(15, currentLevel - 1);
-    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
-        let d = enemyCandidates.pop();
-        dogs.push({ x: d.x, y: d.y });
-    }
 }
 
 function getManhattanDist(p1, p2) {
@@ -703,9 +541,7 @@ function moveHunters() {
                 }
             }
         }
-
         let nextMove = null;
-
         if (h.alerted) {
             let scents =[];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
@@ -735,17 +571,12 @@ function moveHunters() {
                 else nextMove = possible[Math.floor(Math.random() * possible.length)];
             }
         }
-
         if (nextMove) {
-            let nx = h.x + nextMove.dx;
-            let ny = h.y + nextMove.dy;
+            let nx = h.x + nextMove.dx, ny = h.y + nextMove.dy;
             if (nx === player.x && ny === player.y) return; 
-            h.x = nx;
-            h.y = ny;
-            h.lastDir = { dx: nextMove.dx, dy: nextMove.dy };
+            h.x = nx; h.y = ny; h.lastDir = { dx: nextMove.dx, dy: nextMove.dy };
         }
     });
-
     checkHunterCollision();
     triggerHunterSound();
     draw();
@@ -755,29 +586,19 @@ function checkHunterCollision() {
     let hIdx = hunters.findIndex(h => h.x === player.x && h.y === player.y);
     if (hIdx !== -1) {
         if (shotgunAmmo > 0) {
-            shotgunAmmo--;
-            playSound(shotgunSnd);
-            hunters.splice(hIdx, 1);
+            shotgunAmmo--; playSound(shotgunSnd); hunters.splice(hIdx, 1);
             setTimeout(() => playSound(hunterCrySnd), 1300);
-            setTimeout(() => {
-                shotgunRevealActive = true;
-                draw();
-                setTimeout(() => { shotgunRevealActive = false; draw(); }, 250);
-            }, 500);
+            setTimeout(() => { shotgunRevealActive = true; draw(); setTimeout(() => { shotgunRevealActive = false; draw(); }, 250); }, 500);
             updateUI();
-        } else {
-            triggerGameOver(hunterBiteSnd);
-        }
+        } else { triggerGameOver(hunterBiteSnd); }
         return true;
     }
     return false;
 }
 
 function triggerGameOver(snd) {
-    gameStarted = false; 
-    playSound(snd); 
-    stopAllBGM();
-    hunterWoofSnd.pause();
+    gameStarted = false; playSound(snd); stopAllBGM();
+    if (hunterWoofSnd) hunterWoofSnd.pause();
     let msg = gameOverMessages[Math.floor(Math.random()*gameOverMessages.length)];
     setTimeout(() => { alert(`\n\n~~ GAME OVER ~~\n\n${msg}`); resetGame(); }, 100);
 }
@@ -845,108 +666,56 @@ function movePlayer(dx, dy, isAuto = false) {
     if (dx === -1) flipX = false; if (dx === 1) flipX = true;
     lastDir = { dx, dy };
     const nx = player.x + dx, ny = player.y + dy;
-    
     if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || map[ny][nx] === 1) { 
-        if(!isAuto) playOscillator(55, 'sine', 0.15, 0.5); 
-        return;
+        if(!isAuto) playOscillator(55, 'sine', 0.15, 0.5); return;
     } 
-
     let hunterHere = hunters.find(h => h.x === nx && h.y === ny);
-    if (hunterHere) {
-        player.x = nx; player.y = ny;
-        checkHunterCollision();
-        return;
-    }
-
+    if (hunterHere) { player.x = nx; player.y = ny; checkHunterCollision(); return; }
     player.x = nx; player.y = ny;
     playerHistory.push({x: player.x, y: player.y});
     updateScentMap();
-
     let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
     if (dogIndex !== -1) {
         if (shotgunAmmo > 0) { 
-            shotgunAmmo--; 
-            playSound(shotgunSnd); 
-            dogs.splice(dogIndex, 1); 
+            shotgunAmmo--; playSound(shotgunSnd); dogs.splice(dogIndex, 1); 
             setTimeout(() => playSound(dogCrySnd), 1300);
-            setTimeout(() => {
-                shotgunRevealActive = true;
-                draw();
-                setTimeout(() => { shotgunRevealActive = false; draw(); }, 250);
-            }, 500);
+            setTimeout(() => { shotgunRevealActive = true; draw(); setTimeout(() => { shotgunRevealActive = false; draw(); }, 250); }, 500);
             updateUI(); 
-        } else {
-            triggerGameOver(biteSnd); return;
-        }
+        } else { triggerGameOver(biteSnd); return; }
     }
-
     if (!isAuto && dogs.some(d => Math.abs(d.x-player.x)+Math.abs(d.y-player.y)===1)) playSound(growlSnd);
-    
     moveHunters();
-
     if (map[ny][nx] === 2) {
         playGoalSound();
-        // --- Level 20 クリア処理の変更 ---
         if (currentLevel === 20) { 
-            gameStarted = false; 
-            stopAllBGM(); 
-            if (hunterWoofSnd) hunterWoofSnd.pause();
-            
+            gameStarted = false; stopAllBGM(); if (hunterWoofSnd) hunterWoofSnd.pause();
             setTimeout(async () => {
                 const playerName = prompt("全ステージクリア！\n名前を入力してください:", "スーパーネコ") || "イッヌ";
-                
                 const rankingDiv = document.getElementById('ranking-display');
                 rankingDiv.style.display = 'block';
                 rankingDiv.innerHTML = "<h3>スコア送信中...</h3>";
-
                 try {
-                    // ★重要：ここに「新しいデプロイ」で取得した最新のURLを貼る
                     const gasBaseUrl = "https://script.google.com/macros/s/AKfycbyQ4skGmB7LdTklwfVMYegsYlK3y-DwkxILgbyBlEElbjKq_neJkzcNOJEDQPmX6Wfbpg/exec"; 
-                    
-                    // URLの末尾に名前とスコアをくっつける（GET方式）
                     const finalUrl = `${gasBaseUrl}?name=${encodeURIComponent(playerName)}&score=${totalCoins}`;
-
-                    // 通信実行
                     const response = await fetch(finalUrl);
-                    
                     if (!response.ok) throw new Error("通信エラーが発生しました");
-
                     const rankingData = await response.json();
-                    
-                    // ランキング表示
                     let html = "<h2>🏆 殿堂入り 🏆</h2><table id='ranking-table'><tr><th>順位</th><th>名前</th><th>スコア</th></tr>";
-                    rankingData.forEach((row, index) => {
-                        html += `<tr><td>${index + 1}位</td><td>${row.name}</td><td>${row.score}</td></tr>`;
-                    });
+                    rankingData.forEach((row, index) => { html += `<tr><td>${index + 1}位</td><td>${row.name}</td><td>${row.score}</td></tr>`; });
                     html += "</table><button class='retry-btn' onclick='location.reload()'>タイトルへ戻る</button>";
                     rankingDiv.innerHTML = html;
-
                 } catch (e) {
-                    console.error("エラー詳細:", e);
-                    rankingDiv.innerHTML = `<h3>スコア保存完了</h3>
-                        <p style="font-size:12px;">データは保存されましたが、ランキングの読み込みに失敗しました。<br>理由: ブラウザのセキュリティ(CORS)により遮断されました。</p>
-                        <button class='retry-btn' onclick='location.reload()'>タイトルへ戻る</button>`;
+                    rankingDiv.innerHTML = `<h3>スコア保存完了</h3><button class='retry-btn' onclick='location.reload()'>タイトルへ戻る</button>`;
                 }
             }, 100);
             return; 
         }
-// ランキング表示を共通化
-function displayRanking(data) {
-    const rankingDiv = document.getElementById('ranking-display');
-    let html = "<h2>🏆 殿堂入り 🏆</h2><table id='ranking-table'><tr><th>順位</th><th>名前</th><th>スコア</th></tr>";
-    data.forEach((row, index) => {
-        html += `<tr><td>${index + 1}位</td><td>${row.name}</td><td>${row.score}</td></tr>`;
-    });
-    html += "</table><button class='retry-btn' onclick='location.reload()'>タイトルへ戻る</button>";
-    rankingDiv.innerHTML = html;
-}
-        
         currentLevel++; 
         if (isAutoDeviceUsedInThisLevel) hasAutoDevice = false;
         isAutoDeviceUsedInThisLevel = false;
         gameStarted = false; 
         if (!hasDevGlasses) isBlind = true; 
-        stopAutoProcess(); stopAllBGM(); hunterWoofSnd.pause();
+        stopAutoProcess(); stopAllBGM(); if (hunterWoofSnd) hunterWoofSnd.pause();
         const container = document.getElementById('start-container');
         container.classList.remove('opaque'); container.style.display = 'flex'; 
         selectedMenuIndex = 1;
@@ -973,8 +742,7 @@ async function startGame() {
         const active = bgmMap[currentBGM];
         if (active) { active.volume = (currentBGM === 4) ? 0.04 : 0.05; active.currentTime = 0; active.play().catch(e => {}); }
     }
-    generateSimpleMaze(); 
-    updateUI(); draw(); 
+    generateSimpleMaze(); updateUI(); draw(); 
 }
 
 function resetGame() { 
@@ -984,8 +752,7 @@ function resetGame() {
     hasDevGlasses = false; hasFlashlight = false; flashlightBattery = 0;
     hasShotgun = false; shotgunAmmo = 0; hasHeadphone = false; currentBGM = null;
     coinMultiplier = 1; gameStarted = false; isBlind = true; debugClickCount = 0;
-    selectedMenuIndex = 1;
-    hunterWoofSnd.pause();
+    selectedMenuIndex = 1; if (hunterWoofSnd) hunterWoofSnd.pause();
     stopAutoProcess(); document.getElementById('start-container').style.display = 'flex'; updateUI(); 
 }
 
@@ -1022,13 +789,11 @@ function draw() {
     }
     dogs.forEach(d => ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size));
     hunters.forEach(h => ctx.drawImage(hunterImg, oX+h.x*size, oY+h.y*size, size, size));
-
     const pX = oX + player.x * size, pY = oY + player.y * size;
     ctx.save();
     if (flipX) { ctx.translate(pX + size, pY); ctx.scale(-1, 1); ctx.drawImage(playerImg, 0, 0, size, size); } 
     else { ctx.drawImage(playerImg, pX, pY, size, size); }
     ctx.restore();
-    
     if (isBlind && gameStarted && !shotgunRevealActive) { 
         ctx.save();
         const tempCanvas = document.createElement('canvas'); tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
@@ -1060,7 +825,6 @@ window.addEventListener('keydown', e => {
     const key = e.key.toLowerCase();
     const items = getSelectableElements();
     const isRestricted = (el) => el.id === 'level-display' || el.id === 'toggleMode';
-
     if (e.key === 'W' && !gameStarted) {
         const idx = items.findIndex(el => el.id === 'level-display');
         if (idx !== -1) { selectedMenuIndex = idx; updateMenuSelection(); }
@@ -1071,36 +835,22 @@ window.addEventListener('keydown', e => {
         if (idx !== -1) { selectedMenuIndex = idx; updateMenuSelection(); }
         e.preventDefault(); return;
     }
-
     if (!gameStarted) {
         if (key === 'w' || key === 'a' || e.key === 'ArrowUp') {
             selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
-            while (items[selectedMenuIndex] && isRestricted(items[selectedMenuIndex])) {
-                selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length;
-            }
-            updateMenuSelection();
-            e.preventDefault();
+            while (items[selectedMenuIndex] && isRestricted(items[selectedMenuIndex])) { selectedMenuIndex = (selectedMenuIndex - 1 + items.length) % items.length; }
+            updateMenuSelection(); e.preventDefault();
         } else if (key === 's' || key === 'd' || e.key === 'ArrowDown') {
             selectedMenuIndex = (selectedMenuIndex + 1) % items.length;
-            while (items[selectedMenuIndex] && isRestricted(items[selectedMenuIndex])) {
-                selectedMenuIndex = (selectedMenuIndex + 1) % items.length;
-            }
-            updateMenuSelection();
-            e.preventDefault();
+            while (items[selectedMenuIndex] && isRestricted(items[selectedMenuIndex])) { selectedMenuIndex = (selectedMenuIndex + 1) % items.length; }
+            updateMenuSelection(); e.preventDefault();
         } else if (e.key === ' ' || e.key === 'Enter') {
             const target = items[selectedMenuIndex];
-            if (target) {
-                if (target.id === 'mode-toggle-label') {
-                    const cb = document.getElementById('mode-toggle');
-                    toggleStartMode(!cb.checked);
-                } else target.click();
-            }
+            if (target) { if (target.id === 'mode-toggle-label') { toggleStartMode(!document.getElementById('mode-toggle').checked); } else target.click(); }
             e.preventDefault();
         }
     } else {
-        if ((e.key === ' ' || e.key === 'Enter') && items[selectedMenuIndex]?.id === 'toggleMode') {
-            items[selectedMenuIndex].click(); e.preventDefault(); return;
-        }
+        if ((e.key === ' ' || e.key === 'Enter') && items[selectedMenuIndex]?.id === 'toggleMode') { items[selectedMenuIndex].click(); e.preventDefault(); return; }
         if (key === 'w' || e.key === 'ArrowUp') movePlayer(0, -1);
         else if (key === 's' || e.key === 'ArrowDown') movePlayer(0, 1);
         else if (key === 'a' || e.key === 'ArrowLeft') movePlayer(-1, 0);
@@ -1113,15 +863,12 @@ window.addEventListener('touchstart', e => { tsX = e.touches[0].clientX; tsY = e
 window.addEventListener('touchend', e => {
     if (tsX === null || tsY === null) return;
     const dx = e.changedTouches[0].clientX - tsX, dy = e.changedTouches[0].clientY - tsY;
-    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
-        if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1);
-    }
+    if (Math.abs(dx) > 20 || Math.abs(dy) > 20) { if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0); else movePlayer(0, dy > 0 ? 1 : -1); }
     tsX = null; tsY = null;
 });
 const startContainer = document.getElementById('start-container');
 startContainer.addEventListener('mousedown', (e) => resetAutoStartTimer(e));
 startContainer.addEventListener('touchstart', (e) => resetAutoStartTimer(e), {passive: true});
-window.onresize = draw; updateUI(); draw();
-</script>
+window.onresize = draw; updateUI(); draw();</script>
 </body>
 </html>
