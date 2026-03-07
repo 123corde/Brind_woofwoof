@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "23.0.0";
+const GAME_VERSION = "23.0.1";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -538,7 +538,7 @@ function moveHunters() {
         let nextMove = null;
 
         if (h.alerted) {
-            // 嗅覚モード (60/40 確率)
+            // 嗅覚モード (75% 匂い最大, 25 次点)
             let scents = [];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
@@ -549,11 +549,10 @@ function moveHunters() {
             if (scents.length > 0) {
                 scents.sort((a, b) => b.val - a.val);
                 let roll = Math.random();
-                if (roll < 0.6 || scents.length < 2) nextMove = scents[0];
-                else nextMove = scents[1];
-            }
+                if (roll < 0.75 || scents.length < 2) nextMove = scents[0];
+                else nextMove = scents[1];            }
         } else {
-            // 徘徊モード (70% 維持, 30% 変更)
+            // 徘徊モード (60% 維持, 40% 変更)
             let possible = [];
             for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
                 let nx = h.x + dx, ny = h.y + dy;
@@ -564,7 +563,7 @@ function moveHunters() {
             if (possible.length > 0) {
                 let sameDir = possible.find(p => p.dx === h.lastDir.dx && p.dy === h.lastDir.dy);
                 let roll = Math.random();
-                if (sameDir && roll < 0.7) {
+                if (sameDir && roll < 0.60) {
                     nextMove = sameDir;
                 } else {
                     nextMove = possible[Math.floor(Math.random() * possible.length)];
