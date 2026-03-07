@@ -414,7 +414,7 @@ function updateScentMap() {
     for (let i = 0; i < playerHistory.length; i++) {
         let pos = playerHistory[i];
         let n = (playerHistory.length - 1) - i;
-        let power = (n <= 10) ? (100 - 10 * n) + 1 : 1;
+        let power = (n <= 1000) ? (1000 - n) + 1 : 1;
         scentMap[pos.y][pos.x] = power;
     }
 }
