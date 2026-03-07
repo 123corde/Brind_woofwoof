@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>イッヌと寝落ち - Hunter Ranking Edition</title>
+    <title>イッヌと寝落ち - Hunter Scent Turn-based</title>
     <style>
         body { margin: 0; background: #000; color: #333; font-family: sans-serif; overflow: hidden; touch-action: none; }
         canvas { display: block; }
         #ui { position: absolute; bottom: 15px; left: 15px; pointer-events: none; z-index: 200; font-weight: bold; background: rgba(0,0,0,0.6); color: #fff; padding: 10px; border-radius: 6px; font-size: min(14px, 3.5vw); max-width: 80%; }
         .item-row { display: flex; gap: 10px; align-items: center; margin-bottom: 5px; height: 1.5em; }
+        #controls { position: absolute; bottom: 15px; right: 15px; z-index: 300; display: none; }
+        button { padding: 10px 15px; font-size: 12px; background: #444; color: white; border: none; border-radius: 5px; cursor: pointer; pointer-events: auto; }
         #start-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.35); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; text-align: center; padding: 20px; box-sizing: border-box; overflow-y: auto; transition: background-color 2.0s ease-in-out; }
         #start-container > * { opacity: 0; transition: opacity 2.0s ease-in-out; pointer-events: none; }
         #start-container.opaque { background: rgba(255,255,255,1.0) !important; }
@@ -21,24 +23,14 @@
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: var(--toggle-color, #28a745); }
         input:checked + .slider:before { transform: translateX(24px); }
-        .shop-btn { padding: 10px; margin: 3px; background: #ffd54f; color: #333; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; flex-shrink: 0; }
+        .shop-btn { padding: 10px; margin: 3px; background: #ffd54f; color: #333; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; width: 80%; max-width: 300px; }
         .shop-btn:disabled { background: #ccc !important; cursor: not-allowed; color: #777 !important; }
-        #level-display { cursor: pointer; user-select: none; line-height: 1.2; font-weight: bold; font-size: 28px; padding: 5px; border-radius: 5px; }
-
-        /* ランキング表示用スタイル */
-        #ranking-display {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.95); color: white; padding: 15px; border-radius: 10px;
-            z-index: 1000; text-align: center; width: 95%; max-width: 600px; display: none;
-            border: 2px solid #ffd700; overflow-y: auto; max-height: 90vh;
-        }
-        #ranking-table { width: 100%; margin: 10px 0; border-collapse: collapse; font-size: 11px; }
-        #ranking-table th, #ranking-table td { padding: 5px 2px; border-bottom: 1px solid #444; }
-        #ranking-table th { color: #ffd700; }
+        #ranking-display { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0, 0, 0, 0.95); color: white; padding: 15px; border-radius: 10px; z-index: 1000; text-align: center; width: 95%; max-width: 700px; display: none; border: 2px solid #ffd700; overflow-y: auto; max-height: 90vh; }
+        #ranking-table { width: 100%; margin: 10px 0; border-collapse: collapse; font-size: 10px; }
+        #ranking-table th, #ranking-table td { padding: 5px 2px; border-bottom: 1px solid #444; text-align: center; }
         .retry-btn { padding: 10px 20px; background: #ffd700; color: #000; border: none; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        
-        .kb-selected { outline: 4px solid #ccc !important; transform: scale(1.1); transition: transform 0.1s; }
-        @keyframes extreme-shake { 0% { transform: translate(0,0); } 20% { transform: translate(1px, -1px); } 40% { transform: translate(-1px, 1px); } 60% { transform: translate(1px, 1px); } 80% { transform: translate(-1px, -1px); } 100% { transform: translate(0,0); } }
+        .kb-selected { outline: 4px solid #ccc !important; transform: scale(1.05); }
+        @keyframes extreme-shake { 0% { transform: translate(0,0); } 20% { transform: translate(1px, -1px); } 100% { transform: translate(0,0); } }
         .extreme-shake { animation: extreme-shake 0.1s infinite; display: inline-block; }
     </style>
 </head>
@@ -46,7 +38,7 @@
 
     <div id="start-container" class="opaque">
         <div id="level-display" onclick="triggerDebugJump()">Level 1</div>
-        <br><br>
+        <br>
         <button id="hp-buy-btn" class="shop-btn" onclick="buyHeadphone()">🎹 キーボード (5コイン)</button>
         <button id="bgm-cycle-btn" class="shop-btn" style="display:none;" onclick="cycleBGM()"></button>        
         <button id="flashlight-btn" class="shop-btn" onclick="buyFlashlight()"></button>
@@ -57,7 +49,7 @@
         <br>
         <div class="start-action-row">
             <button id="start-btn" onclick="startGame()">START</button>
-            <div id="toggle-container" style="display: flex; flex-direction: column; align-items: center;">
+            <div id="toggle-container">
                 <label class="switch" id="mode-toggle-label">
                     <input type="checkbox" id="mode-toggle" checked onchange="toggleStartMode(this.checked)">
                     <span class="slider"></span>
@@ -74,23 +66,29 @@
             <div id="auto-status"></div>
             <div id="flashlight-display"></div>
         </div>
-        <div id="level-text-ui" style="font-size: 1.1em; color: #fff; margin-bottom: 2px;">Level 1/20</div>
+        <div id="level-text-ui">Level 1/20</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
     </div>
 
+    <div id="controls"><button id="toggleMode" onclick="toggleBlind()">👁️ Dev Options</button></div>
+    
+    <audio id="bgm-koori" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/koorinohana.mp3" loop></audio>
+    <audio id="bgm-hikari" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/wasurezinohikari.mp3" loop></audio>
+    <audio id="bgm-suzumusi" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Suzumusi.mp3" loop></audio>
+    <audio id="bgm-brown" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Brown_Noise.mp3" loop></audio>
+    
     <div id="ranking-display"></div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
-// ★ここを新しいGASのURLに貼り替えてください
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyDIHGP3KTQlG6qb0Gyqf8sia-m9625WZv7k0SOgu5Zak6tL7bLDYEkaGGpIWcKH13Eag/exec";
+const GAME_VERSION = "24.5.9";
+const GAS_URL = "https://script.google.com/macros/s/AKfycby2EiyJEB9tKFKRZh_F53Up1beC-zIxrIMirvxj8i-bmZCfAz-rnlrSEWMxUE5K_opvOQ/exec";
 
-const GAME_VERSION = "25.0.0";
+// Asset Settings
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
 const hunterImg = new Image(); hunterImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Hunter.png';
-
 const growlSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog_woof.wav');
 const biteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Dogbite.wav');
 const dogCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane_watchdog.mp3');
@@ -99,350 +97,277 @@ const hunterWoofSnd = new Audio('https://raw.githubusercontent.com/123corde/Brin
 const hunterBiteSnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Hunterbite.mp3');
 const hunterCrySnd = new Audio('https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Cane_hunter.mp3');
 
-// 計測用グローバル変数
-let gameStartTime = null;
-let totalSteps = 0;
-let totalLightTime = 0;
-let totalGunUsed = 0;
-let totalMapUsed = 0;
-let neotiCount = 0;
-let bgmDurations = { "🔕": 0, "❄️": 0, "🏝️": 0, "🌌": 0, "🎵": 0 };
-
-let audioCtx = null, soundReady = false;
-let isBlind = true, gameStarted = false;
-let autoStartTimeout = null, countdownInterval = null;
-let isManualMode = false; 
-
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
-let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
-let hasHeadphone = false;
-let currentBGM = null; 
-
-let hasShotgun = false, shotgunAmmo = 0; 
-let shotgunRevealActive = false; 
-let hasFlashlight = false, flashlightBattery = 0;
-const FLASHLIGHT_MAX = 200; 
-const FLASHLIGHT_BONUS = 180;
-let lastDir = { dx: 0, dy: -1 }; 
-let flipX = false; 
-let debugClickCount = 0;
-
+// Game State
+let audioCtx = null, soundReady = false, isBlind = true, gameStarted = false;
+let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1;
+let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false, hasHeadphone = false;
+let currentBGM = null, shotgunAmmo = 0, hasShotgun = false, hasFlashlight = false, flashlightBattery = 0;
+let isManualMode = false, autoStartTimeout = null, countdownInterval = null;
 let ROWS, COLS, map = [], dogs = [], hunters = [], player = { x: 0, y: 0 }, goalPos = { x: 0, y: 0 };
-let scentMap = []; 
-let playerHistory = []; 
-let shortestPath = [], coinsCollectedInLevel = 0;
-let lastMoveTime = Date.now(), autoMoveTimeout = null, autoLoadState = "NONE";
-let loadingDots = 0;
-let isAutoDeviceUsedInThisLevel = false;
-let selectedMenuIndex = 1;
+let scentMap = [], playerHistory = [], shortestPath = [], lastMoveTime = Date.now(), autoLoadState = "NONE";
+let lastDir = { dx: 0, dy: -1 }, flipX = false, debugClickCount = 0, selectedMenuIndex = 1;
+let shotgunRevealActive = false;
 
-const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50, 1174.66, 1318.51, 1396.91, 1567.98, 1760.00, 1975.53, 2093.00];
+// Statistics
+let gameStartTime = null;
+let stats = { totalSteps: 0, totalLightTime: 0, totalShots: 0, totalMapUses: 0, bgmTime: { "🔕": 0, "❄️": 0, "🏝️": 0, "🌌": 0, "🎵": 0 }, neotiCount: 0 };
+let isWaitingNeotiResumption = false;
+const WHITE_KEYS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
 
+// --- Initialization & Audio ---
 function unlockAudio() {
     if (soundReady) return;
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const silentPlay = (audio) => { audio.muted = true; audio.play().then(() => { audio.pause(); audio.currentTime = 0; audio.muted = false; }).catch(e => {}); };
-    [growlSnd, biteSnd, dogCrySnd, shotgunSnd, hunterWoofSnd, hunterBiteSnd, hunterCrySnd].forEach(silentPlay);
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    [growlSnd, biteSnd, dogCrySnd, shotgunSnd, hunterWoofSnd, hunterBiteSnd, hunterCrySnd].forEach(a => { a.muted=true; a.play().then(()=>{a.pause();a.currentTime=0;a.muted=false;}); });
     soundReady = true;
 }
-
-function playSound(audio) { if (!audio) return; audio.pause(); audio.currentTime = 0; audio.play().catch(e => {}); }
-
-function stopAllBGM() { ['bgm-koori', 'bgm-hikari', 'bgm-suzumusi', 'bgm-brown'].forEach(id => { const el = document.getElementById(id); if (el) el.pause(); }); }
-
-function toggleStartMode(isAuto) {
-    isManualMode = !isAuto;
-    const startBtn = document.getElementById('start-btn');
-    document.getElementById('mode-toggle').checked = isAuto;
-    if (isManualMode) { if (autoStartTimeout) clearTimeout(autoStartTimeout); if (countdownInterval) clearInterval(countdownInterval); startBtn.innerText = "START"; }
-    else if (currentLevel >= 2) startAutoStartCountdown();
+function playSound(a) { if(!a)return; a.pause(); a.currentTime=0; a.play().catch(()=>{}); }
+async function playOscillator(f, t, d, vol=0.06) {
+    if(!audioCtx) return;
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type=t; o.frequency.setValueAtTime(f, audioCtx.currentTime);
+    g.gain.setValueAtTime(vol, audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime+d);
+    o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+d);
 }
 
-function startAutoStartCountdown() {
-    if (gameStarted) return;
-    const startBtn = document.getElementById('start-btn');
-    if (autoStartTimeout) clearTimeout(autoStartTimeout);
-    if (countdownInterval) clearInterval(countdownInterval);
-    if (isManualMode || currentLevel < 2) { startBtn.innerText = "START"; return; }
-    let remaining = 10;
-    startBtn.innerText = `START (${remaining}s)`;
-    countdownInterval = setInterval(() => { remaining--; startBtn.innerText = remaining <= 0 ? "START" : `START (${remaining}s)`; }, 1000);
-    autoStartTimeout = setTimeout(() => { if (!gameStarted && !isManualMode) startGame(); }, 10000);
-}
+// --- Shop Logic ---
+function buyHeadphone() { if(totalCoins>=5){totalCoins-=5; hasHeadphone=true; updateUI(); resetAutoStartTimer();} }
+function cycleBGM() { currentBGM = (currentBGM === null)? 1 : (currentBGM < 4 ? currentBGM+1 : null); updateUI(); resetAutoStartTimer(); }
+function buyFlashlight() { if(!hasFlashlight){ if(totalCoins>=15){totalCoins-=15; hasFlashlight=true; flashlightBattery=60;} } else { if(totalCoins>=5 && flashlightBattery<200){totalCoins-=5; flashlightBattery=Math.min(200, flashlightBattery+10);} } updateUI(); resetAutoStartTimer(); }
+function buyAmulet() { if(!hasAmulet && totalCoins>=25){totalCoins-=25; hasAmulet=true; coinMultiplier=3; updateUI(); resetAutoStartTimer();} }
+function buyShotgun() { if(!hasShotgun){ if(totalCoins>=50){totalCoins-=50; hasShotgun=true; shotgunAmmo=2;} } else { if(totalCoins>=30 && shotgunAmmo<2){totalCoins-=30; shotgunAmmo++;} } updateUI(); resetAutoStartTimer(); }
+function buyAutoDevice() { if(!hasAutoDevice && totalCoins>=200){totalCoins-=200; hasAutoDevice=true; updateUI(); resetAutoStartTimer();} }
+function buyDevGlasses() { if(!hasDevGlasses && totalCoins>=1000){totalCoins-=1000; hasDevGlasses=true; updateUI(); resetAutoStartTimer();} }
 
-function resetAutoStartTimer() { if (!gameStarted && currentLevel >= 2 && !isManualMode) startAutoStartCountdown(); }
-
-function getSelectableElements() {
-    return ['level-display', 'hp-buy-btn', 'bgm-cycle-btn', 'flashlight-btn', 'amulet-btn', 'shotgun-btn', 'auto-device-btn', 'dev-glass-btn', 'start-btn', 'mode-toggle-label']
-        .map(id => document.getElementById(id)).filter(el => el && window.getComputedStyle(el).display !== 'none');
-}
-
-function updateMenuSelection() {
-    const elements = getSelectableElements();
-    elements.forEach((el, idx) => { if (idx === selectedMenuIndex) el.classList.add('kb-selected'); else el.classList.remove('kb-selected'); });
-}
-
-function updateUI() {
-    const levelDisplay = document.getElementById('level-display');
-    const startBtn = document.getElementById('start-btn');
-    const slider = document.querySelector('.slider');
-    const isHard = currentLevel >= 11 && currentLevel <= 15, isExtreme = currentLevel >= 16;
-    const modeColor = isExtreme ? "#dc3545" : (isHard ? "#007bff" : "#28a745");
-    
-    startBtn.style.backgroundColor = modeColor;
-    slider.style.setProperty('--toggle-color', modeColor);
-    document.getElementById('start-container').style.border = isExtreme ? `10px double ${modeColor}` : (isHard ? `6px solid ${modeColor}` : "none");
-    levelDisplay.innerHTML = `<span class="${isExtreme?'extreme-shake':''}" style="color:${modeColor};">Level ${currentLevel}</span><br><span style="font-size:18px; color:${modeColor};">${isExtreme?'EXTREME':(isHard?'HARD':'NORMAL')} MODE</span>`;
-
-    document.getElementById('toggle-container').style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
-    document.getElementById('shotgun-btn').style.display = (currentLevel >= 11) ? 'block' : 'none';
-    document.getElementById('auto-device-btn').style.display = (currentLevel >= 11) ? 'block' : 'none';
-
-    document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
-    document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
-    
-    const hpBtn = document.getElementById('hp-buy-btn'), cyBtn = document.getElementById('bgm-cycle-btn'), hpDisp = document.getElementById('headphone-display');
-    if (hasHeadphone) {
-        const bgmIcons = {null:"🔕", 1:"❄️", 2:"🏝️", 3:"🌌", 4:"🎵"};
-        const names = ["❄️ 氷の華", "🏝️ 最果ての島", "🌌 夜の音", "🎵 ブラウンノイズ", "🔕 なし"];
-        hpDisp.innerText = `🎹${bgmIcons[currentBGM]}`;
-        hpBtn.style.display = 'none'; cyBtn.style.display = 'block'; cyBtn.innerText = `🎹${names[currentBGM ? currentBGM-1 : 4]}に変更`;
-    } else { hpDisp.innerText = ""; hpBtn.style.display = 'block'; cyBtn.style.display = 'none'; }
-
-    const sBtn = document.getElementById('shotgun-btn');
-    sBtn.innerText = !hasShotgun ? "💥 ショットガン (50)" : `💥 弾[${shotgunAmmo}/2] (30)`;
-    document.getElementById('ammo-display').innerText = "💥".repeat(shotgunAmmo);
-
-    const fBtn = document.getElementById('flashlight-btn');
-    fBtn.innerText = !hasFlashlight ? "🔦 懐中電灯 (15)" : `🔦 電池[${Math.ceil(flashlightBattery)}] (5)`;
-    document.getElementById('flashlight-display').innerText = hasFlashlight && flashlightBattery>0 ? `🔦${Math.ceil(flashlightBattery)}s` : "";
-
-    document.getElementById('auto-status').innerText = hasAutoDevice ? (autoLoadState==="MOVING" ? "📍[案内]" : "📍") : "";
-    if (!gameStarted) updateMenuSelection();
-}
-
-function buyHeadphone() { if (totalCoins >= 5) { totalCoins -= 5; hasHeadphone = true; updateUI(); } }
-function cycleBGM() { currentBGM = (currentBGM === null) ? 1 : (currentBGM < 4 ? currentBGM + 1 : null); updateUI(); }
-function buyShotgun() { if (!hasShotgun && totalCoins >= 50) { totalCoins -= 50; hasShotgun = true; shotgunAmmo = 2; } else if (totalCoins >= 30 && shotgunAmmo < 2) { totalCoins -= 30; shotgunAmmo++; } updateUI(); }
-function buyFlashlight() { if (!hasFlashlight && totalCoins >= 15) { totalCoins -= 15; hasFlashlight = true; flashlightBattery = 60; } else if (totalCoins >= 5 && flashlightBattery < FLASHLIGHT_MAX) { totalCoins -= 5; flashlightBattery = Math.min(FLASHLIGHT_MAX, flashlightBattery + 10); } updateUI(); }
-function buyAmulet() { if (!hasAmulet && totalCoins >= 25) { totalCoins -= 25; hasAmulet = true; coinMultiplier = 3; updateUI(); } }
-function buyAutoDevice() { if (!hasAutoDevice && totalCoins >= 200) { totalCoins -= 200; hasAutoDevice = true; updateUI(); } }
-function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoins -= 1000; hasDevGlasses = true; updateUI(); } }
-
-function triggerDebugJump() {
-    debugClickCount++;
-    if (debugClickCount === 10) currentLevel = 11;
-    else if (debugClickCount === 20) currentLevel = 16;
-    else if (debugClickCount === 30) currentLevel = 20;
-    updateUI();
-}
-
-function initScentMap() { scentMap = Array.from({ length: ROWS }, () => Array(COLS).fill(0)); playerHistory = [{x: player.x, y: player.y}]; updateScentMap(); }
-function updateScentMap() {
-    for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) scentMap[y][x] = 0;
-    playerHistory.forEach((pos, i) => { let n = (playerHistory.length - 1) - i; scentMap[pos.y][pos.x] = n <= 1000 ? (1000 - n) + 1 : 1; });
-}
-
+// --- Maze Logic ---
 function generateSimpleMaze() {
-    const sizes = { 1:[5,7], 2:[7,9], 10:[15,19], 20:[17,21] };
-    const s = sizes[currentLevel] || (currentLevel<10?[9,11]:[15,19]);
+    const sizeMap = { 1:[5,7], 5:[9,11], 10:[15,19], 15:[17,21], 20:[17,21] };
+    let s = sizeMap[currentLevel] || [13,15];
     COLS = s[0]; ROWS = s[1];
-    map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-    let sX = 1 + Math.floor(Math.random()*((COLS-1)/2))*2, sY = 1 + Math.floor(Math.random()*((ROWS-1)/2))*2;
-    player = { x: sX, y: sY }; map[sY][sX] = 0;
-    const dig = (x, y) => { [[0,2],[0,-2],[2,0],[-2,0]].sort(()=>Math.random()-0.5).forEach(([dx,dy])=>{
-        let nx=x+dx, ny=y+dy; if(nx>0&&nx<COLS-1&&ny>0&&ny<ROWS-1&&map[ny][nx]===1){map[y+dy/2][x+dx/2]=0; map[ny][nx]=0; dig(nx,ny);}
-    });};
-    dig(sX, sY);
-    let dists = Array.from({length:ROWS},()=>Array(COLS).fill(-1)), q = [{x:sX, y:sY, d:0, path:[]}], allW=[];
-    dists[sY][sX]=0;
-    while(q.length>0){
-        let c=q.shift(); allW.push(c);
+    map = Array.from({length:ROWS}, () => Array(COLS).fill(1));
+    
+    // Simple Drunkard Walk + Random Dig
+    let rx = 1, ry = 1; map[ry][rx] = 0; player = {x:rx, y:ry};
+    for(let i=0; i<2000; i++) {
+        let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random()*4)];
+        let nx=rx+dx, ny=ry+dy;
+        if(nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1) { map[ny][nx]=0; rx=nx; ry=ny; }
+    }
+    // Goal placement (Furthest)
+    let q=[{x:1, y:1, d:0}], dists=Array.from({length:ROWS},()=>Array(COLS).fill(-1)), lastP={x:1,y:1};
+    dists[1][1]=0;
+    while(q.length>0) {
+        let c=q.shift(); lastP=c;
         [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx,dy])=>{
-            let nx=c.x+dx, ny=c.y+dy; if(ny>=0&&ny<ROWS&&nx>=0&&nx<COLS&&map[ny][nx]!==1&&dists[ny][nx]===-1){dists[ny][nx]=c.d+1; q.push({x:nx,y:ny,d:c.d+1,path:[...c.path,{x:nx,y:ny}]});}
+            let nx=c.x+dx, ny=c.y+dy;
+            if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && dists[ny][nx]===-1){
+                dists[ny][nx]=c.d+1; q.push({x:nx, y:ny, d:c.d+1});
+            }
         });
     }
-    allW.sort((a,b)=>dists[b.y][b.x]-dists[a.y][a.x]);
-    let target = allW[0]; map[target.y][target.x]=2; goalPos={x:target.x, y:target.y}; shortestPath=target.path;
-    for(let i=0; i<shortestPath.length; i+=(currentLevel<10?2:5)) if(map[shortestPath[i].y][shortestPath[i].x]===0) map[shortestPath[i].y][shortestPath[i].x]=3;
-    
+    map[lastP.y][lastP.x] = 2; goalPos = {x:lastP.x, y:lastP.y};
+
+    // Coins
+    for(let i=0; i<currentLevel+2; i++) {
+        let cx = Math.floor(Math.random()*COLS), cy = Math.floor(Math.random()*ROWS);
+        if(map[cy][cx]===0 && (cx!==player.x || cy!==player.y)) map[cy][cx]=3;
+    }
+
+    // Enemies
     dogs = []; hunters = [];
-    let spawnP = allW.filter(p => Math.abs(p.x-sX)+Math.abs(p.y-sY)>3 && map[p.y][p.x]===0);
-    if(currentLevel>=16) { let h=spawnP.splice(Math.floor(Math.random()*spawnP.length),1)[0]; hunters.push({x:h.x, y:h.y, alerted:false, lastDir:{dx:0,dy:0}}); }
-    for(let i=0; i<Math.min(10, currentLevel); i++) if(spawnP.length>0) dogs.push(spawnP.splice(Math.floor(Math.random()*spawnP.length),1)[0]);
-    initScentMap();
+    let dogCount = Math.min(10, Math.floor(currentLevel/2));
+    for(let i=0; i<dogCount; i++) {
+        let dx = Math.floor(Math.random()*COLS), dy = Math.floor(Math.random()*ROWS);
+        if(map[dy][dx]===0 && Math.abs(dx-player.x)+Math.abs(dy-player.y)>3) dogs.push({x:dx, y:dy});
+    }
+    if(currentLevel>=16) {
+        hunters.push({x:goalPos.x, y:goalPos.y, alerted:false, lastDir:{dx:0,dy:0}});
+    }
+    playerHistory = [{x:player.x, y:player.y}]; updateScentMap();
+}
+
+function updateScentMap() {
+    scentMap = Array.from({length:ROWS},()=>Array(COLS).fill(0));
+    playerHistory.forEach((p, i) => {
+        let power = Math.max(1, 1000 - (playerHistory.length - 1 - i));
+        scentMap[p.y][p.x] = power;
+    });
+}
+
+// --- Movement & AI ---
+function movePlayer(dx, dy, isAuto=false) {
+    if(!gameStarted) return;
+    if(isWaitingNeotiResumption){ stats.neotiCount++; isWaitingNeotiResumption=false; }
+    if(!isAuto){ lastMoveTime=Date.now(); stopAutoProcess(); }
+
+    const nx=player.x+dx, ny=player.y+dy;
+    if(nx<0 || nx>=COLS || ny<0 || ny>=ROWS || map[ny][nx]===1) return;
+
+    stats.totalSteps++;
+    player.x=nx; player.y=ny; flipX=(dx===1); lastDir={dx,dy};
+    playerHistory.push({x:nx, y:ny}); updateScentMap();
+
+    // Check Dog
+    let di = dogs.findIndex(d=>d.x===nx && d.y===ny);
+    if(di!==-1) {
+        if(shotgunAmmo>0){ shotgunAmmo--; stats.totalShots++; playSound(shotgunSnd); dogs.splice(di,1); updateUI(); }
+        else { triggerGameOver(biteSnd); return; }
+    }
+    
+    moveHunters();
+
+    // Check Hunter Collision
+    if(hunters.some(h=>h.x===nx && h.y===ny)) {
+        if(shotgunAmmo>0){ shotgunAmmo--; stats.totalShots++; playSound(shotgunSnd); hunters=[]; updateUI(); }
+        else { triggerGameOver(hunterBiteSnd); return; }
+    }
+
+    if(map[ny][nx]===2) { // Goal
+        if(currentLevel===20) finishGame();
+        else { currentLevel++; gameStarted=false; stopAllBGM(); document.getElementById('start-container').style.display='flex'; setTimeout(()=>document.getElementById('start-container').classList.add('opaque'),50); updateUI(); startAutoStartCountdown(); }
+    } else if(map[ny][nx]===3) { // Coin
+        map[ny][nx]=0; totalCoins += (currentLevel>=11?10:1)*coinMultiplier; playOscillator(WHITE_KEYS[stats.totalSteps%8],'sine',0.1); updateUI();
+    }
+    draw();
 }
 
 function moveHunters() {
     hunters.forEach(h => {
-        if(!h.alerted) [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx,dy])=>{ if(scentMap[h.y+dy]?.[h.x+dx]>0) h.alerted=true; });
-        let possible = [[0,1],[0,-1],[1,0],[-1,0]].map(([dx,dy])=>({dx,dy,nx:h.x+dx,ny:h.y+dy})).filter(p=>map[p.ny]?.[p.nx]!==1);
-        let next = null;
-        if(h.alerted){
-            possible.sort((a,b)=>scentMap[b.ny][b.nx]-scentMap[a.ny][a.nx]);
-            next = Math.random()<0.7 ? possible[0] : possible[1]||possible[0];
-        } else {
-            let same = possible.find(p=>p.dx===h.lastDir.dx&&p.dy===h.lastDir.dy);
-            next = (same && Math.random()<0.6) ? same : possible[Math.floor(Math.random()*possible.length)];
+        if(!h.alerted && scentMap[h.y][h.x]>0) h.alerted=true;
+        if(h.alerted) {
+            let best={dx:0, dy:0, v:-1};
+            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx,dy])=>{
+                let nx=h.x+dx, ny=h.y+dy;
+                if(nx>=0 && nx<COLS && ny>=0 && ny<ROWS && map[ny][nx]!==1 && scentMap[ny][nx]>best.v) { best={dx,dy,v:scentMap[ny][nx]}; }
+            });
+            h.x+=best.dx; h.y+=best.dy;
         }
-        if(next && (next.nx!==player.x || next.ny!==player.y)){ h.x=next.nx; h.y=next.ny; h.lastDir={dx:next.dx,dy:next.dy}; }
     });
 }
 
-function checkCollision() {
-    let enemyIdx = [...dogs, ...hunters].findIndex(e => e.x===player.x && e.y===player.y);
-    if(enemyIdx !== -1){
-        if(shotgunAmmo>0){
-            shotgunAmmo--; totalGunUsed++; playSound(shotgunSnd);
-            if(enemyIdx < dogs.length) dogs.splice(enemyIdx, 1); else hunters.splice(enemyIdx-dogs.length, 1);
-            shotgunRevealActive=true; setTimeout(()=>{shotgunRevealActive=false; draw();},250);
-            updateUI(); return false;
-        } else { triggerGameOver(biteSnd); return true; }
-    }
-    return false;
-}
+// --- Stats & Ranking ---
+async function finishGame() {
+    gameStarted=false; stopAllBGM();
+    const clearTimeMin = (Date.now()-gameStartTime)/60000;
+    const mostBgm = Object.keys(stats.bgmTime).reduce((a,b)=>stats.bgmTime[a]>stats.bgmTime[b]?a:b);
+    const score = ((totalCoins*1000 - stats.totalSteps*0.003 - stats.totalLightTime*0.005 - stats.totalShots*0.3 - stats.totalMapUses)/clearTimeMin) + (stats.neotiCount*10000);
 
-function triggerGameOver(snd) { gameStarted=false; playSound(snd); stopAllBGM(); setTimeout(()=>{alert("GAME OVER"); resetGame();},100); }
-
-function movePlayer(dx, dy, isAuto=false) {
-    if(!gameStarted) return;
-    if(!isAuto){
-        let idle = Date.now() - lastMoveTime;
-        if(idle > 300000) neotiCount++; // 5分以上放置
-        lastMoveTime = Date.now();
-        autoLoadState = "NONE"; if(autoMoveTimeout) clearTimeout(autoMoveTimeout);
-    }
-    const nx=player.x+dx, ny=player.y+dy;
-    if(map[ny]?.[nx]===1){ if(!isAuto) playOscillator(55,'sine',0.1); return; }
-    
-    player.x=nx; player.y=ny; totalSteps++; flipX = dx!==0 ? dx===1 : flipX; lastDir={dx,dy};
-    playerHistory.push({x:nx, y:ny}); updateScentMap();
-    if(checkCollision()) return;
-    moveHunters(); if(checkCollision()) return;
-
-    if(map[ny][nx]===2){
-        if(currentLevel===20) { handleGameClear(); return; }
-        currentLevel++; if(isAutoDeviceUsedInThisLevel) hasAutoDevice=false; isAutoDeviceUsedInThisLevel=false;
-        gameStarted=false; stopAllBGM(); document.getElementById('start-container').style.display='flex';
-        setTimeout(()=>document.getElementById('start-container').classList.add('opaque'),500); updateUI();
-    } else if(map[ny][nx]===3){ map[ny][nx]=0; totalCoins += (currentLevel>=11?10:1)*coinMultiplier; playCoinSound(); updateUI(); }
-    draw();
-}
-
-async function handleGameClear() {
-    gameStarted = false; stopAllBGM();
-    const name = prompt("全ステージクリア！おめでとうございます！\nランキングに登録する名前を入力してください:", "スーパーネコ") || "イッヌ";
-    
-    const rDiv = document.getElementById('ranking-display');
-    rDiv.style.display = 'block'; rDiv.innerHTML = "<h3>スコア算出 & 送信中...</h3>";
-
-    // 計算
-    const clearTimeMin = (Date.now() - gameStartTime) / 60000;
-    const score = ((totalCoins*1000 - totalSteps*0.003 - totalLightTime*0.005 - totalGunUsed*0.3 - totalMapUsed) / clearTimeMin) + neotiCount*10000;
-    
-    // BGM集計
-    let topBGM = Object.keys(bgmDurations).reduce((a, b) => bgmDurations[a] > bgmDurations[b] ? a : b);
+    const name = prompt("全クリア！お名前を入力:","スーパーネコ") || "イッヌ";
+    const rankingDiv = document.getElementById('ranking-display');
+    rankingDiv.style.display='block'; rankingDiv.innerHTML="<h3>送信中...</h3>";
 
     try {
-        const query = new URLSearchParams({
-            name: name, score: score.toFixed(2), cleartime: clearTimeMin.toFixed(2),
-            coin: totalCoins, hosuu: totalSteps, light: totalLightTime.toFixed(1),
-            gun: totalGunUsed, map: totalMapUsed, bgm: topBGM, neoti: neotiCount
-        });
-        const res = await fetch(`${GAS_URL}?${query.toString()}`);
+        const query = `name=${encodeURIComponent(name)}&score=${score.toFixed(2)}&cleartime=${clearTimeMin.toFixed(2)}&coin=${totalCoins}&hosuu=${stats.totalSteps}&light=${stats.totalLightTime.toFixed(1)}&gun=${stats.totalShots}&map=${stats.totalMapUses}&bgm=${encodeURIComponent(mostBgm)}&neoti=${stats.neotiCount}`;
+        const res = await fetch(`${GAS_URL}?${query}`);
         const data = await res.json();
-        
-        let html = "<h2>🏆 Top 10 🏆</h2><table id='ranking-table'><tr><th>順位</th><th>名</th><th>点</th><th>時(分)</th><th>寝</th><th>銭</th><th>歩</th><th>灯(秒)</th><th>砲</th><th>図</th></tr>";
-        data.forEach((r, i) => {
-            html += `<tr><td>${i+1}</td><td>${r.name}</td><td>${Math.floor(r.score)}</td><td>${r.time}</td><td>${r.neoti}</td><td>${r.coin}</td><td>${r.hosuu}</td><td>${r.light}</td><td>${r.gun}</td><td>${r.map}</td></tr>`;
-        });
+        let html = "<h2>🏆 殿堂入り 🏆</h2><table id='ranking-table'><tr><th>位</th><th>名前</th><th>スコア</th><th>Time</th><th>寝</th><th>コイン</th><th>歩</th><th>灯</th><th>銃</th><th>地図</th></tr>";
+        data.forEach((r, i) => { html += `<tr><td>${i+1}</td><td>${r.name}</td><td>${Math.floor(r.score)}</td><td>${r.cleartime}m</td><td>${r.neoti}</td><td>${r.coin}</td><td>${r.hosuu}</td><td>${Math.floor(r.light)}s</td><td>${r.gun}</td><td>${r.map}</td></tr>`; });
         html += "</table><button class='retry-btn' onclick='location.reload()'>タイトルへ</button>";
-        rDiv.innerHTML = html;
-    } catch(e) {
-        rDiv.innerHTML = `<h3>送信完了(表示失敗)</h3><p>エラー: ${e.message}</p><button class='retry-btn' onclick='location.reload()'>戻る</button>`;
-    }
+        rankingDiv.innerHTML = html;
+    } catch(e) { rankingDiv.innerHTML = "<h3>送信完了(表示エラー)</h3><button class='retry-btn' onclick='location.reload()'>戻る</button>"; }
 }
 
-// 毎フレーム・毎秒の処理
-setInterval(() => {
-    if(!gameStarted) return;
-    // BGM/ライト計測
-    const bgmIcons = {null:"🔕", 1:"❄️", 2:"🏝️", 3:"🌌", 4:"🎵"};
-    bgmDurations[bgmIcons[currentBGM]] += 0.1;
-    if(hasFlashlight && flashlightBattery > 0){ flashlightBattery -= 0.1; totalLightTime += 0.1; if(Math.random()>0.9) draw(); }
+// --- UI & Controls ---
+function updateUI() {
+    const isExtreme = currentLevel>=16, isHard = currentLevel>=11;
+    const levelDisplay = document.getElementById('level-display');
+    const startBtn = document.getElementById('start-btn');
+    const container = document.getElementById('start-container');
     
-    // オート案内
-    if(hasAutoDevice && Date.now()-lastMoveTime > 3000 && autoLoadState==="NONE") autoLoadState="LOADING";
-    if(autoLoadState==="LOADING" && Date.now()-lastMoveTime > 9000){ autoLoadState="MOVING"; executeAutoStep(); }
+    document.getElementById('mode-toggle-label').style.visibility = (currentLevel===1)?"hidden":"visible";
+    
+    if(isExtreme) { startBtn.style.background="#dc3545"; startBtn.classList.add('extreme-shake'); levelDisplay.innerHTML=`<span class='extreme-shake' style='color:#dc3545'>Level ${currentLevel}<br>EXTREME</span>`; }
+    else if(isHard) { startBtn.style.background="#007bff"; levelDisplay.innerHTML=`<span style='color:#007bff'>Level ${currentLevel}<br>HARD</span>`; }
+    else { startBtn.style.background="#28a745"; levelDisplay.innerHTML=`<span style='color:#28a745'>Level ${currentLevel}<br>NORMAL</span>`; }
+
+    document.getElementById('hp-buy-btn').style.display = hasHeadphone?"none":"block";
+    document.getElementById('bgm-cycle-btn').style.display = hasHeadphone?"block":"none";
+    document.getElementById('bgm-cycle-btn').innerText = `🎹BGM切替 (${currentBGM||'🔕'})`;
+    document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
+    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20`;
+    document.getElementById('amulet-display').innerText = hasAmulet?"⛩️":"";
+    document.getElementById('ammo-display').innerText = "💥".repeat(shotgunAmmo);
+    document.getElementById('flashlight-display').innerText = hasFlashlight?`🔦${Math.ceil(flashlightBattery)}s`:"";
+    
+    const items = getSelectableElements();
+    items.forEach((el, i) => { if(i===selectedMenuIndex) el.classList.add('kb-selected'); else el.classList.remove('kb-selected'); });
+}
+
+function getSelectableElements() {
+    return ['hp-buy-btn','bgm-cycle-btn','flashlight-btn','amulet-btn','shotgun-btn','auto-device-btn','dev-glass-btn','start-btn'].map(id=>document.getElementById(id)).filter(el=>el && el.style.display!=='none');
+}
+
+function startGame() {
+    if(currentLevel===1){ gameStartTime=Date.now(); stats={totalSteps:0,totalLightTime:0,totalShots:0,totalMapUses:0,bgmTime:{"🔕":0,"❄️":0,"🏝️":0,"🌌":0,"🎵":0},neotiCount:0}; }
+    unlockAudio(); document.getElementById('start-container').style.display='none'; gameStarted=true;
+    if(hasHeadphone && currentBGM){
+        const b = [null, 'bgm-koori','bgm-hikari','bgm-suzumusi','bgm-brown'][currentBGM];
+        if(b) document.getElementById(b).play();
+    }
+    generateSimpleMaze(); draw();
+}
+
+function stopAllBGM() { ['bgm-koori','bgm-hikari','bgm-suzumusi','bgm-brown'].forEach(id=>document.getElementById(id).pause()); }
+function triggerGameOver(s){ gameStarted=false; playSound(s); stopAllBGM(); setTimeout(()=>{alert("GAME OVER"); location.reload();},200); }
+function toggleBlind(){ isBlind=!isBlind; draw(); }
+
+// --- Main Loops ---
+setInterval(()=>{
+    if(!gameStarted) return;
+    let idle = Date.now()-lastMoveTime;
+    if(idle > 300000) isWaitingNeotiResumption=true;
+    if(hasFlashlight && flashlightBattery>0){ flashlightBattery-=0.1; stats.totalLightTime+=0.1; if(flashlightBattery<=0)updateUI(); }
+    let k = currentBGM===1?"❄️":currentBGM===2?"🏝️":currentBGM===3?"🌌":currentBGM===4?"🎵":"🔕";
+    stats.bgmTime[k]+=0.1;
 }, 100);
 
-function executeAutoStep() {
-    if(autoLoadState!=="MOVING" || !gameStarted) return;
-    isAutoDeviceUsedInThisLevel = true; totalMapUsed++;
-    // 最短経路探索(簡易)
-    let q=[{x:player.x,y:player.y,p:[]}], v=new Set();
-    while(q.length>0){
-        let c=q.shift(); if(map[c.y][c.x]===2){ if(c.p[0]) movePlayer(c.p[0].dx, c.p[0].dy, true); break; }
-        [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx,dy])=>{
-            let nx=c.x+dx,ny=c.y+dy; if(map[ny]?.[nx]!==1 && !v.has(`${nx},${ny}`)){v.add(`${nx},${ny}`); q.push({x:nx,y:ny,p:[...c.p,{dx,dy}]});}
-        });
-    }
-    autoMoveTimeout = setTimeout(executeAutoStep, 1000);
-}
-
-async function startGame() {
-    if(currentLevel===1) { gameStartTime = Date.now(); totalSteps=0; totalLightTime=0; totalGunUsed=0; totalMapUsed=0; neotiCount=0; }
-    unlockAudio(); document.getElementById('start-container').style.display='none';
-    gameStarted=true; generateSimpleMaze(); updateUI(); draw();
-    if(hasHeadphone && currentBGM){
-        const ids = ['bgm-koori','bgm-hikari','bgm-suzumusi','bgm-brown'];
-        const el = document.getElementById(ids[currentBGM-1]);
-        if(el){ el.volume=0.05; el.currentTime=0; el.play(); }
-    }
-}
-
-function resetGame() { currentLevel=1; totalCoins=0; hasAmulet=false; hasAutoDevice=false; hasFlashlight=false; hasShotgun=false; hasHeadphone=false; gameStarted=false; document.getElementById('start-container').style.display='flex'; updateUI(); }
-
-function playCoinSound() { playOscillator(880, 'sine', 0.1); }
-async function playOscillator(f,t,d) { if(!audioCtx) return; const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type=t; o.frequency.setValueAtTime(f,audioCtx.currentTime); g.gain.setValueAtTime(0.05,audioCtx.currentTime); o.connect(g); g.connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+d); }
-
 function draw() {
-    const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+    const canvas=document.getElementById('gameCanvas'), ctx=canvas.getContext('2d');
     canvas.width=window.innerWidth; canvas.height=window.innerHeight;
     const size=Math.min(canvas.width/COLS, canvas.height/ROWS), oX=(canvas.width-size*COLS)/2, oY=(canvas.height-size*ROWS)/2;
-    ctx.fillStyle="#000"; ctx.fillRect(0,0,canvas.width,canvas.height);
-    for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++) {
+    ctx.fillStyle="#222"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(let y=0; y<ROWS; y++) for(let x=0; x<COLS; x++){
         let px=oX+x*size, py=oY+y*size;
         if(map[y][x]===1) ctx.drawImage(wallImg, px, py, size+0.5, size+0.5);
-        else if(map[y][x]===2) { ctx.fillStyle=(x+y)%2===0?"#fff":"#000"; ctx.fillRect(px,py,size,size); }
-        else if(map[y][x]===3) { ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2,py+size/2,size/4,0,Math.PI*2); ctx.fill(); }
+        else if(map[y][x]===2) { ctx.fillStyle="#fff"; ctx.fillRect(px,py,size,size); ctx.fillStyle="#000"; ctx.fillText("GOAL",px+size/2,py+size/2); }
+        else if(map[y][x]===3) { ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill(); }
     }
-    dogs.forEach(d => ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size));
-    hunters.forEach(h => ctx.drawImage(hunterImg, oX+h.x*size, oY+h.y*size, size, size));
-    ctx.save(); if(flipX){ ctx.translate(oX+player.x*size+size,oY+player.y*size); ctx.scale(-1,1); ctx.drawImage(playerImg,0,0,size,size); } else ctx.drawImage(playerImg,oX+player.x*size,oY+player.y*size,size,size); ctx.restore();
-
-    if(isBlind && gameStarted && !hasDevGlasses && !shotgunRevealActive){
-        ctx.globalCompositeOperation='destination-in';
-        const grad = ctx.createRadialGradient(oX+player.x*size+size/2, oY+player.y*size+size/2, 0, oX+player.x*size+size/2, oY+player.y*size+size/2, hasFlashlight&&flashlightBattery>0?size*3:size*1.2);
-        grad.addColorStop(0,'rgba(0,0,0,1)'); grad.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=grad; ctx.fillRect(0,0,canvas.width,canvas.height);
+    dogs.forEach(d=>ctx.drawImage(dogImg, oX+d.x*size, oY+d.y*size, size, size));
+    hunters.forEach(h=>ctx.drawImage(hunterImg, oX+h.x*size, oY+h.y*size, size, size));
+    ctx.save(); if(flipX){ ctx.translate(oX+player.x*size+size, oY+player.y*size); ctx.scale(-1,1); ctx.drawImage(playerImg,0,0,size,size); } else { ctx.drawImage(playerImg,oX+player.x*size, oY+player.y*size, size, size); } ctx.restore();
+    if(isBlind && !hasDevGlasses && !shotgunRevealActive){
+        ctx.globalCompositeOperation='multiply'; ctx.fillStyle="black";
+        if(hasFlashlight && flashlightBattery>0){
+            // Gradient Flashlight Light
+            let grad = ctx.createRadialGradient(oX+player.x*size+size/2, oY+player.y*size+size/2, size, oX+player.x*size+size/2, oY+player.y*size+size/2, size*4);
+            grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(1, 'rgba(0,0,0,1)');
+            ctx.fillStyle=grad;
+        }
+        ctx.fillRect(0,0,canvas.width,canvas.height); ctx.globalCompositeOperation='source-over';
     }
 }
 
 window.addEventListener('keydown', e => {
-    if(!gameStarted) {
+    if(!gameStarted){
         const items = getSelectableElements();
-        if(e.key==="ArrowUp"||e.key==="w") selectedMenuIndex=(selectedMenuIndex-1+items.length)%items.length;
-        if(e.key==="ArrowDown"||e.key==="s") selectedMenuIndex=(selectedMenuIndex+1)%items.length;
-        if(e.key==="Enter"||e.key===" ") items[selectedMenuIndex].click();
-        updateMenuSelection();
+        if(e.key==='ArrowUp'||e.key==='w') selectedMenuIndex=(selectedMenuIndex-1+items.length)%items.length;
+        if(e.key==='ArrowDown'||e.key==='s') selectedMenuIndex=(selectedMenuIndex+1)%items.length;
+        if(e.key==='Enter'||e.key===' ') items[selectedMenuIndex].click();
+        updateUI();
     } else {
-        if(e.key==="ArrowUp"||e.key==="w") movePlayer(0,-1);
-        if(e.key==="ArrowDown"||e.key==="s") movePlayer(0,1);
-        if(e.key==="ArrowLeft"||e.key==="a") movePlayer(-1,0);
-        if(e.key==="ArrowRight"||e.key==="d") movePlayer(1,0);
+        if(e.key==='ArrowUp'||e.key==='w') movePlayer(0,-1);
+        if(e.key==='ArrowDown'||e.key==='s') movePlayer(0,1);
+        if(e.key==='ArrowLeft'||e.key==='a') movePlayer(-1,0);
+        if(e.key==='ArrowRight'||e.key==='d') movePlayer(1,0);
     }
 });
-window.onresize=draw; updateUI();
+
+function stopAutoProcess(){ autoLoadState="NONE"; updateUI(); }
+function resetAutoStartTimer(){ if(autoStartTimeout) clearTimeout(autoStartTimeout); }
+function startAutoStartCountdown(){ /* 簡易版 */ }
+function triggerDebugJump(){ debugClickCount++; if(debugClickCount>=10) currentLevel=19; updateUI(); }
+
+updateUI();
 </script>
 </body>
 </html>
