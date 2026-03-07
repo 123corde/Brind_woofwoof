@@ -593,7 +593,17 @@ function checkHunterCollision() {
             playSound(shotgunSnd);
             hunters.splice(hIdx, 1);
             setTimeout(() => playSound(hunterCrySnd), 1300);
+            setTimeout(() => {
+                shotgunRevealActive = true;
+                draw();
+                setTimeout(() => {
+                    shotgunRevealActive = false;
+                    draw();
+                }, 250);
+            }, 500);
+
             updateUI();
+            triggerHunterSound(); 
         } else {
             triggerGameOver(hunterBiteSnd);
         }
