@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "24.5.8";
+const GAME_VERSION = "25.0.0";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -428,87 +428,145 @@ function updateScentMap() {
 
 function generateSimpleMaze() {
     const sizeMap = {
-        1: [5, 7],   2: [7, 9],   3: [7, 9],   4: [9, 11],  5: [9, 11],
-        6: [11, 13], 7: [11, 13], 8: [13, 15], 9: [13, 15], 10: [15, 19],
-        11: [13, 15], 12: [15, 19], 13: [15, 19], 14: [17, 21], 15: [17, 21],
-        16: [15, 19], 17: [15, 19], 18: [15, 19], 19: [17, 21], 20: [17, 21]
+        1: [11, 13],  2: [13, 15],  3: [15, 17],  4: [17, 19],  5: [19, 21],
+        6: [21, 23],  7: [23, 25],  8: [25, 27],  9: [27, 29], 10: [29, 31],
+        11: [27, 29], 12: [29, 31], 13: [31, 33], 14: [33, 35], 15: [35, 37],
+        16: [31, 33], 17: [33, 35], 18: [35, 37], 19: [37, 39], 20: [39, 41]
     };
-    const s = sizeMap[currentLevel] || [17, 21];
+    const s = sizeMap[currentLevel] || [31, 31];
     COLS = s[0]; ROWS = s[1];
 
-    let found = false, attempts = 0;
-    while (!found && attempts < 50) {
-        attempts++;
-        map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-        let sX = 1 + Math.floor(Math.random() * ((COLS - 1) / 2)) * 2;
-        let sY = 1 + Math.floor(Math.random() * ((ROWS - 1) / 2)) * 2;
-        player = { x: sX, y: sY }; map[sY][sX] = 0;
-        let walkTarget = Math.floor(ROWS * COLS * 0.35), walked = 1, rx = sX, ry = sY;
-        for (let i = 0; i < 2000 && walked < walkTarget; i++) {
-            let dirs = [[0,1],[0,-1],[1,0],[-1,0]], [dx, dy] = dirs[Math.floor(Math.random() * 4)];
-            let nx = rx + dx, ny = ry + dy;
-            if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) { if(map[ny][nx] === 1) { map[ny][nx] = 0; walked++; } rx = nx; ry = ny; }
-        }
-        const dig = (x, y) => {
-            let dirs = [[0,2],[0,-2],[2,0],[-2,0]].sort(() => Math.random() - 0.5);
-            for(let [dx, dy] of dirs) {
-                let nx = x + dx, ny = y + dy;
-                if(nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && map[ny][nx] === 1) { map[y + dy/2][x + dx/2] = 0; map[ny][nx] = 0; dig(nx, ny); }
-            }
-        };
-        for(let y = 1; y < ROWS; y += 2) for(let x = 1; x < COLS; x += 2) if(map[y][x] === 0) dig(x, y);
-        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1)), q = [{x: sX, y: sY, d: 0, fullPath: []}]; 
-        dists[sY][sX] = 0; let allWalkable = [];
-        while(q.length > 0) {
-            let curr = q.shift(); allWalkable.push(curr);
-            for(let [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
-                let nx = curr.x + dx, ny = curr.y + dy;
-                if(ny >= 0 && ny < ROWS && nx >= 0 && nx < COLS && map[ny][nx] !== 1 && dists[ny][nx] === -1) { dists[ny][nx] = curr.d + 1; q.push({x: nx, y: ny, d: curr.d + 1, fullPath: [...curr.fullPath, {x: nx, y: ny}]}); }
+    // 1. 初期化: 密度45%でランダムに壁を配置
+    let tempMap = Array.from({ length: ROWS }, (_, y) =>
+        Array.from({ length: COLS }, (_, x) => {
+            if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) return 1;
+            return Math.random() < 0.45 ? 1 : 0;
+        })
+    );
+
+    // 2. セル・オートマトン (4-5ルール) で地形を整える
+    for (let i = 0; i < 3; i++) {
+        let nextGen = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+        for (let y = 1; y < ROWS - 1; y++) {
+            for (let x = 1; x < COLS - 1; x++) {
+                let walls = 0;
+                for (let yy = -1; yy <= 1; yy++) {
+                    for (let xx = -1; xx <= 1; xx++) {
+                        if (tempMap[y + yy][x + xx] === 1) walls++;
+                    }
+                }
+                nextGen[y][x] = (walls >= 5) ? 1 : 0;
             }
         }
-        allWalkable.sort((a, b) => dists[b.y][b.x] - dists[a.y][a.x]);
-        let target = allWalkable[0];
-        if(target && dists[target.y][target.x] > 2) {
-            map[target.y][target.x] = 2; goalPos = { x: target.x, y: target.y };
-            shortestPath = target.fullPath; coinsCollectedInLevel = 0;
-            if (currentLevel <= 10) {
-                let stepSize = { 1:1, 2:1, 3:2, 4:2, 5:3, 6:3, 7:4, 8:4, 9:5, 10:5 }[currentLevel] || 5;
-                for (let i = 0; i < shortestPath.length; i += stepSize) { let p = shortestPath[i]; if (!(p.x === goalPos.x && p.y === goalPos.y)) map[p.y][p.x] = 3; }
-            } else {
-                let walkableTiles = [];
-                for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (map[y][x] === 0 && !(x === player.x && y === player.y) && !(x === goalPos.x && y === goalPos.y)) walkableTiles.push({ x, y });
-                for (let i = walkableTiles.length - 1; i > 0; i--) { let j = Math.floor(Math.random() * (i + 1)); [walkableTiles[i], walkableTiles[j]] = [walkableTiles[j], walkableTiles[i]]; }
-                let coinCount = Math.min(currentLevel, walkableTiles.length);
-                for (let i = 0; i < coinCount; i++) map[walkableTiles[i].y][walkableTiles[i].x] = 3;
-            }
-            
-            dogs = []; hunters = [];
-            let safetyZone = new Set(); safetyZone.add(`${player.x},${player.y}`);
-            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => safetyZone.add(`${player.x + dx},${player.y + dy}`));
-            let pathSet = new Set(), pathSurroundSet = new Set();
-            shortestPath.forEach(p => { pathSet.add(`${p.x},${p.y}`); [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => pathSurroundSet.add(`${p.x + dx},${p.y + dy}`)); });
-            
-            let spawnCandidates = allWalkable.filter(p => { 
-                const posKey = `${p.x},${p.y}`; 
-                if (safetyZone.has(posKey) || map[p.y][p.x] === 2) return false; 
-                return (currentLevel <= 10) ? (!pathSet.has(posKey) && !pathSurroundSet.has(posKey)) : !pathSet.has(posKey); 
-            });
+        tempMap = nextGen;
+    }
 
-            if (currentLevel >= 16) {
-                let idx = Math.floor(Math.random() * spawnCandidates.length);
-                let h = spawnCandidates[idx];
-                hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
-                spawnCandidates.splice(idx, 1);
+    // 3. 領域(小部屋)の抽出 (Flood Fill)
+    let regions = [];
+    let visited = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+    for (let y = 1; y < ROWS - 1; y++) {
+        for (let x = 1; x < COLS - 1; x++) {
+            if (tempMap[y][x] === 0 && !visited[y][x]) {
+                let region = [];
+                let q = [{x, y}];
+                visited[y][x] = true;
+                while (q.length > 0) {
+                    let p = q.shift();
+                    region.push(p);
+                    [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
+                        let nx = p.x + dx, ny = p.y + dy;
+                        if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && tempMap[ny][nx] === 0 && !visited[ny][nx]) {
+                            visited[ny][nx] = true;
+                            q.push({x: nx, y: ny});
+                        }
+                    });
+                }
+                regions.push(region);
             }
-
-            let dogNum = Math.min(15, currentLevel - 1);
-            for(let i = 0; i < dogNum && spawnCandidates.length > 0; i++) { 
-                let idx = Math.floor(Math.random() * spawnCandidates.length); 
-                dogs.push(spawnCandidates[idx]); spawnCandidates.splice(idx, 1); 
-            }
-            found = true;
         }
     }
+
+    // 4. 小部屋同士を「幅のある通路」で連結する
+    map = tempMap;
+    const carveWidePath = (p1, p2) => {
+        let cx = p1.x, cy = p1.y;
+        while (cx !== p2.x || cy !== p2.y) {
+            if (cx !== p2.x) cx += (p2.x > cx ? 1 : -1);
+            else if (cy !== p2.y) cy += (p2.y > cy ? 1 : -1);
+            // 2x2の太さで床を塗る
+            for(let dy=0; dy<=1; dy++) {
+                for(let dx=0; dx<=1; dx++) {
+                    let nx = cx + dx, ny = cy + dy;
+                    if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1) map[ny][nx] = 0;
+                }
+            }
+        }
+    };
+
+    // すべての領域を直前の領域と連結
+    for (let i = 0; i < regions.length - 1; i++) {
+        carveWidePath(regions[i][0], regions[i+1][0]);
+    }
+
+    // 5. プレイヤーとゴールの配置
+    let allWalkable = [];
+    for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) allWalkable.push({x, y});
+    
+    let startPos = allWalkable[Math.floor(Math.random() * allWalkable.length)];
+    player = { x: startPos.x, y: startPos.y };
+
+    // 最遠地点をゴールにする(BFS)
+    let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
+    let q = [{ x: player.x, y: player.y, d: 0, path: [] }];
+    dists[player.y][player.x] = 0;
+    let furthest = q[0];
+
+    let walkableData = [];
+    while (q.length > 0) {
+        let curr = q.shift();
+        walkableData.push(curr);
+        if (curr.d > furthest.d) furthest = curr;
+        [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
+            let nx = curr.x + dx, ny = curr.y + dy;
+            if (nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1 && map[ny][nx] === 0 && dists[ny][nx] === -1) {
+                dists[ny][nx] = curr.d + 1;
+                q.push({ x: nx, y: ny, d: curr.d + 1, path: [...curr.path, {x: nx, y: ny}] });
+            }
+        });
+    }
+
+    goalPos = { x: furthest.x, y: furthest.y };
+    map[goalPos.y][goalPos.x] = 2;
+    shortestPath = furthest.path;
+    coinsCollectedInLevel = 0;
+
+    // 6. アイテム・敵の配置 (既存ロジック流用)
+    let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
+    candidates.sort(() => Math.random() - 0.5);
+
+    // コイン配置
+    let coinCount = (currentLevel <= 10) ? Math.floor(shortestPath.length / 4) : currentLevel;
+    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
+        let p = candidates[i];
+        map[p.y][p.x] = 3;
+    }
+
+    // 敵配置
+    dogs = []; hunters = [];
+    let safetyZone = new Set();
+    for(let i=-2; i<=2; i++) for(let j=-2; j<=2; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
+    let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`) && map[p.y][p.x] === 0);
+
+    if (currentLevel >= 16 && enemyCandidates.length > 0) {
+        let h = enemyCandidates.pop();
+        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
+    }
+    let dogNum = Math.min(15, currentLevel - 1);
+    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
+        let d = enemyCandidates.pop();
+        dogs.push({ x: d.x, y: d.y });
+    }
+
     initScentMap();
 }
 
