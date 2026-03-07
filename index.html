@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.0.7";
+const GAME_VERSION = "25.0.8";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -451,9 +451,11 @@ function generateSimpleMaze() {
     let found = false;
     let attempts = 0;
 
-    while (!found && attempts < 15) {
+    while (!found && attempts < 20) {
         attempts++;
-        let wallDensity = currentLevel === 1 ? 0.38 : 0.46;
+        
+        // 1. 初期配置: 床60%：壁40% に近づけるため、壁密度を 0.38 (38%) に設定
+        let wallDensity = 0.38;
         let tempMap = Array.from({ length: ROWS }, (_, y) =>
             Array.from({ length: COLS }, (_, x) => {
                 if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) return 1;
@@ -461,7 +463,9 @@ function generateSimpleMaze() {
             })
         );
 
-        let iterations = currentLevel === 1 ? 2 : 4; 
+        // 2. セル・オートマトン (4-5ルール)
+        // 回数を 3回 に抑えて、広場を残しつつ洞窟の壁を整える
+        let iterations = 3;
         for (let i = 0; i < iterations; i++) {
             let nextGen = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
             for (let y = 1; y < ROWS - 1; y++) {
@@ -472,36 +476,49 @@ function generateSimpleMaze() {
                             if (tempMap[y + yy][x + xx] === 1) walls++;
                         }
                     }
-                    if (walls >= 5) nextGen[y][x] = 1;
-                    else if (walls <= 3) nextGen[y][x] = 0;
-                    else nextGen[y][x] = tempMap[y][x];
+                    if (walls >= 5) nextGen[y][x] = 1;      // 壁が5つ以上なら壁
+                    else if (walls <= 3) nextGen[y][x] = 0; // 床が5つ以上なら床
+                    else nextGen[y][x] = tempMap[y][x];     // それ以外は維持
                 }
             }
             tempMap = nextGen;
         }
 
-        let regions = getRegions(tempMap);
+        // 3. 領域連結
+        map = tempMap;
+        let regions = getRegions(map);
         if (regions.length === 0) continue;
 
-        map = tempMap;
+        // 全ての孤立した部屋を細い通路で繋ぐ
         for (let i = 0; i < regions.length - 1; i++) {
-            connectRegions(regions[i], regions[i+1]);
+            connectRegions(regions[i], regions[i + 1]);
         }
 
+        // 4. プレイヤー配置の確定
+        // 通路を掘り終わった「後」に最新の床リストを取得する
         let allWalkable = [];
-        for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) allWalkable.push({x, y});
-        if (allWalkable.length < (COLS * ROWS) * 0.2) continue;
+        for(let y=1; y<ROWS-1; y++) {
+            for(let x=1; x<COLS-1; x++) {
+                if(map[y][x] === 0) allWalkable.push({x, y});
+            }
+        }
+
+        if (allWalkable.length < (COLS * ROWS) * 0.3) continue; // 床が少なすぎたらリトライ
 
         let startPos = allWalkable[Math.floor(Math.random() * allWalkable.length)];
         player = { x: startPos.x, y: startPos.y };
+        map[player.y][player.x] = 0; // 念のためプレイヤー位置を床に固定
 
+        // BFSでゴール探索
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let q = [{ x: player.x, y: player.y, d: 0, path: [] }];
         dists[player.y][player.x] = 0;
-        let furthest = q[0], reachableData = [];
+        let furthest = q[0];
+        let reachableData = [];
 
         while (q.length > 0) {
-            let curr = q.shift(); reachableData.push(curr);
+            let curr = q.shift();
+            reachableData.push(curr);
             if (curr.d > furthest.d) furthest = curr;
             [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
                 let nx = curr.x + dx, ny = curr.y + dy;
@@ -512,6 +529,7 @@ function generateSimpleMaze() {
             });
         }
 
+        // ゴール距離の判定
         let requiredDist = currentLevel === 1 ? 4 : Math.floor(Math.max(COLS, ROWS) * 0.6);
         if (furthest.d >= requiredDist) {
             goalPos = { x: furthest.x, y: furthest.y };
@@ -534,11 +552,13 @@ function getRegions(m) {
                 let q = [{x, y}];
                 visited[y][x] = true;
                 while (q.length > 0) {
-                    let p = q.shift(); region.push(p);
+                    let p = q.shift();
+                    region.push(p);
                     [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
                         let nx = p.x + dx, ny = p.y + dy;
                         if (nx > 0 && nx < COLS - 1 && ny > 0 && ny < ROWS - 1 && m[ny][nx] === 0 && !visited[ny][nx]) {
-                            visited[ny][nx] = true; q.push({x: nx, y: ny});
+                            visited[ny][nx] = true;
+                            q.push({x: nx, y: ny});
                         }
                     });
                 }
@@ -553,6 +573,7 @@ function connectRegions(regA, regB) {
     let p1 = regA[Math.floor(Math.random() * regA.length)];
     let p2 = regB[Math.floor(Math.random() * regB.length)];
     let cx = p1.x, cy = p1.y;
+    // 目的地まで1マスずつ掘り進める
     while (cx !== p2.x || cy !== p2.y) {
         if (cx !== p2.x) cx += (p2.x > cx ? 1 : -1);
         else if (cy !== p2.y) cy += (p2.y > cy ? 1 : -1);
