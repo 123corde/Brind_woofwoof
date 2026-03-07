@@ -112,7 +112,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "23.2.0";
+const GAME_VERSION = "23.2.1";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -593,6 +593,8 @@ function checkHunterCollision() {
             playSound(shotgunSnd);
             hunters.splice(hIdx, 1);
             setTimeout(() => playSound(hunterCrySnd), 1300);
+            
+            // 画面フラッシュ演出
             setTimeout(() => {
                 shotgunRevealActive = true;
                 draw();
@@ -706,9 +708,21 @@ function movePlayer(dx, dy, isAuto = false) {
     let dogIndex = dogs.findIndex(d => d.x === player.x && d.y === player.y);
     if (dogIndex !== -1) {
         if (shotgunAmmo > 0) { 
-            shotgunAmmo--; playSound(shotgunSnd); dogs.splice(dogIndex, 1); 
+            shotgunAmmo--; 
+            playSound(shotgunSnd); 
+            dogs.splice(dogIndex, 1); 
+            
+            // Watchdog撃破時もHunterと同様にフラッシュさせる
             setTimeout(() => playSound(dogCrySnd), 1300);
-            setTimeout(() => { shotgunRevealActive = true; draw(); setTimeout(() => { shotgunRevealActive = false; draw(); }, 250); }, 500);
+            setTimeout(() => {
+                shotgunRevealActive = true;
+                draw();
+                setTimeout(() => {
+                    shotgunRevealActive = false;
+                    draw();
+                }, 250);
+            }, 500);
+            
             updateUI(); 
         } else {
             triggerGameOver(biteSnd); return;
