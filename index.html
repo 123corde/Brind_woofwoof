@@ -118,10 +118,12 @@
     <audio id="bgm-suzumusi" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Suzumusi.mp3" loop></audio>
     <audio id="bgm-brown" src="https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Brown_Noise.mp3" loop></audio>
     
+    <div id="ranking-display"></div>
+    
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "24.4.0";
+const GAME_VERSION = "24.5.0";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -730,6 +732,7 @@ function movePlayer(dx, dy, isAuto = false) {
                 const playerName = prompt("全ステージクリア！おめでとうございます！\nランキングに登録する名前を入力してください:", "スーパーネコ") || "イッヌ";
                 
                 // 送信中メッセージの表示
+                console.log("クリア判定：ランキング表示開始"); // 開発ツール(F12)で確認用
                 const rankingDiv = document.getElementById('ranking-display');
                 rankingDiv.style.display = 'block';
                 rankingDiv.innerHTML = "<h3>スコア送信中...</h3>";
