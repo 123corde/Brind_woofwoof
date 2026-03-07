@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.0.8";
+const GAME_VERSION = "25.0.9";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -438,108 +438,216 @@ function placeEntities(walkableData) {
     }
 }
 
-function generateSimpleMaze() {
-    const sizeMap = {
-        1: [7, 9],    2: [9, 11],   3: [11, 13],  4: [13, 15],  5: [15, 19],
-        6: [13, 15],  7: [15, 19],  8: [15, 19],  9: [17, 21],  10: [17, 21],
-        11: [15, 19], 12: [15, 19], 13: [17, 21], 14: [17, 21], 15: [17, 21],
-        16: [17, 23], 17: [19, 23], 18: [19, 25], 19: [21, 25], 20: [23, 27]
-    };
-    const s = sizeMap[currentLevel] || [23, 27];
-    COLS = s[0]; ROWS = s[1];
+function generateSimpleMaze(){
 
-    let found = false;
-    let attempts = 0;
+const sizeMap = {
+1:[7,9],2:[9,11],3:[11,13],4:[13,15],5:[15,19],
+6:[13,15],7:[15,19],8:[15,19],9:[17,21],10:[17,21],
+11:[15,19],12:[15,19],13:[17,21],14:[17,21],15:[17,21],
+16:[17,23],17:[19,23],18:[19,25],19:[21,25],20:[23,27]
+};
 
-    while (!found && attempts < 20) {
-        attempts++;
-        
-        // 1. 初期配置: 床60%：壁40% に近づけるため、壁密度を 0.38 (38%) に設定
-        let wallDensity = 0.38;
-        let tempMap = Array.from({ length: ROWS }, (_, y) =>
-            Array.from({ length: COLS }, (_, x) => {
-                if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) return 1;
-                return Math.random() < wallDensity ? 1 : 0;
-            })
-        );
+const s=sizeMap[currentLevel]||[23,27];
+COLS=s[0];
+ROWS=s[1];
 
-        // 2. セル・オートマトン (4-5ルール)
-        // 回数を 3回 に抑えて、広場を残しつつ洞窟の壁を整える
-        let iterations = 3;
-        for (let i = 0; i < iterations; i++) {
-            let nextGen = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-            for (let y = 1; y < ROWS - 1; y++) {
-                for (let x = 1; x < COLS - 1; x++) {
-                    let walls = 0;
-                    for (let yy = -1; yy <= 1; yy++) {
-                        for (let xx = -1; xx <= 1; xx++) {
-                            if (tempMap[y + yy][x + xx] === 1) walls++;
-                        }
-                    }
-                    if (walls >= 5) nextGen[y][x] = 1;      // 壁が5つ以上なら壁
-                    else if (walls <= 3) nextGen[y][x] = 0; // 床が5つ以上なら床
-                    else nextGen[y][x] = tempMap[y][x];     // それ以外は維持
-                }
-            }
-            tempMap = nextGen;
-        }
+map = Array.from({length:ROWS},()=>Array(COLS).fill(1));
 
-        // 3. 領域連結
-        map = tempMap;
-        let regions = getRegions(map);
-        if (regions.length === 0) continue;
+let rooms=[];
 
-        // 全ての孤立した部屋を細い通路で繋ぐ
-        for (let i = 0; i < regions.length - 1; i++) {
-            connectRegions(regions[i], regions[i + 1]);
-        }
+function carveRoom(x,y,w,h){
 
-        // 4. プレイヤー配置の確定
-        // 通路を掘り終わった「後」に最新の床リストを取得する
-        let allWalkable = [];
-        for(let y=1; y<ROWS-1; y++) {
-            for(let x=1; x<COLS-1; x++) {
-                if(map[y][x] === 0) allWalkable.push({x, y});
-            }
-        }
+for(let yy=y;yy<y+h;yy++)
+for(let xx=x;xx<x+w;xx++){
 
-        if (allWalkable.length < (COLS * ROWS) * 0.3) continue; // 床が少なすぎたらリトライ
+if(xx>0 && xx<COLS-1 && yy>0 && yy<ROWS-1)
+map[yy][xx]=0;
 
-        let startPos = allWalkable[Math.floor(Math.random() * allWalkable.length)];
-        player = { x: startPos.x, y: startPos.y };
-        map[player.y][player.x] = 0; // 念のためプレイヤー位置を床に固定
+}
 
-        // BFSでゴール探索
-        let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
-        let q = [{ x: player.x, y: player.y, d: 0, path: [] }];
-        dists[player.y][player.x] = 0;
-        let furthest = q[0];
-        let reachableData = [];
+}
 
-        while (q.length > 0) {
-            let curr = q.shift();
-            reachableData.push(curr);
-            if (curr.d > furthest.d) furthest = curr;
-            [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dx, dy]) => {
-                let nx = curr.x + dx, ny = curr.y + dy;
-                if (nx > 0 && nx < COLS-1 && ny > 0 && ny < ROWS-1 && map[ny][nx] === 0 && dists[ny][nx] === -1) {
-                    dists[ny][nx] = curr.d + 1;
-                    q.push({ x: nx, y: ny, d: curr.d + 1, path: [...curr.path, {x: nx, y: ny}] });
-                }
-            });
-        }
+function carveOrganic(p1,p2){
 
-        // ゴール距離の判定
-        let requiredDist = currentLevel === 1 ? 4 : Math.floor(Math.max(COLS, ROWS) * 0.6);
-        if (furthest.d >= requiredDist) {
-            goalPos = { x: furthest.x, y: furthest.y };
-            map[goalPos.y][goalPos.x] = 2;
-            shortestPath = furthest.path;
-            placeEntities(reachableData);
-            found = true;
-        }
-    }
-    initScentMap();
+let cx=p1.x;
+let cy=p1.y;
+
+while(cx!==p2.x || cy!==p2.y){
+
+map[cy][cx]=0;
+
+if(Math.random()<0.6){
+
+if(cx<p2.x)cx++;
+else if(cx>p2.x)cx--;
+
+}else{
+
+if(cy<p2.y)cy++;
+else if(cy>p2.y)cy--;
+
+}
+
+if(Math.random()<0.2){
+
+let dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+let d=dirs[Math.floor(Math.random()*4)];
+
+let nx=cx+d[0];
+let ny=cy+d[1];
+
+if(nx>0 && nx<COLS-1 && ny>0 && ny<ROWS-1){
+cx=nx;
+cy=ny;
+}
+
+}
+
+}
+
+}
+
+let roomCount = Math.floor((ROWS*COLS)/60)+2;
+
+for(let i=0;i<roomCount;i++){
+
+let w = 3+Math.floor(Math.random()*3);
+let h = 3+Math.floor(Math.random()*3);
+
+let x = 1+Math.floor(Math.random()*(COLS-w-2));
+let y = 1+Math.floor(Math.random()*(ROWS-h-2));
+
+carveRoom(x,y,w,h);
+
+rooms.push({
+x:x+Math.floor(w/2),
+y:y+Math.floor(h/2)
+});
+
+}
+
+for(let i=1;i<rooms.length;i++){
+
+carveOrganic(rooms[i-1],rooms[i]);
+
+}
+
+for(let i=0;i<rooms.length;i++){
+
+if(Math.random()<0.35){
+
+let r1=rooms[Math.floor(Math.random()*rooms.length)];
+let r2=rooms[Math.floor(Math.random()*rooms.length)];
+
+carveOrganic(r1,r2);
+
+}
+
+}
+
+for(let y=1;y<ROWS-1;y++)
+for(let x=1;x<COLS-1;x++){
+
+if(map[y][x]===0 && Math.random()<0.1){
+
+for(let dy=-1;dy<=1;dy++)
+for(let dx=-1;dx<=1;dx++){
+
+if(map[y+dy][x+dx]!==1)
+map[y+dy][x+dx]=0;
+
+}
+
+}
+
+}
+
+let changed=true;
+
+while(changed){
+
+changed=false;
+
+for(let y=1;y<ROWS-1;y++)
+for(let x=1;x<COLS-1;x++){
+
+if(map[y][x]!==0)continue;
+
+let walls=0;
+
+[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
+if(map[y+dy][x+dx]===1)walls++;
+});
+
+if(walls>=3){
+
+map[y][x]=1;
+changed=true;
+
+}
+
+}
+
+}
+
+let walk=[];
+
+for(let y=1;y<ROWS-1;y++)
+for(let x=1;x<COLS-1;x++)
+if(map[y][x]===0)walk.push({x,y});
+
+let start=walk[Math.floor(Math.random()*walk.length)];
+
+player={x:start.x,y:start.y};
+
+let q=[{x:player.x,y:player.y,d:0,path:[]}];
+
+let visited=new Set([`${player.x},${player.y}`]);
+
+let furthest=q[0];
+
+let reachable=[];
+
+while(q.length){
+
+let c=q.shift();
+
+reachable.push(c);
+
+if(c.d>furthest.d)furthest=c;
+
+[[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
+
+let nx=c.x+dx;
+let ny=c.y+dy;
+let k=`${nx},${ny}`;
+
+if(nx>0&&nx<COLS-1&&ny>0&&ny<ROWS-1&&map[ny][nx]===0&&!visited.has(k)){
+
+visited.add(k);
+
+q.push({
+x:nx,
+y:ny,
+d:c.d+1,
+path:[...c.path,{x:nx,y:ny}]
+});
+
+}
+
+});
+
+}
+
+goalPos={x:furthest.x,y:furthest.y};
+map[goalPos.y][goalPos.x]=2;
+
+shortestPath=furthest.path;
+
+placeEntities(reachable);
+
+initScentMap();
+
 }
 
 function getRegions(m) {
