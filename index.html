@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.1.2";
+const GAME_VERSION = "25.1.3";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -409,64 +409,87 @@ function generateSimpleMaze() {
     const s = sizeMap[currentLevel] || [23, 27];
     COLS = s[0]; ROWS = s[1];
 
+    if (currentLevel <= 2) {
+        // --- Level 1-2 専用：シンプルアルゴリズム ---
+        generateTutorialMaze();
+    } else {
+        // --- Level 3以上：複雑なアリの巣セミオートマトン ---
+        generateComplexMaze();
+    }
+    initScentMap();
+}
+
+// Level 1-2用：確実な道を1本作り、周囲を少し広げるだけ
+function generateTutorialMaze() {
+    map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+    player = { x: 1, y: 1 };
+    goalPos = { x: COLS - 2, y: ROWS - 2 };
+
+    // プレイヤーからゴールまでL字に掘る（確実に道を保証）
+    for (let x = player.x; x <= goalPos.x; x++) map[player.y][x] = 0;
+    for (let y = player.y; y <= goalPos.y; y++) map[y][goalPos.x] = 0;
+
+    // ランダムに少しだけ床を増やして「洞窟感」を出す
+    for (let i = 0; i < (COLS * ROWS) * 0.3; i++) {
+        let rx = 1 + Math.floor(Math.random() * (COLS - 2));
+        let ry = 1 + Math.floor(Math.random() * (ROWS - 2));
+        map[ry][rx] = 0;
+    }
+
+    map[player.y][player.x] = 0;
+    map[goalPos.y][goalPos.x] = 2;
+
+    // 最短経路を計算（UI表示用など）
+    shortestPath = []; 
+    for(let x=player.x; x<=goalPos.x; x++) shortestPath.push({x: x, y: player.y});
+    for(let y=player.y+1; y<=goalPos.y; y++) shortestPath.push({x: goalPos.x, y: y});
+
+    // アイテム配置
+    let walkable = [];
+    for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) walkable.push({x, y});
+    placeEntities(walkable);
+}
+
+// Level 3以上用：複雑なうねうね迷路
+function generateComplexMaze() {
     let found = false;
     let attempts = 0;
-
     while (!found && attempts < 50) {
         attempts++;
-        
-        // 1. 壁密度をレベルに応じて調整 (低レベルは38%、高レベルは52%)
-        let wallDensity = Math.min(0.52, 0.38 + (currentLevel * 0.015));
-        
-        map = Array.from({ length: ROWS }, (_, y) =>
+        let wallDensity = Math.min(0.52, 0.40 + (currentLevel * 0.01));
+        let tempMap = Array.from({ length: ROWS }, (_, y) =>
             Array.from({ length: COLS }, (_, x) => {
                 if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) return 1;
                 return Math.random() < wallDensity ? 1 : 0;
             })
         );
 
-        // 2. セル・オートマトン (低レベルは2回、高レベルは1回)
-        // 低レベルで回数を増やすのは、狭い場所での「細かいトゲ状の壁」を消して歩きやすくするため
-        let iterations = currentLevel <= 4 ? 2 : 1;
-        for (let i = 0; i < iterations; i++) {
-            let nextGen = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
-            for (let y = 1; y < ROWS - 1; y++) {
-                for (let x = 1; x < COLS - 1; x++) {
-                    let walls = 0;
-                    for (let yy = -1; yy <= 1; yy++) {
-                        for (let xx = -1; xx <= 1; xx++) {
-                            if (map[y + yy][x + xx] === 1) walls++;
-                        }
+        // セルオートマトン(1回)
+        let nextGen = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+        for (let y = 1; y < ROWS - 1; y++) {
+            for (let x = 1; x < COLS - 1; x++) {
+                let walls = 0;
+                for (let yy = -1; yy <= 1; yy++) {
+                    for (let xx = -1; xx <= 1; xx++) {
+                        if (tempMap[y + yy][x + xx] === 1) walls++;
                     }
-                    if (walls >= 5) nextGen[y][x] = 1;
-                    else if (walls <= 3) nextGen[y][x] = 0;
-                    else nextGen[y][x] = map[y][x];
                 }
+                nextGen[y][x] = (walls >= 4) ? 1 : 0;
             }
-            map = nextGen;
         }
+        map = nextGen;
 
-        // 3. 領域抽出と連結
         let regions = getRegions(map);
         if (regions.length < 1) continue;
+        for (let i = 0; i < regions.length - 1; i++) connectRegionsHighlyWinding(regions[i], regions[i + 1]);
 
-        // 全ての領域を連結
-        for (let i = 0; i < regions.length - 1; i++) {
-            connectRegionsHighlyWinding(regions[i], regions[i + 1]);
-        }
-
-        // 4. プレイヤー配置と歩行可能エリアの特定
         let allWalkable = [];
         for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) allWalkable.push({x, y});
-        
-        // 面積チェック (低レベルは30%以上、高レベルは20%以上を確保)
-        let minFloorPercent = currentLevel <= 4 ? 0.35 : 0.22;
-        if (allWalkable.length < (COLS * ROWS) * minFloorPercent) continue;
+        if (allWalkable.length < (COLS * ROWS) * 0.22) continue;
 
         let startPos = allWalkable[Math.floor(Math.random() * allWalkable.length)];
         player = { x: startPos.x, y: startPos.y };
 
-        // BFS探索
         let dists = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
         let q = [{ x: player.x, y: player.y, d: 0, path: [] }];
         dists[player.y][player.x] = 0;
@@ -484,11 +507,7 @@ function generateSimpleMaze() {
             });
         }
 
-        // ゴール距離判定 (低レベルは緩く、高レベルは厳しく)
-        let distFactor = currentLevel <= 4 ? 0.6 : 0.85;
-        let requiredDist = Math.floor(Math.max(COLS, ROWS) * distFactor);
-        
-        if (furthest.d >= requiredDist && furthest.d > 1) {
+        if (furthest.d >= Math.floor(Math.max(COLS, ROWS) * 0.85)) {
             goalPos = { x: furthest.x, y: furthest.y };
             map[goalPos.y][goalPos.x] = 2;
             shortestPath = furthest.path;
@@ -496,7 +515,6 @@ function generateSimpleMaze() {
             found = true;
         }
     }
-    initScentMap();
 }
 
 function getRegions(m) {
@@ -528,18 +546,14 @@ function connectRegionsHighlyWinding(regA, regB) {
     let p1 = regA[Math.floor(Math.random() * regA.length)];
     let p2 = regB[Math.floor(Math.random() * regB.length)];
     let cx = p1.x, cy = p1.y;
-    // 低レベルは迷走率を下げて、道が潰れるのを防ぐ
-    let randomWalkChance = currentLevel <= 4 ? 0.2 : 0.5;
     while (cx !== p2.x || cy !== p2.y) {
-        if (Math.random() > randomWalkChance) {
+        if (Math.random() > 0.5) {
             if (cx !== p2.x && (cy === p2.y || Math.random() < 0.5)) cx += (p2.x > cx ? 1 : -1);
             else cy += (p2.y > cy ? 1 : -1);
         } else {
             let dirs = [[0,1],[0,-1],[1,0],[-1,0]];
             let d = dirs[Math.floor(Math.random() * 4)];
-            if (cx+d[0] > 0 && cx+d[0] < COLS-1 && cy+d[1] > 0 && cy+d[1] < ROWS-1) {
-                cx += d[0]; cy += d[1];
-            }
+            if (cx+d[0] > 0 && cx+d[0] < COLS-1 && cy+d[1] > 0 && cy+d[1] < ROWS-1) { cx += d[0]; cy += d[1]; }
         }
         map[cy][cx] = 0;
     }
@@ -560,9 +574,9 @@ function placeEntities(walkableData) {
         let h = enemyCandidates.pop();
         hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
     }
-    let dogNum = Math.min(3, Math.floor(currentLevel / 5) + (currentLevel > 1 ? 1 : 0)); 
-    if (currentLevel === 1) dogNum = 0;
-    for(let i=0; i<dogNum && enemyCandidates.length > 0; i++) {
+    let dogLimit = currentLevel === 2 ? 1 : 0; // Level 2は1匹、Level 1は0匹
+    if (currentLevel >= 3) dogLimit = Math.min(3, Math.floor(currentLevel / 5) + 1);
+    for(let i=0; i<dogLimit && enemyCandidates.length > 0; i++) {
         let d = enemyCandidates.pop();
         dogs.push({ x: d.x, y: d.y });
     }
