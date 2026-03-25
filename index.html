@@ -563,8 +563,8 @@ function placeEntities(walkableData) {
     let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
     candidates.sort(() => Math.random() - 0.5);
 
-    // --- Coin Placement (Fixed to 70% of walkable tiles) ---
-    let coinCount = Math.floor(candidates.length * 0.7);
+    // --- Coin Placement (Fixed to 40% of walkable tiles) ---
+    let coinCount = Math.floor(candidates.length * 0.4);
     for(let i=0; i<coinCount; i++) {
         map[candidates[i].y][candidates[i].x] = 3;
     }
