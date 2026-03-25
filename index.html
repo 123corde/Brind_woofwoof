@@ -46,14 +46,14 @@
         #auto-status { color: #fff; font-size: 1.1em; font-weight: bold; }
         #level-display { cursor: pointer; user-select: none; -webkit-user-select: none; line-height: 1.2; font-weight: bold; font-size: 28px; padding: 5px; border-radius: 5px; }
         #ranking-display {
-    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.9); color: white; padding: 20px; border-radius: 10px;
-    z-index: 1000; text-align: center; min-width: 280px; display: none;
-    border: 2px solid #ffd700;
-}
-#ranking-table { width: 100%; margin: 15px 0; border-collapse: collapse; }
-#ranking-table th, #ranking-table td { padding: 8px; border-bottom: 1px solid #444; }
-.retry-btn { padding: 10px 20px; background: #ffd700; color: #000; border: none; cursor: pointer; font-weight: bold; }
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9); color: white; padding: 20px; border-radius: 10px;
+            z-index: 1000; text-align: center; min-width: 280px; display: none;
+            border: 2px solid #ffd700;
+        }
+        #ranking-table { width: 100%; margin: 15px 0; border-collapse: collapse; }
+        #ranking-table th, #ranking-table td { padding: 8px; border-bottom: 1px solid #444; }
+        .retry-btn { padding: 10px 20px; background: #ffd700; color: #000; border: none; cursor: pointer; font-weight: bold; }
         
         .kb-selected {
             outline: 4px solid #ccc !important;
@@ -106,7 +106,7 @@
             <div id="auto-status"></div>
             <div id="flashlight-display"></div>
         </div>
-        <div id="level-text-ui" style="font-size: 1.1em; color: #fff; margin-bottom: 2px;">Level 1/20</div>
+        <div id="level-text-ui" style="font-size: 1.1em; color: #fff; margin-bottom: 2px;">Level 1/10</div>
         <div id="total-coins" style="color: #ffd700;">所持コイン: 0</div>
         <div id="ver-text" style="font-size: 0.85em; margin-top: 5px; color: #aaa;"></div>
     </div>
@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.2.1";
+const GAME_VERSION = "25.2.2";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -144,7 +144,7 @@ let autoStartTimeout = null;
 let countdownInterval = null;
 let isManualMode = false; 
 
-let currentLevel = 1, totalCoins = 101000, coinMultiplier = 1; 
+let currentLevel = 1, totalCoins = 0, coinMultiplier = 1; 
 let hasAmulet = false, hasAutoDevice = false, hasDevGlasses = false;
 let hasHeadphone = false;
 let currentBGM = null; 
@@ -264,12 +264,15 @@ function updateUI() {
     const slider = document.querySelector('.slider');
     const devBtn = document.getElementById('dev-glass-btn');
     toggleContainer.style.visibility = (currentLevel === 1) ? 'hidden' : 'visible';
-    const isHard = currentLevel >= 11 && currentLevel <= 15;
-    const isExtreme = currentLevel >= 16;
+    
+    const isHard = currentLevel >= 6 && currentLevel <= 9;
+    const isExtreme = currentLevel === 10;
+    
     startContainer.style.boxShadow = "none";
     startBtn.style.boxShadow = "none";
     startBtn.classList.remove('extreme-shake');
     slider.style.setProperty('--toggle-color', "#28a745");
+    
     if (isExtreme) {
         const modeColor = "#dc3545"; 
         startBtn.style.backgroundColor = modeColor;
@@ -290,17 +293,20 @@ function updateUI() {
         startContainer.style.border = "none";
         levelDisplay.innerHTML = `<span style="color:${modeColor};">Level ${currentLevel}</span><br><span style="font-size: 18px; color:${modeColor};">NORMAL MODE</span>`;
     }
-    if (currentLevel >= 11) {
+    
+    if (currentLevel >= 6) {
         document.getElementById('shotgun-btn').style.display = 'block';
         document.getElementById('auto-device-btn').style.display = 'block';
     } else {
         document.getElementById('shotgun-btn').style.display = 'none';
         document.getElementById('auto-device-btn').style.display = 'none';
     }
+    
     if (isManualMode || currentLevel === 1) startBtn.innerText = "START";
     document.getElementById('total-coins').innerText = `所持コイン: ${totalCoins}`;
     document.getElementById('amulet-display').innerText = hasAmulet ? "⛩️" : "";
     devBtn.disabled = (hasDevGlasses || totalCoins < 1000);
+    
     const hpBuyBtn = document.getElementById('hp-buy-btn');
     const cycleBtn = document.getElementById('bgm-cycle-btn');
     const hpDisplay = document.getElementById('headphone-display');
@@ -322,25 +328,31 @@ function updateUI() {
         hpBuyBtn.disabled = totalCoins < 5;
         cycleBtn.style.display = 'none';
     }
+    
     const sBtn = document.getElementById('shotgun-btn');
     if (!hasShotgun) { sBtn.innerText = "💥 ショットガン (50コイン)"; sBtn.disabled = totalCoins < 50; } 
     else { sBtn.innerText = `💥 ショットガンの弾 [${shotgunAmmo}/2] (30コイン)`; sBtn.disabled = (shotgunAmmo >= 2 || totalCoins < 30); }
     document.getElementById('ammo-display').innerText = (hasShotgun && shotgunAmmo > 0) ? "💥".repeat(shotgunAmmo) : "";
+    
     const fBtn = document.getElementById('flashlight-btn');
     if (!hasFlashlight) { fBtn.innerText = "🔦 懐中電灯 (15コイン)"; fBtn.disabled = totalCoins < 15; } 
     else { fBtn.innerText = `🔦 電池10s追加 [${Math.ceil(flashlightBattery)}/${FLASHLIGHT_MAX}s] (5コイン)`; fBtn.disabled = (flashlightBattery >= FLASHLIGHT_MAX || totalCoins < 5); }
+    
     const fDisplay = document.getElementById('flashlight-display');
     if (hasFlashlight && flashlightBattery > 0) {
         fDisplay.innerText = `🔦${Math.ceil(flashlightBattery)}s`;
         fDisplay.style.color = (flashlightBattery < 10) ? "#ff4444" : "#fff";
     } else { fDisplay.innerText = ""; }
+    
     const aBtn = document.getElementById('auto-device-btn');
     aBtn.innerText = "📍 Google Map (200コイン)"; aBtn.disabled = (hasAutoDevice || totalCoins < 200);
     const amuletBtn = document.getElementById('amulet-btn');
     amuletBtn.innerText = `⛩️ 金運アップお守り (25コイン)`; amuletBtn.disabled = (hasAmulet || totalCoins < 25);
+    
     document.getElementById('controls').style.display = hasDevGlasses ? 'block' : 'none';
     let diffTag = isExtreme ? " (EXTREME)" : (isHard ? " (HARD)" : "");
-    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/20${diffTag}`;
+    document.getElementById('level-text-ui').innerText = `Level ${currentLevel}/10${diffTag}`;
+    
     let statusText = "";
     if (hasAutoDevice) {
         if (autoLoadState === "NONE") statusText = "📍";
@@ -377,9 +389,8 @@ function buyDevGlasses() { if (!hasDevGlasses && totalCoins >= 1000) { totalCoin
 function triggerDebugJump() {
     if (gameStarted) return;
     debugClickCount++;
-    if (debugClickCount === 10) { currentLevel = 11; updateUI(); resetAutoStartTimer(); } 
-    else if (debugClickCount === 20) { currentLevel = 16; updateUI(); resetAutoStartTimer(); }
-    else if (debugClickCount === 30) { currentLevel = 20; updateUI(); resetAutoStartTimer(); }
+    if (debugClickCount === 10) { currentLevel = 6; updateUI(); resetAutoStartTimer(); } 
+    else if (debugClickCount === 20) { currentLevel = 10; updateUI(); resetAutoStartTimer(); }
 }
 
 function initScentMap() {
@@ -398,38 +409,30 @@ function updateScentMap() {
     }
 }
 
-// 1マス幅を基本とした、うねうねした細い道を作る関数
 function generateSimpleMaze() {
     const sizeMap = {
-        1: [7, 9],    2: [9, 11],   3: [11, 13],  4: [13, 15],  5: [15, 19],
-        6: [13, 15],  7: [15, 19],  8: [15, 19],  9: [17, 21],  10: [17, 21],
-        11: [15, 19], 12: [15, 19], 13: [17, 21], 14: [17, 21], 15: [17, 21],
-        16: [17, 23], 17: [19, 23], 18: [19, 25], 19: [21, 25], 20: [23, 27]
+        1: [7, 9],    2: [11, 13],  3: [13, 15],  4: [15, 19],  5: [17, 21],
+        6: [15, 19],  7: [17, 21],  8: [19, 23],  9: [21, 25],  10: [23, 27]
     };
     const s = sizeMap[currentLevel] || [23, 27];
     COLS = s[0]; ROWS = s[1];
 
-    if (currentLevel <= 2) {
-        // --- Level 1-2 専用：シンプルアルゴリズム ---
+    if (currentLevel === 1) {
         generateTutorialMaze();
     } else {
-        // --- Level 3以上：複雑なアリの巣セミオートマトン ---
         generateComplexMaze();
     }
     initScentMap();
 }
 
-// Level 1-2用：確実な道を1本作り、周囲を少し広げるだけ
 function generateTutorialMaze() {
     map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
     player = { x: 1, y: 1 };
     goalPos = { x: COLS - 2, y: ROWS - 2 };
 
-    // プレイヤーからゴールまでL字に掘る（確実に道を保証）
     for (let x = player.x; x <= goalPos.x; x++) map[player.y][x] = 0;
     for (let y = player.y; y <= goalPos.y; y++) map[y][goalPos.x] = 0;
 
-    // ランダムに少しだけ床を増やして「洞窟感」を出す
     for (let i = 0; i < (COLS * ROWS) * 0.3; i++) {
         let rx = 1 + Math.floor(Math.random() * (COLS - 2));
         let ry = 1 + Math.floor(Math.random() * (ROWS - 2));
@@ -439,24 +442,21 @@ function generateTutorialMaze() {
     map[player.y][player.x] = 0;
     map[goalPos.y][goalPos.x] = 2;
 
-    // 最短経路を計算（UI表示用など）
     shortestPath = []; 
     for(let x=player.x; x<=goalPos.x; x++) shortestPath.push({x: x, y: player.y});
     for(let y=player.y+1; y<=goalPos.y; y++) shortestPath.push({x: goalPos.x, y: y});
 
-    // アイテム配置
     let walkable = [];
     for(let y=1; y<ROWS-1; y++) for(let x=1; x<COLS-1; x++) if(map[y][x] === 0) walkable.push({x, y});
     placeEntities(walkable);
 }
 
-// Level 3以上用：複雑なうねうね迷路
 function generateComplexMaze() {
     let found = false;
     let attempts = 0;
     while (!found && attempts < 50) {
         attempts++;
-        let wallDensity = Math.min(0.52, 0.40 + (currentLevel * 0.01));
+        let wallDensity = Math.min(0.52, 0.40 + (currentLevel * 0.02));
         let tempMap = Array.from({ length: ROWS }, (_, y) =>
             Array.from({ length: COLS }, (_, x) => {
                 if (x === 0 || x === COLS - 1 || y === 0 || y === ROWS - 1) return 1;
@@ -464,7 +464,6 @@ function generateComplexMaze() {
             })
         );
 
-        // セルオートマトン(1回)
         let nextGen = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
         for (let y = 1; y < ROWS - 1; y++) {
             for (let x = 1; x < COLS - 1; x++) {
@@ -507,7 +506,7 @@ function generateComplexMaze() {
             });
         }
 
-        if (furthest.d >= Math.floor(Math.max(COLS, ROWS) * 0.85)) {
+        if (furthest.d >= Math.floor(Math.max(COLS, ROWS) * 0.80)) {
             goalPos = { x: furthest.x, y: furthest.y };
             map[goalPos.y][goalPos.x] = 2;
             shortestPath = furthest.path;
@@ -563,43 +562,33 @@ function placeEntities(walkableData) {
     let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
     candidates.sort(() => Math.random() - 0.5);
 
-    // コイン配置
-    let coinCount = (currentLevel <= 10) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel;
+    let coinCount = (currentLevel <= 5) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel * 2;
     for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
         map[candidates[i].y][candidates[i].x] = 3;
     }
 
-    // 敵リストの初期化
     dogs = []; hunters = [];
     let safetyZone = new Set();
-    // プレイヤーの周囲1マスには湧かせない
     for(let i=-1; i<=1; i++) for(let j=-1; j<=1; j++) safetyZone.add(`${player.x+j},${player.y+i}`);
     
     let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
 
-    // --- ハンター(Hunter)の出現処理 ---
-    if (currentLevel === 20) {
-        // Level 20 特例：ハンター 20体召喚
-        for (let i = 0; i < 20 && enemyCandidates.length > 0; i++) {
+    if (currentLevel === 10) {
+        for (let i = 0; i < 15 && enemyCandidates.length > 0; i++) {
             let h = enemyCandidates.pop();
             hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
         }
-    } else if (currentLevel >= 16 && enemyCandidates.length > 0) {
-        // 通常の後半ステージ：1体のみ
+    } else if (currentLevel >= 6 && enemyCandidates.length > 0) {
         let h = enemyCandidates.pop();
         hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
     }
 
-    // --- イッヌ(Watchdog)の出現処理 ---
     let dogLimit = 0;
-    if (currentLevel === 2) dogLimit = 1;
-    else if (currentLevel >= 3 && currentLevel < 20) {
-        dogLimit = Math.min(3, Math.floor(currentLevel / 5) + 1);
+    if (currentLevel >= 2 && currentLevel < 10) {
+        dogLimit = Math.min(3, Math.floor(currentLevel / 3) + 1);
     }
-    // Level 20はハンターが多すぎるのでイッヌは0匹にする(任意)
-    if (currentLevel === 20) dogLimit = 0;
+    if (currentLevel === 10) dogLimit = 0;
 
-    // 最短経路上の座標をセット化して、イッヌの候補から除外する
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
     let dogCandidates = enemyCandidates.filter(p => !pathSet.has(`${p.x},${p.y}`));
 
@@ -782,7 +771,7 @@ function movePlayer(dx, dy, isAuto = false) {
     moveHunters();
     if (map[ny][nx] === 2) {
         playGoalSound();
-        if (currentLevel === 20) { 
+        if (currentLevel === 10) { 
             gameStarted = false; stopAllBGM(); if (hunterWoofSnd) hunterWoofSnd.pause();
             setTimeout(async () => {
                 const playerName = prompt("全ステージクリア！\n名前を入力してください:", "スーパーネコ") || "イッヌ";
@@ -818,7 +807,7 @@ function movePlayer(dx, dy, isAuto = false) {
         updateUI();
     } else if (map[ny][nx] === 3) {
         playCoinSound(coinsCollectedInLevel); map[ny][nx] = 0; 
-        totalCoins += ((currentLevel >= 11 ? 10 : 1) * coinMultiplier);
+        totalCoins += ((currentLevel >= 6 ? 10 : 1) * coinMultiplier);
         coinsCollectedInLevel++; updateUI();
     }
     if (isAuto) updateUI();
@@ -858,7 +847,7 @@ function playCoinSound(step) {
         if (hasAmulet) { [1, 1.25, 1.5].forEach((r, i) => setTimeout(() => playOscillator(f * r, 'sine', 0.25), i * 25)); } 
         else { playOscillator(f, 'sine', 0.15); }
     };
-    if (currentLevel >= 11) { for (let i = 0; i < 5; i++) setTimeout(triggerTone, i * 100); } else { triggerTone(); }
+    if (currentLevel >= 6) { for (let i = 0; i < 5; i++) setTimeout(triggerTone, i * 100); } else { triggerTone(); }
 }
 async function playGoalSound() { [523, 659, 783, 1046].forEach((f, i) => setTimeout(() => playOscillator(f, 'triangle', 0.4), i * 150)); }
 
@@ -964,6 +953,7 @@ window.addEventListener('touchend', e => {
 const startContainer = document.getElementById('start-container');
 startContainer.addEventListener('mousedown', (e) => resetAutoStartTimer(e));
 startContainer.addEventListener('touchstart', (e) => resetAutoStartTimer(e), {passive: true});
-window.onresize = draw; updateUI(); draw();</script>
+window.onresize = draw; updateUI(); draw();
+</script>
 </body>
 </html>
