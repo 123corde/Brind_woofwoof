@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.2.6";
+const GAME_VERSION = "25.2.7";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -559,12 +559,11 @@ function connectRegionsHighlyWinding(regA, regB) {
 }
 
 function placeEntities(walkableData) {
-    // プレイヤーの開始位置とゴール位置を除外したタイルを候補にする
     let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
     candidates.sort(() => Math.random() - 0.5);
 
-    // --- Coin Placement (Fixed to 40% of walkable tiles) ---
-    let coinCount = Math.floor(candidates.length * 0.4);
+    // --- Coin Placement (Fixed to 50% of walkable tiles) ---
+    let coinCount = Math.floor(candidates.length * 0.5);
     for(let i=0; i<coinCount; i++) {
         map[candidates[i].y][candidates[i].x] = 3;
     }
@@ -575,19 +574,16 @@ function placeEntities(walkableData) {
     
     let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
 
-    // --- Hunter Placement (Unified Level 6-10) ---
     if (currentLevel >= 6 && enemyCandidates.length > 0) {
         let h = enemyCandidates.pop();
         hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
     }
 
-    // --- Watchdog Placement (Unified Level 2-10) ---
     let dogLimit = 0;
     if (currentLevel >= 2) {
         dogLimit = Math.min(3, Math.floor(currentLevel / 3) + 1);
     }
 
-    // 最短経路上の座標をセット化して、イッヌの候補から除外する
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
     let dogCandidates = enemyCandidates.filter(p => !pathSet.has(`${p.x},${p.y}`));
 
@@ -865,8 +861,36 @@ function draw() {
                 let cs=3, rs=4, cw=size/cs, ch=size/rs;
                 for(let r=0; r<rs; r++) for(let c=0; c<cs; c++) { ctx.fillStyle=(r+c)%2===0?"#fff":"#000"; ctx.fillRect(px+c*cw, py+r*ch, cw, ch); }
             } else if (map[y][x] === 3) {
-                ctx.fillStyle="#ffd700"; ctx.beginPath(); ctx.arc(px+size/2, py+size/2, size/4, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle="#5d4037"; ctx.font=`bold ${size/2.5}px sans-serif`; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("$", px+size/2, py+size/2);
+                // --- 100-yen Silver Coin Design ---
+                const cX = px + size / 2;
+                const cY = py + size / 2;
+                const radius = size / 2.6;
+
+                // Metallic Silver Gradient
+                let grad = ctx.createRadialGradient(cX - radius*0.3, cY - radius*0.3, 0, cX, cY, radius);
+                grad.addColorStop(0, "#fdfdfd"); // Shine
+                grad.addColorStop(0.5, "#bdbdbd"); // Base silver
+                grad.addColorStop(1, "#757575"); // Edge shadow
+
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(cX, cY, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Rim
+                ctx.strokeStyle = "#9e9e9e";
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // "100" Text (Etched look)
+                ctx.fillStyle = "rgba(0,0,0,0.5)"; // Shadow for depth
+                ctx.font = `bold ${size/3.2}px sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("100", cX + 0.5, cY + 0.5);
+                
+                ctx.fillStyle = "#f5f5f5"; // Bright etched surface
+                ctx.fillText("100", cX, cY);
             }
         }
     }
