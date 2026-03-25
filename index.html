@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.2.4";
+const GAME_VERSION = "25.2.3";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -573,28 +573,31 @@ function placeEntities(walkableData) {
     
     let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
 
-    // --- ハンター(Hunter)の出現処理 ---
-// Level 6以上（Level 10含む）は一律でハンター1体を配置
-if (currentLevel >= 6 && enemyCandidates.length > 0) {
-    let h = enemyCandidates.pop();
-    hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
+    if (currentLevel === 10) {
+        for (let i = 0; i < 15 && enemyCandidates.length > 0; i++) {
+            let h = enemyCandidates.pop();
+            hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
+        }
+    } else if (currentLevel >= 6 && enemyCandidates.length > 0) {
+        let h = enemyCandidates.pop();
+        hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
+    }
+
+    let dogLimit = 0;
+    if (currentLevel >= 2 && currentLevel < 10) {
+        dogLimit = Math.min(3, Math.floor(currentLevel / 3) + 1);
+    }
+    if (currentLevel === 10) dogLimit = 0;
+
+    const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
+    let dogCandidates = enemyCandidates.filter(p => !pathSet.has(`${p.x},${p.y}`));
+
+    for(let i=0; i<dogLimit && dogCandidates.length > 0; i++) {
+        let d = dogCandidates.pop();
+        dogs.push({ x: d.x, y: d.y });
+    }
 }
 
-// --- イッヌ(Watchdog)の出現処理 ---
-let dogLimit = 0;
-// Level 2以上（Level 10含む）はレベルに応じた数（最大3匹）を配置
-if (currentLevel >= 2) {
-    dogLimit = Math.min(3, Math.floor(currentLevel / 3) + 1);
-}
-
-// 最短経路上の座標をセット化して、イッヌの候補から除外する
-const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
-let dogCandidates = enemyCandidates.filter(p => !pathSet.has(`${p.x},${p.y}`));
-
-for(let i=0; i<dogLimit && dogCandidates.length > 0; i++) {
-    let d = dogCandidates.pop();
-    dogs.push({ x: d.x, y: d.y });
-}
 function getManhattanDist(p1, p2) {
     return Math.abs(p1.x - p2.x) + Math.abs(p1.y - p2.y);
 }
