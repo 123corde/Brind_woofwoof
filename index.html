@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.2.0";
+const GAME_VERSION = "25.2.1";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -599,8 +599,12 @@ function placeEntities(walkableData) {
     // Level 20はハンターが多すぎるのでイッヌは0匹にする(任意)
     if (currentLevel === 20) dogLimit = 0;
 
-    for(let i=0; i<dogLimit && enemyCandidates.length > 0; i++) {
-        let d = enemyCandidates.pop();
+    // 最短経路上の座標をセット化して、イッヌの候補から除外する
+    const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
+    let dogCandidates = enemyCandidates.filter(p => !pathSet.has(`${p.x},${p.y}`));
+
+    for(let i=0; i<dogLimit && dogCandidates.length > 0; i++) {
+        let d = dogCandidates.pop();
         dogs.push({ x: d.x, y: d.y });
     }
 }
