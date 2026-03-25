@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.2.8";
+const GAME_VERSION = "25.2.9";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -864,17 +864,22 @@ function draw() {
                 // --- Yellow-Brown intermediate color ($ Mark) ---
                 const cX = px + size / 2;
                 const cY = py + size / 2;
-                const radius = size / 2.6;
+                const radius = size / 3.2;
 
-                // intermediate yellow-brown (#c09000)
+                // コインの地の色
                 ctx.fillStyle = "#c09000"; 
                 ctx.beginPath();
                 ctx.arc(cX, cY, radius, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Original brown color for text
+                // 円枠の追加 (ドルマークと同じ色)
+                ctx.strokeStyle = "#5d4037";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // ドルマーク
                 ctx.fillStyle = "#5d4037";
-                ctx.font = `bold ${size/2.5}px sans-serif`;
+                ctx.font = `bold ${size/3.5}px sans-serif`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
                 ctx.fillText("$", cX, cY);
