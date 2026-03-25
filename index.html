@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.2.5";
+const GAME_VERSION = "25.2.6";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -559,11 +559,13 @@ function connectRegionsHighlyWinding(regA, regB) {
 }
 
 function placeEntities(walkableData) {
+    // プレイヤーの開始位置とゴール位置を除外したタイルを候補にする
     let candidates = walkableData.filter(p => (p.x !== goalPos.x || p.y !== goalPos.y) && (p.x !== player.x || p.y !== player.y));
     candidates.sort(() => Math.random() - 0.5);
 
-    let coinCount = (currentLevel <= 5) ? Math.max(1, Math.floor(shortestPath.length / 4)) : currentLevel * 2;
-    for(let i=0; i<Math.min(coinCount, candidates.length); i++) {
+    // --- Coin Placement (Fixed to 70% of walkable tiles) ---
+    let coinCount = Math.floor(candidates.length * 0.7);
+    for(let i=0; i<coinCount; i++) {
         map[candidates[i].y][candidates[i].x] = 3;
     }
 
@@ -585,6 +587,7 @@ function placeEntities(walkableData) {
         dogLimit = Math.min(3, Math.floor(currentLevel / 3) + 1);
     }
 
+    // 最短経路上の座標をセット化して、イッヌの候補から除外する
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
     let dogCandidates = enemyCandidates.filter(p => !pathSet.has(`${p.x},${p.y}`));
 
