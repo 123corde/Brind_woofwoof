@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.2.2";
+const GAME_VERSION = "25.2.3";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -279,7 +279,7 @@ function updateUI() {
         startBtn.classList.add('extreme-shake');
         slider.style.setProperty('--toggle-color', modeColor);
         startContainer.style.border = `10px double ${modeColor}`;
-        levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><br><span class="extreme-shake" style="font-size: 18px; color:${modeColor};">EXTREME MODE</span>`;
+        levelDisplay.innerHTML = `<span class="extreme-shake" style="color:${modeColor};">Level ${currentLevel}</span><br><span class="extreme-shake" style="font-size: 18px; color:${modeColor};">🐕LAST STAGE🐕</span>`;
     } else if (isHard) {
         const modeColor = "#007bff"; 
         startBtn.style.backgroundColor = modeColor;
