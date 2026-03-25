@@ -123,7 +123,7 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-const GAME_VERSION = "25.2.3";
+const GAME_VERSION = "25.2.5";
 const wallImg = new Image(); wallImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/blue_wall.png';
 const playerImg = new Image(); playerImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Me.png';
 const dogImg = new Image(); dogImg.src = 'https://raw.githubusercontent.com/123corde/Brind_woofwoof/main/Watchdog.png';
@@ -573,21 +573,17 @@ function placeEntities(walkableData) {
     
     let enemyCandidates = candidates.filter(p => !safetyZone.has(`${p.x},${p.y}`));
 
-    if (currentLevel === 10) {
-        for (let i = 0; i < 15 && enemyCandidates.length > 0; i++) {
-            let h = enemyCandidates.pop();
-            hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
-        }
-    } else if (currentLevel >= 6 && enemyCandidates.length > 0) {
+    // --- Hunter Placement (Unified Level 6-10) ---
+    if (currentLevel >= 6 && enemyCandidates.length > 0) {
         let h = enemyCandidates.pop();
         hunters.push({ x: h.x, y: h.y, alerted: false, lastDir: { dx: 0, dy: 0 } });
     }
 
+    // --- Watchdog Placement (Unified Level 2-10) ---
     let dogLimit = 0;
-    if (currentLevel >= 2 && currentLevel < 10) {
+    if (currentLevel >= 2) {
         dogLimit = Math.min(3, Math.floor(currentLevel / 3) + 1);
     }
-    if (currentLevel === 10) dogLimit = 0;
 
     const pathSet = new Set(shortestPath.map(p => `${p.x},${p.y}`));
     let dogCandidates = enemyCandidates.filter(p => !pathSet.has(`${p.x},${p.y}`));
